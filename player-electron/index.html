@@ -4,29 +4,49 @@
     <meta charset="UTF-8" />
     <title>Beamer Player</title>
     <style>
-      body {
+      html, body {
+        margin: 0;
+        padding: 0;
+        width: 100%;
+        height: 100%;
         background: black;
         color: white;
+        font-family: system-ui, sans-serif;
         display: flex;
         align-items: center;
         justify-content: center;
-        font-family: sans-serif;
-        font-size: 24px;
+      }
+      #root {
+        text-align: center;
+        max-width: 90vw;
+      }
+      img {
+        margin-top: 20px;
+        max-width: 90vw;
+        max-height: 80vh;
+        object-fit: contain;
       }
     </style>
   </head>
   <body>
-    <div id="status">Starting player...</div>
+    <div id="root">Starting player...</div>
 
     <script>
-      window.playerAPI.startPlayer((creative) => {
-        document.getElementById("status").innerHTML = `
+      // Because nodeIntegration = true, we can use require() here
+      const path = require("path");
+      const { initPlayer } = require("../player-core/dist/index.js");
+
+      function renderCreative(creative) {
+        const root = document.getElementById("root");
+        root.innerHTML = `
           <div>Now Playing:</div>
           <div><strong>${creative.creative_id}</strong></div>
           <div>${creative.type} - ${creative.duration_seconds}s</div>
-          <div>${creative.file_url}</div>
+          <img src="${creative.file_url}" alt="Creative" />
         `;
-      });
+      }
+
+      initPlayer(renderCreative);
     </script>
   </body>
 </html>
