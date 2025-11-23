@@ -25,8 +25,8 @@ export async function updatePlaylist(auth_token: string): Promise<Playlist> {
 
     const dummy: Creative = {
       creative_id: "dummy_1",
-      type: "image",
-      file_url: "https://via.placeholder.com/320x108.png?text=Beamer+Test+Ad",
+      type: "video",
+      file_url: "https://firebasestorage.googleapis.com/v0/b/beamer-f945b.appspot.com/o/Creatives%2FAwari%20billboard%20(1).mp4?alt=media&token=8730f32a-1967-4584-823b-42dcc80b28cf",
       duration_seconds: 10,
     };
 
