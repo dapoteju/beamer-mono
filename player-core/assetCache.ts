@@ -23,7 +23,8 @@ function getCacheDir() {
 
 function getExtensionFromUrl(url: string): string {
   try {
-    const { path: pathname } = new URL(url);
+    const parsed = new URL(url);
+    const pathname = parsed.pathname; // <-- CORRECT
     const lastSegment = pathname.split("/").pop() || "";
     const extMatch = lastSegment.match(/\.(\w+)$/);
     return extMatch ? extMatch[0] : "";
@@ -31,6 +32,7 @@ function getExtensionFromUrl(url: string): string {
     return "";
   }
 }
+
 
 async function cacheCreative(creative: Creative): Promise<Creative> {
   if (!isNodeEnv()) {
