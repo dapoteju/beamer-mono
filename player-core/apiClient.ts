@@ -50,27 +50,33 @@ export async function fetchPlaylist(
     ? `${BASE_URL}/playlist?config_hash=${config_hash}`
     : `${BASE_URL}/playlist`;
 
-  const res = await fetch(url, {
-    headers: {
-      ...authHeader(auth_token),
-    },
-  });
+  try {
+    const res = await fetch(url, {
+      headers: {
+        ...authHeader(auth_token),
+      },
+    });
 
-  if (res.status === 304) {
-    // No changes
+    if (res.status === 304) {
+      // No changes since last config_hash
+      return null;
+    }
+
+    const json = await res.json();
+
+    if (json.status !== "success") {
+      console.error("Failed to fetch playlist:", json);
+      return null;
+    }
+
+    return json.data as Playlist;
+  } catch (err) {
+    console.error("Playlist fetch failed (probably offline):", err);
+    // 🔴 IMPORTANT: returning null lets updatePlaylist() fall back to local playlist
     return null;
   }
-
-  const json = await res.json();
-
-  if (json.status !== "success") {
-    console.error("Failed to fetch playlist:", json);
-    return null;
-  }
-
-  // Assuming json.data is shaped like Playlist
-  return json.data as Playlist;
 }
+
 
 export async function sendPlaybackEvent(auth_token: string, event: PlaybackEvent) {
   const res = await fetch(`${BASE_URL}/events/playbacks`, {
