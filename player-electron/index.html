@@ -36,6 +36,7 @@
 
       function renderCreative(creative) {
         const root = document.getElementById("root");
+        const src = creative.local_file_path || creative.file_url;
 
         if (creative.type === "video") {
           root.innerHTML = `
@@ -43,7 +44,7 @@
             <div><strong>${creative.creative_id}</strong></div>
             <div>${creative.duration_seconds}s</div>
             <video id="creative-video"
-                   src="${creative.file_url}"
+                   src="${src}"
                    autoplay
                    muted
                    playsinline
@@ -58,12 +59,13 @@
             <div>Now Playing (IMAGE):</div>
             <div><strong>${creative.creative_id}</strong></div>
             <div>${creative.duration_seconds}s</div>
-            <img src="${creative.file_url}" alt="Creative" />
+            <img src="${src}" alt="Creative" />
           `;
         }
       }
 
       initPlayer(renderCreative);
     </script>
+
   </body>
 </html>

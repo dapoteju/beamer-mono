@@ -1,6 +1,7 @@
 import { loadJSON, saveJSON } from "./storage";
 import { Playlist, Creative } from "./types";
 import { fetchPlaylist } from "./apiClient";
+import { cachePlaylistAssets } from "./assetCache";
 
 export async function loadLocalPlaylist(): Promise<Playlist | null> {
   return loadJSON("playlist.json");
@@ -19,15 +20,16 @@ export async function updatePlaylist(auth_token: string): Promise<Playlist> {
     throw new Error("No playlist available (remote failed, no local cache)");
   }
 
-  // 🔹 DEV ONLY: if playlist is empty, inject a dummy creative for testing
+  // DEV ONLY: if playlist is empty, inject a dummy creative for testing
   if (!Array.isArray(playlist.playlist) || playlist.playlist.length === 0) {
     console.warn("Remote playlist is empty. Injecting a dummy test creative (DEV ONLY).");
 
     const dummy: Creative = {
       creative_id: "dummy_1",
       type: "video",
-      file_url: "https://firebasestorage.googleapis.com/v0/b/beamer-f945b.appspot.com/o/Creatives%2FAwari%20billboard%20(1).mp4?alt=media&token=8730f32a-1967-4584-823b-42dcc80b28cf",
-      duration_seconds: 7, // or whatever you want
+      file_url:
+        "https://firebasestorage.googleapis.com/v0/b/beamer-f945b.appspot.com/o/Creatives%2FAwari%20billboard%20(1).mp4?alt=media&token=8730f32a-1967-4584-823b-42dcc80b28cf",
+      duration_seconds: 7,
     };
 
     playlist = {
@@ -36,7 +38,10 @@ export async function updatePlaylist(auth_token: string): Promise<Playlist> {
     };
   }
 
-  // Save to disk
-  saveJSON("playlist.json", playlist);
-  return playlist;
+  // ⬇️ NEW: cache assets locally (Node/Electron only)
+  const playlistWithCache = await cachePlaylistAssets(playlist);
+
+  // Save to disk (includes local_file_path)
+  saveJSON("playlist.json", playlistWithCache);
+  return playlistWithCache;
 }

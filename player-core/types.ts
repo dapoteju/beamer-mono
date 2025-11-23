@@ -3,7 +3,10 @@ export interface Creative {
   type: "image" | "video";
   file_url: string;
   duration_seconds: number;
+  // Optional path to a locally cached file (set by the player, not the API)
+  local_file_path?: string;
 }
+
 
 // This matches what your API actually returns
 export interface Playlist {
