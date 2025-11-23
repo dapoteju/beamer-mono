@@ -19,9 +19,8 @@
       #root {
         text-align: center;
         max-width: 90vw;
-        word-wrap: break-word;
       }
-      img {
+      img, video {
         margin-top: 20px;
         max-width: 90vw;
         max-height: 80vh;
@@ -33,35 +32,38 @@
     <div id="root">Starting player...</div>
 
     <script>
-      const root = document.getElementById("root");
+      const { initPlayer } = require("../player-core/dist/index.js");
 
-      (async () => {
-        try {
-          // Load the compiled player-core module
-          const playerCore = require("../player-core/dist/index.js");
-          const initPlayer = playerCore.initPlayer || playerCore.default || playerCore;
+      function renderCreative(creative) {
+        const root = document.getElementById("root");
 
-          if (typeof initPlayer !== "function") {
-            root.innerText = "Player error: initPlayer is not a function";
-            console.error("playerCore module:", playerCore);
-            return;
+        if (creative.type === "video") {
+          root.innerHTML = `
+            <div>Now Playing (VIDEO):</div>
+            <div><strong>${creative.creative_id}</strong></div>
+            <div>${creative.duration_seconds}s</div>
+            <video id="creative-video"
+                   src="${creative.file_url}"
+                   autoplay
+                   muted
+                   playsinline
+                   loop></video>
+          `;
+          const video = document.getElementById("creative-video");
+          if (video) {
+            video.play().catch(() => {});
           }
-
-          function renderCreative(creative) {
-            root.innerHTML = `
-              <div>Now Playing:</div>
-              <div><strong>${creative.creative_id}</strong></div>
-              <div>${creative.type} - ${creative.duration_seconds}s</div>
-              <img src="${creative.file_url}" alt="Creative" />
-            `;
-          }
-
-          await initPlayer(renderCreative);
-        } catch (err) {
-          console.error(err);
-          root.innerText = "Player error: " + (err && err.message ? err.message : String(err));
+        } else {
+          root.innerHTML = `
+            <div>Now Playing (IMAGE):</div>
+            <div><strong>${creative.creative_id}</strong></div>
+            <div>${creative.duration_seconds}s</div>
+            <img src="${creative.file_url}" alt="Creative" />
+          `;
         }
-      })();
+      }
+
+      initPlayer(renderCreative);
     </script>
   </body>
 </html>
