@@ -1,0 +1,14 @@
+{
+  "screen_id": "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee",
+  "region": "NG",
+  "city": "Lagos",
+  "config_hash": "012f166ac998ba23",
+  "playlist": [
+    {
+      "creative_id": "dummy_1",
+      "type": "image",
+      "file_url": "https://via.placeholder.com/320x108.png?text=Beamer+Test+Ad",
+      "duration_seconds": 10
+    }
+  ]
+}
