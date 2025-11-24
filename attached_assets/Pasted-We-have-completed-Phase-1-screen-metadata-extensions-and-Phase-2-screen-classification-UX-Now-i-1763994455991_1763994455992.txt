@@ -1,0 +1,304 @@
+We have completed Phase 1 (screen metadata extensions) and Phase 2 (screen classification UX).
+Now implement Phase 3A, which restructures organisations into:
+
+Publishers (owners/managers of Inventory)
+
+Advertisers (buyers of campaigns)
+
+This must be non-breaking, fully compatible with the current CMS/Backend, and implemented in a safe migration path.
+
+This phase includes:
+
+New data model for publisher profiles (including individuals)
+
+Splitting organisations into Advertisers, Publishers, Internal
+
+Updating Screens so they belong to Publishers, not Organisations
+
+New CMS navigation using the DOOH-standard term Inventory
+
+New CRUD pages for Publishers / Advertisers
+
+Updating Screens Create/Edit to use the new Publisher model
+
+0. CONTEXT (IMPORTANT)
+
+Today:
+
+organisations table stores both publishers AND advertisers
+
+Screens reference organisations indirectly
+
+Users belong to an organisation and have orgType + role
+
+There is no proper publisher profile concept
+
+CMS shows an “Organisations” section only for internal users
+
+Screens are effectively part of "inventory" but are placed under organisations
+
+We now need a professional DOOH-grade structure:
+
+Publishers
+
+Own Inventory (screens)
+
+Can be organisations OR individuals
+
+May have vehicles
+
+Have profiles
+
+Advertisers
+
+Own campaigns
+
+Have their own profile data
+
+Internal
+
+Full visibility and control
+
+CMS must reflect this separation.
+
+1. DATABASE CHANGES (SAFE & NON-BREAKING)
+1.1 Add an explicit organisation category
+
+Add to organisations table:
+
+organisation_category text CHECK ('advertiser', 'publisher', 'internal') NOT NULL DEFAULT 'advertiser'
+
+
+Backfill:
+
+If organisation has linked screens → publisher
+
+If organisation has campaigns → advertiser
+
+Beamer org → internal
+
+1.2 Create publisher_profiles table
+publisher_profiles
+  id               text primary key
+  organisation_id  text nullable FK -> organisations.id
+  publisher_type   text CHECK ('organisation', 'individual') NOT NULL
+  full_name        text nullable
+  phone_number     text nullable
+  email            text nullable
+  address          text nullable
+  notes            text nullable
+  created_at       timestamp
+  updated_at       timestamp
+
+1.3 Migrate existing publishers
+
+For each organisation with organisation_category='publisher':
+
+Create a publisher_profile:
+
+publisher_type = "organisation"
+
+organisation_id = org.id
+
+full_name = null
+
+Use organisation.billing_email for email where appropriate
+
+1.4 Update screens table
+
+Add publisherId (FK → publisher_profiles.id)
+
+Migrate:
+
+If publisherOrgId exists → map it to the appropriate publisher_profile.id
+
+After migration, keep publisherOrgId temporarily for backward compatibility but mark as deprecated.
+
+2. BACKEND API UPDATES
+2.1 New Publisher API
+
+Create:
+
+GET /api/publishers
+GET /api/publishers/:id
+POST /api/publishers
+PATCH /api/publishers/:id
+
+
+Publisher payload includes:
+
+publisher_type (organisation | individual)
+
+organisation_id (only if organisation-based)
+
+full_name, phone, email
+
+address, notes
+
+2.2 New Advertiser API
+
+Create:
+
+GET /api/advertisers
+GET /api/advertisers/:id
+POST /api/advertisers
+PATCH /api/advertisers/:id
+
+
+Advertiser maps to an organisation with organisation_category='advertiser'.
+
+2.3 Update Screens API
+
+GET /api/screens and GET /api/screens/:id must now return:
+
+publisher: {
+   id
+   publisher_type
+   full_name
+   phone
+   email
+   organisation (if applicable)
+}
+
+2.4 Permissions
+
+Internal users → full access
+
+Publisher users → access only to their publisher profile + their inventory
+
+Advertisers → access only to their profile + campaigns
+
+Update backend route guards accordingly.
+
+3. CMS NAVIGATION UPDATES (IMPORTANT)
+
+Replace the current “Organisations” section with Inventory-based structure.
+
+For internal users:
+Inventory
+  - Screens
+  - Players
+  - Vehicles (optional future)
+Publishers
+  - List Publishers
+  - Publisher Detail
+Advertisers
+  - List Advertisers
+  - Advertiser Detail
+Campaigns
+Reporting
+
+For publisher users:
+My Publisher Profile
+Inventory
+  - My Screens
+  - My Vehicles (future)
+Reports
+
+For advertiser users:
+My Advertiser Profile
+Campaigns
+Reports
+
+
+Implement navigation using the existing layout system and route guards.
+
+4. CMS UI IMPLEMENTATION (Frontend)
+4.1 Publishers UI
+
+Create:
+
+cms-web/src/pages/publishers/PublishersList.tsx
+cms-web/src/pages/publishers/PublisherDetail.tsx
+cms-web/src/components/PublisherFormModal.tsx
+
+
+List should show:
+
+Publisher Name (full_name OR organisation.name)
+
+Type (Individual / Organisation)
+
+of Screens in their Inventory
+of Vehicles
+
+Contact info
+
+Publisher Create/Edit modal supports:
+
+Selecting publisher_type
+
+If organisation → dropdown of publisher organisations
+
+If individual → full_name, phone, email, address fields
+
+4.2 Advertisers UI
+
+Create:
+
+cms-web/src/pages/advertisers/AdvertisersList.tsx
+cms-web/src/pages/advertisers/AdvertiserDetail.tsx
+cms-web/src/components/AdvertiserFormModal.tsx
+
+
+Support CRUD for advertiser profiles.
+
+4.3 Update Screen Create/Edit modal
+
+Replace old organisation dropdown with:
+
+New publisher dropdown
+
+Loaded via /api/publishers/dropdown
+
+4.4 Update Screens list
+
+Replace “Organisation” column with “Publisher”
+
+Format:
+
+“John Doe (Individual Publisher)”
+
+“FleetCo Ltd (Organisation Publisher)”
+
+4.5 Screen Detail page
+
+Show publisher section:
+
+Type
+
+Name
+
+Email
+
+Phone
+
+Linked organisation if applicable
+
+5. NON-BREAKING REQUIREMENTS
+
+Screens CRUD must continue to work
+
+Player assignment must continue to work
+
+Vehicles must remain selectable
+
+Classifications must continue to work
+
+Heartbeats, PoP, campaigns must not break
+
+User sessions and auth must remain unchanged
+
+6. AFTER IMPLEMENTATION, PROVIDE:
+
+List of DB schema changes
+
+Updated backend modules
+
+New CMS pages & modified files
+
+Example responses for /api/publishers & /api/advertisers
+
+Confirmation that screens continue to function normally
+
+Confirmation that CMS builds with no TS errors

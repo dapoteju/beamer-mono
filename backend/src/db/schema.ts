@@ -45,6 +45,33 @@ export const organisations = pgTable("organisations", {
   createdAt: timestamp("created_at", { withTimezone: true })
     .defaultNow()
     .notNull(),
+  
+  // Phase 3A: Organisation category for publisher/advertiser separation
+  organisationCategory: orgTypeEnum("organisation_category").notNull().default("advertiser"),
+});
+
+// --- Publisher Profiles (Phase 3A) ---
+
+export const publisherTypeEnum = pgEnum("publisher_type", [
+  "organisation",
+  "individual",
+]);
+
+export const publisherProfiles = pgTable("publisher_profiles", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  organisationId: uuid("organisation_id").references(() => organisations.id),
+  publisherType: publisherTypeEnum("publisher_type").notNull(),
+  fullName: text("full_name"),
+  phoneNumber: text("phone_number"),
+  email: text("email"),
+  address: text("address"),
+  notes: text("notes"),
+  createdAt: timestamp("created_at", { withTimezone: true })
+    .defaultNow()
+    .notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true })
+    .defaultNow()
+    .notNull(),
 });
 
 // --- Vehicles (Phase 1: Vehicle metadata) ---
@@ -88,6 +115,9 @@ export const screens = pgTable("screens", {
   createdAt: timestamp("created_at", { withTimezone: true })
     .defaultNow()
     .notNull(),
+  
+  // Phase 3A: New publisher profile reference (nullable for migration, will be required later)
+  publisherId: uuid("publisher_id").references(() => publisherProfiles.id),
   
   // Phase 1: Extended metadata (all nullable, non-breaking)
   screenClassification: text("screen_classification").default("vehicle"), // vehicle, billboard, indoor
