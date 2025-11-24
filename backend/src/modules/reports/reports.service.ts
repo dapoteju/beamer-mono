@@ -11,8 +11,9 @@ import {
   regions,
   publisherProfiles,
   organisations,
+  screenLocationHistory,
 } from "../../db/schema";
-import { eq, sql, and, desc, gte, lte } from "drizzle-orm";
+import { eq, sql, and, desc, gte, lte, asc, inArray } from "drizzle-orm";
 
 export interface CampaignReport {
   campaignId: string;
@@ -550,5 +551,164 @@ export async function getCreativeReport(
     width: creativeData.width,
     height: creativeData.height,
     duration_seconds: creativeData.durationSeconds,
+  };
+}
+
+export interface CampaignMobilityReport {
+  campaignId: string;
+  startDate: string;
+  endDate: string;
+  screens: Array<{
+    screenId: string;
+    screenName?: string | null;
+    screenType?: string | null;
+    screenClassification?: string | null;
+    publisherName?: string | null;
+    publisherType?: string | null;
+    points: Array<{
+      lat: number;
+      lng: number;
+      recordedAt: string;
+    }>;
+  }>;
+}
+
+export async function getCampaignMobilityReport(
+  campaignId: string,
+  startDate?: string,
+  endDate?: string
+): Promise<CampaignMobilityReport | null> {
+  const campaign = await db
+    .select()
+    .from(campaigns)
+    .where(eq(campaigns.id, campaignId))
+    .limit(1);
+
+  if (campaign.length === 0) {
+    return null;
+  }
+
+  const campaignData = campaign[0];
+
+  const today = new Date().toISOString().split('T')[0];
+  const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+
+  let effectiveStartDate = startDate || campaignData.startDate || thirtyDaysAgo;
+  let effectiveEndDate = endDate || campaignData.endDate || today;
+
+  const startDateObj = new Date(effectiveStartDate);
+  const endDateObj = new Date(effectiveEndDate);
+  
+  if (isNaN(startDateObj.getTime()) || isNaN(endDateObj.getTime())) {
+    throw new Error("Invalid date format provided");
+  }
+
+  if (startDateObj > endDateObj) {
+    effectiveStartDate = effectiveEndDate;
+    effectiveEndDate = startDate || campaignData.startDate || thirtyDaysAgo;
+    if (new Date(effectiveStartDate) > new Date(effectiveEndDate)) {
+      effectiveEndDate = effectiveStartDate;
+    }
+  }
+
+  const campaignScreensResult = await db
+    .selectDistinct({ screenId: playEvents.screenId })
+    .from(playEvents)
+    .where(eq(playEvents.campaignId, campaignId));
+
+  const campaignScreenIds = campaignScreensResult.map(r => r.screenId);
+
+  if (campaignScreenIds.length === 0) {
+    return {
+      campaignId: campaignData.id,
+      startDate: effectiveStartDate,
+      endDate: effectiveEndDate,
+      screens: [],
+    };
+  }
+
+  const locationHistoryResult = await db
+    .select({
+      screenId: screenLocationHistory.screenId,
+      latitude: screenLocationHistory.latitude,
+      longitude: screenLocationHistory.longitude,
+      recordedAt: screenLocationHistory.recordedAt,
+    })
+    .from(screenLocationHistory)
+    .where(
+      and(
+        inArray(screenLocationHistory.screenId, campaignScreenIds),
+        gte(screenLocationHistory.recordedAt, new Date(effectiveStartDate)),
+        lte(screenLocationHistory.recordedAt, new Date(effectiveEndDate + 'T23:59:59.999Z'))
+      )
+    )
+    .orderBy(asc(screenLocationHistory.recordedAt));
+
+  const screenIdsWithHistory = [...new Set(locationHistoryResult.map(r => r.screenId))];
+
+  if (screenIdsWithHistory.length === 0) {
+    return {
+      campaignId: campaignData.id,
+      startDate: effectiveStartDate,
+      endDate: effectiveEndDate,
+      screens: [],
+    };
+  }
+
+  const screenMetadataResult = await db
+    .select({
+      screenId: screens.id,
+      screenName: screens.name,
+      screenType: screens.screenType,
+      screenClassification: screens.screenClassification,
+      publisherName: sql<string>`COALESCE(${publisherProfiles.fullName}, ${organisations.name}, 'Unknown')`,
+      publisherType: sql<string>`COALESCE(${publisherProfiles.publisherType}::text, ${organisations.type}::text, 'Unknown')`,
+    })
+    .from(screens)
+    .leftJoin(publisherProfiles, eq(screens.publisherId, publisherProfiles.id))
+    .leftJoin(organisations, eq(screens.publisherOrgId, organisations.id))
+    .where(inArray(screens.id, screenIdsWithHistory));
+
+  const screenMetadataMap = new Map(
+    screenMetadataResult.map(s => [s.screenId, s])
+  );
+
+  const pointsByScreen = new Map<string, Array<{ lat: number; lng: number; recordedAt: string }>>();
+  
+  for (const row of locationHistoryResult) {
+    const screenId = row.screenId;
+    if (!pointsByScreen.has(screenId)) {
+      pointsByScreen.set(screenId, []);
+    }
+    pointsByScreen.get(screenId)!.push({
+      lat: parseFloat(row.latitude),
+      lng: parseFloat(row.longitude),
+      recordedAt: row.recordedAt.toISOString(),
+    });
+  }
+
+  const screensWithMobility = screenIdsWithHistory.map(screenId => {
+    const metadata = screenMetadataMap.get(screenId);
+    const points = pointsByScreen.get(screenId) || [];
+    const screenClassification = metadata?.screenClassification || metadata?.screenType || null;
+    
+    return {
+      screenId,
+      screenName: metadata?.screenName || null,
+      screenType: screenClassification,
+      screenClassification: screenClassification,
+      publisherName: metadata?.publisherName || null,
+      publisherType: metadata?.publisherType || null,
+      points,
+    };
+  });
+
+  screensWithMobility.sort((a, b) => b.points.length - a.points.length);
+
+  return {
+    campaignId: campaignData.id,
+    startDate: effectiveStartDate,
+    endDate: effectiveEndDate,
+    screens: screensWithMobility,
   };
 }

@@ -1,0 +1,444 @@
+You are helping me extend the Beamer CMS Campaign Reporting page to add a new Mobility tab for campaigns that use mobile screens (e.g. vehicle / taxi-top screens).
+
+We already have a solid Delivery tab with:
+
+Campaign selector + date range filters
+
+Backend endpoint:
+GET /api/reports/campaigns/:campaignId?startDate=YYYY-MM-DD&endDate=YYYY-MM-DD
+
+Response (CampaignReport) that includes:
+
+campaignId, startDate, endDate, totalImpressions
+
+byDay[] and byScreen[]
+
+Enriched byScreen items with:
+
+screenId
+
+screenName
+
+screenType (e.g. vehicle, billboard, indoor)
+
+publisherName
+
+publisherType
+
+impressions
+
+Delivery tab UI:
+
+Summary stat cards
+
+Line chart (daily impressions)
+
+Bar chart (top 10 screens)
+
+Pie chart (screen type distribution)
+
+“Impressions by Screen” table with Screen Type & Publisher
+
+CSV exports
+
+Proper loading / error / empty states
+
+We also already have:
+
+GPS/location tracking:
+
+screen_location_history table with (screenId, latitude, longitude, recordedAt)
+
+A Leaflet-based Inventory Map page showing screen locations
+
+Seed data where some screens are vehicle / mobile and have location history
+
+Existing auth / org scoping (internal vs advertiser users) enforced via JWT
+
+Now we want to add a Mobility tab under Campaign Reporting to show where mobile screens actually travelled during the selected date range.
+
+GOAL
+
+Extend /reporting/campaigns to have two tabs:
+
+Delivery (existing Proof-of-Play report)
+
+Mobility (new – only relevant for campaigns with mobile screens and location data)
+
+The Mobility tab should:
+
+Reuse the selected campaign and date range
+
+Fetch mobility data from a new backend endpoint
+
+Show:
+
+Summary metrics
+
+A Leaflet map with movement paths/points for mobile screens in that campaign
+
+A table of mobile screens included in the mobility report
+
+Handle loading / error / empty states cleanly
+
+Respect existing permissions (advertisers see only their campaigns)
+
+1. Backend – Add Campaign Mobility Report Endpoint
+
+Add a new endpoint:
+
+GET /api/reports/campaigns/:campaignId/mobility?startDate=YYYY-MM-DD&endDate=YYYY-MM-DD
+
+Response Type
+
+Define a TypeScript interface like:
+
+export interface CampaignMobilityReport {
+  campaignId: string;
+  startDate: string; // ISO date
+  endDate: string;   // ISO date;
+  screens: {
+    screenId: string;
+    screenName?: string | null;
+    screenType?: string | null; // e.g. 'vehicle', 'billboard', 'indoor'
+    publisherName?: string | null;
+    publisherType?: string | null; // e.g. 'publisher', 'individual'
+    points: {
+      lat: number;
+      lng: number;
+      recordedAt: string; // ISO timestamp
+    }[];
+  }[];
+}
+
+
+Place type + function in the existing backend reports module (where other report handlers live).
+
+Backend Logic
+
+Inside the handler for /api/reports/campaigns/:campaignId/mobility:
+
+Parse inputs:
+
+campaignId from route params
+
+startDate and endDate from query params
+
+Apply the same “smart defaults” as Delivery if dates are missing (e.g. last 30 days or campaign period).
+
+Validate that startDate <= endDate.
+
+Find screens for the campaign:
+
+Use existing relationships:
+
+campaign → bookings → flights → screen IDs (reuse existing logic if possible).
+
+From this set of screens, identify which are mobile:
+
+Primary rule: screens that have location history entries in screen_location_history.
+
+Optionally also use screenType = 'vehicle' to reinforce.
+
+Fetch location history for those screens:
+
+Query screen_location_history:
+
+Filter by screenId IN (...)
+
+Filter recordedAt between startDate and endDate (inclusive).
+
+Group results by screenId.
+
+Sort each screen’s points by recordedAt ascending.
+
+Enrich with screen & publisher metadata:
+
+LEFT JOIN with screens table to get screenName, screenType.
+
+LEFT JOIN with publisher / organisation tables (same logic you already used to enrich byScreen in the Delivery report):
+
+publisherName: profile name → organisation name → 'Unknown'
+
+publisherType: profile type → organisation type → 'Unknown'
+
+Build and return the CampaignMobilityReport object:
+
+Include:
+
+campaignId, startDate, endDate
+
+screens[] only for screens that:
+
+Belong to the campaign
+
+Have at least 1 point in the date range
+
+If no mobile screens / no points:
+
+Return screens: [] (no error, just empty).
+
+Permissions / scoping:
+
+Use the same JWT-based org scoping as the Delivery report:
+
+Advertiser users can only access campaigns they own.
+
+Internal users can access any campaign.
+
+2. Frontend – Tabs in Campaign Reporting
+
+Update the Campaign Reporting page (whatever file holds the /reporting/campaigns UI, e.g. cms-web/src/pages/CampaignReporting.tsx):
+
+Introduce two tabs:
+
+Delivery (existing UI)
+
+Mobility (new UI)
+
+You can implement tabs as:
+
+A simple useState<'delivery' | 'mobility'> + buttons, OR
+
+Reuse any existing Tabs component in your design system.
+
+Behaviour:
+
+The campaign selector and date range remain at the top and are shared.
+
+The user:
+
+Selects campaign + dates
+
+Clicks Load Report (as now)
+
+Delivery tab loads the Delivery report
+
+Mobility tab will load Mobility data when selected (see below)
+
+3. Frontend – API Helper for Mobility
+
+In cms-web/src/api/reports.ts (where CampaignReport is defined), add:
+
+export interface CampaignMobilityReport {
+  campaignId: string;
+  startDate: string;
+  endDate: string;
+  screens: {
+    screenId: string;
+    screenName?: string | null;
+    screenType?: string | null;
+    publisherName?: string | null;
+    publisherType?: string | null;
+    points: {
+      lat: number;
+      lng: number;
+      recordedAt: string;
+    }[];
+  }[];
+}
+
+export async function getCampaignMobilityReport(params: {
+  campaignId: string;
+  startDate: string;
+  endDate: string;
+}): Promise<CampaignMobilityReport> {
+  const { campaignId, startDate, endDate } = params;
+  const query = new URLSearchParams({ startDate, endDate }).toString();
+  const res = await fetch(
+    `/api/reports/campaigns/${campaignId}/mobility?${query}`,
+    { method: "GET", credentials: "include" }
+  );
+  if (!res.ok) {
+    throw new Error(`Failed to fetch mobility report`);
+  }
+  return res.json();
+}
+
+
+Then use React Query (useQuery) in the UI to fetch this when needed.
+
+4. Frontend – Mobility Tab UI
+
+Create a new component for the Mobility tab, e.g.:
+
+cms-web/src/pages/reporting/CampaignMobilityTab.tsx
+
+This component should:
+
+Accept as props:
+
+campaignId
+
+startDate
+
+endDate
+
+A flag like hasLoadedOnce or similar so you know user has clicked Load Report
+
+Use React Query and getCampaignMobilityReport to fetch data when:
+
+campaignId, startDate, endDate are defined
+
+The Mobility tab is active
+
+A. Loading & Error States
+
+While loading:
+
+Show a centered spinner / “Loading mobility data…” message.
+
+On error:
+
+Show an error alert similar to Delivery:
+
+“We couldn’t load mobility data. Please try again. If the problem persists, contact support.”
+
+B. Empty State
+
+If:
+
+report.screens.length === 0
+
+Show a clear empty state like:
+
+No mobile movement data for this campaign and date range.
+This usually means the campaign has no mobile screens or no GPS data was recorded in this period.
+
+C. Summary Metrics
+
+If screens.length > 0, show 3 summary cards, similar styling to Delivery:
+
+Mobile Screens Tracked
+
+screens.length
+
+Total GPS Points
+
+Sum of screen.points.length across all screens
+
+Tracked Date Range
+
+Same startDate → endDate display used in Delivery
+
+(You can add distance later; for now just points + counts.)
+
+D. Map View (Leaflet)
+
+Reuse your existing Leaflet map setup from the Inventory Map page.
+
+Implementation:
+
+Create a reusable MobilityMap component or reuse the existing map component with props.
+
+It should:
+
+Center on an appropriate bounding box that includes all points (use Leaflet’s fitBounds logic).
+
+For each screen:
+
+Draw a polyline using its ordered points (lat/lng).
+
+Optionally, place:
+
+A marker at the first point (start)
+
+A marker at the last point (end)
+
+Use different colors per screen if easy, or a single consistent color otherwise.
+
+For v1, it’s OK to:
+
+Not weight points by impressions (we’re showing movement, not delivery intensity).
+
+Just show raw paths/points.
+
+If performance is a concern with many points:
+
+Optionally sample points (e.g. keep every Nth point per screen or limit to last X points).
+
+E. Screens Table
+
+Below the map, add a table listing all mobile screens included:
+
+Columns:
+
+Screen Name or ID
+
+Use screenName || screenId
+
+Screen Type
+
+Use the same badge style as the Delivery table (vehicle, billboard, indoor)
+
+Publisher
+
+publisherName (with publisherType in parentheses if available)
+
+GPS Points
+
+points.length
+
+First Seen
+
+Minimum recordedAt for that screen in the range (format as date/time)
+
+Last Seen
+
+Maximum recordedAt for that screen in the range
+
+Sort descending by GPS Points so the most active screens appear first.
+
+5. Integration into Existing Campaign Reporting Page
+
+In the main Campaign Reporting page:
+
+Wire up the tabs:
+
+When activeTab === 'delivery', show existing Delivery UI.
+
+When activeTab === 'mobility', render <CampaignMobilityTab ... />.
+
+The Mobility tab should only attempt to load when:
+
+There is a valid campaignId, startDate, endDate.
+
+The user has clicked Load Report at least once (so we don’t auto-fire loads on page mount with no filters).
+
+Optional:
+If you want to be clever, you can hide the Mobility tab entirely if:
+
+After first fetch, screens.length === 0 for multiple campaigns
+…but for now, it’s okay to always show the tab and rely on the empty state message.
+
+6. Permissions
+
+Do not change permission logic.
+
+Ensure the new mobility endpoint uses the same org / auth scoping as the Delivery report.
+
+Advertiser users must not be able to fetch mobility for campaigns they don’t own.
+
+7. Deliverables Summary
+
+When you’re done, please output a brief summary:
+
+Backend:
+
+New endpoint path and file(s) changed.
+
+Any helper functions created or reused.
+
+Frontend:
+
+Files created/updated (e.g. CampaignMobilityTab, updates to CampaignReporting, reports.ts).
+
+How tabs are implemented.
+
+How loading/error/empty states behave for Mobility.
+
+How to test:
+
+Example campaign from seed data that has mobile screens + GPS history.
+
+Steps to see the map and screens table in action.

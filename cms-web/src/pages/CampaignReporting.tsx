@@ -5,6 +5,7 @@ import { fetchCampaigns } from "../api/campaigns";
 import { getCampaignReport, type CampaignReport } from "../api/reports";
 import { useAuthStore } from "../store/authStore";
 import { downloadCsv } from "../utils/csv";
+import CampaignMobilityTab from "./reporting/CampaignMobilityTab";
 import {
   LineChart,
   Line,
@@ -21,6 +22,8 @@ import {
   ResponsiveContainer,
 } from "recharts";
 
+type ReportTab = "delivery" | "mobility";
+
 export default function CampaignReporting() {
   const { user } = useAuthStore();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -30,6 +33,8 @@ export default function CampaignReporting() {
   );
   const [startDate, setStartDate] = useState<string>("");
   const [endDate, setEndDate] = useState<string>("");
+  const [activeTab, setActiveTab] = useState<ReportTab>("delivery");
+  const [hasLoadedOnce, setHasLoadedOnce] = useState(false);
   const [reportData, setReportData] = useState<CampaignReport | null>(null);
   const [isLoadingReport, setIsLoadingReport] = useState(false);
   const [reportError, setReportError] = useState<string | null>(null);
@@ -73,6 +78,7 @@ export default function CampaignReporting() {
         endDate,
       });
       setReportData(data);
+      setHasLoadedOnce(true);
     } catch (err: any) {
       console.error("Failed to load report:", err);
       setReportError(
@@ -252,17 +258,51 @@ export default function CampaignReporting() {
         )}
       </div>
 
-      {isLoadingReport && !reportData && (
-        <div className="bg-white rounded-lg border border-zinc-200 p-12">
-          <div className="flex flex-col items-center justify-center space-y-4">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
-            <p className="text-sm text-zinc-600">Loading report...</p>
-          </div>
-        </div>
-      )}
+      <div className="border-b border-zinc-200">
+        <nav className="-mb-px flex space-x-8" aria-label="Tabs">
+          <button
+            onClick={() => setActiveTab("delivery")}
+            className={`whitespace-nowrap border-b-2 py-4 px-1 text-sm font-medium ${
+              activeTab === "delivery"
+                ? "border-blue-600 text-blue-600"
+                : "border-transparent text-zinc-500 hover:text-zinc-700 hover:border-zinc-300"
+            }`}
+          >
+            Delivery Report
+          </button>
+          <button
+            onClick={() => setActiveTab("mobility")}
+            className={`whitespace-nowrap border-b-2 py-4 px-1 text-sm font-medium ${
+              activeTab === "mobility"
+                ? "border-blue-600 text-blue-600"
+                : "border-transparent text-zinc-500 hover:text-zinc-700 hover:border-zinc-300"
+            }`}
+          >
+            Mobility
+          </button>
+        </nav>
+      </div>
 
-      {reportData && !isLoadingReport && (
+      {activeTab === "mobility" ? (
+        <CampaignMobilityTab
+          campaignId={selectedCampaignId}
+          startDate={startDate}
+          endDate={endDate}
+          hasLoadedOnce={hasLoadedOnce}
+        />
+      ) : (
         <>
+          {isLoadingReport && !reportData && (
+            <div className="bg-white rounded-lg border border-zinc-200 p-12">
+              <div className="flex flex-col items-center justify-center space-y-4">
+                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+                <p className="text-sm text-zinc-600">Loading report...</p>
+              </div>
+            </div>
+          )}
+
+          {reportData && !isLoadingReport && (
+            <>
           {reportData.totalImpressions === 0 ? (
             <div className="bg-white rounded-lg border border-zinc-200 p-12">
               <div className="text-center">
@@ -578,6 +618,8 @@ export default function CampaignReporting() {
                   </div>
                 )}
               </div>
+            </>
+          )}
             </>
           )}
         </>
