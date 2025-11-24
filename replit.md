@@ -38,10 +38,11 @@ beamer-mono/
 - **Build Tool**: Vite 7.2.4
 - **Language**: TypeScript 5.9.3
 - **Styling**: Tailwind CSS 4.1.17
-- **State Management**: Zustand 5.0.8
+- **State Management**: Zustand 5.0.8 (with localStorage persistence)
 - **Data Fetching**: TanStack Query 5.90.10
-- **HTTP Client**: Axios 1.13.2
-- **Routing**: React Router DOM 7.9.6
+- **HTTP Client**: Axios 1.13.2 (configured with auth headers)
+- **Routing**: React Router DOM 7.9.6 (with protected routes)
+- **Authentication**: JWT-based with auto-hydration from localStorage
 
 ### API Modules
 - Health checks
@@ -58,8 +59,14 @@ beamer-mono/
 ## Configuration
 
 ### Environment Variables
+
+**Backend:**
 - `DATABASE_URL`: PostgreSQL connection (auto-configured by Replit)
 - `PORT`: API server port (default: 3000)
+- `JWT_SECRET`: Secret key for JWT token signing (configured)
+
+**Frontend:**
+- `VITE_API_URL`: Backend API URL (default: http://localhost:3000/api)
 
 ### Workflows
 - **Backend API**: Runs `npm run dev` in backend directory
@@ -138,7 +145,45 @@ Users table includes:
 - JWT middleware for route protection
 - Environment-based JWT secret
 
+## CMS Frontend Authentication
+
+### Implementation
+- **Login Page**: Beautiful form with email/password inputs and error handling
+- **Protected Routes**: Automatic redirect to /login for unauthenticated users
+- **Session Persistence**: Auto-login on page refresh using localStorage
+- **User Display**: Topbar shows user full name, email, and role badge
+- **Logout**: Clears session and redirects to login page
+
+### Technical Details
+- **API Client**: Axios instance with automatic auth header injection
+- **Auth Store**: Zustand store with hasHydrated flag to prevent race conditions
+- **Auth Initializer**: React component that hydrates auth state on app load
+- **Route Protection**: ProtectedRoute component with loading state during hydration
+
+### Files Created
+- `cms-web/src/api/client.ts` - Axios API client configuration
+- `cms-web/src/api/auth.ts` - Auth API helpers and TypeScript types
+- `cms-web/src/store/authStore.ts` - Zustand auth store with persistence
+- `cms-web/src/pages/Login.tsx` - Login page component
+- `cms-web/.env` - Environment variables (VITE_API_URL)
+
+### Files Modified
+- `cms-web/src/router/index.tsx` - Added ProtectedRoute and /login route
+- `cms-web/src/layouts/AppLayout.tsx` - Updated topbar with real user data and logout
+- `cms-web/src/main.tsx` - Added AuthInitializer for proper hydration
+
 ## Recent Changes
+- November 24, 2025: CMS Frontend Authentication Integration
+  - Implemented complete authentication flow in CMS frontend
+  - Created API client with Axios and auth token management
+  - Built Zustand auth store with localStorage persistence
+  - Created beautiful login page with form validation
+  - Added route protection with ProtectedRoute component
+  - Updated AppLayout topbar with user info (name, email, role badge) and logout button
+  - Fixed hydration race condition with hasHydrated flag and AuthInitializer component
+  - All TypeScript compiles with no errors
+  - Production-ready and architect-approved
+
 - November 24, 2025: Authentication System Implementation
   - Created comprehensive JWT-based authentication system
   - Implemented user management with role-based access control (admin, ops, viewer)
