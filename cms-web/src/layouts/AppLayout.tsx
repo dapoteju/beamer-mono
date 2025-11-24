@@ -1,4 +1,5 @@
-import { NavLink, Outlet } from "react-router-dom";
+import { NavLink, Outlet, useNavigate } from "react-router-dom";
+import { useAuthStore } from "../store/authStore";
 
 const navItems = [
   { to: "/dashboard", label: "Dashboard" },
@@ -37,13 +38,55 @@ function Sidebar() {
 }
 
 function Topbar() {
+  const navigate = useNavigate();
+  const { user, logout } = useAuthStore();
+
+  function handleLogout() {
+    logout();
+    navigate("/login");
+  }
+
+  const getRoleBadgeColor = (role: string) => {
+    switch (role) {
+      case "admin":
+        return "bg-purple-100 text-purple-700";
+      case "ops":
+        return "bg-blue-100 text-blue-700";
+      case "viewer":
+        return "bg-gray-100 text-gray-700";
+      default:
+        return "bg-gray-100 text-gray-700";
+    }
+  };
+
   return (
     <header className="h-16 border-b border-zinc-200 flex items-center justify-between px-6 bg-white">
       <div className="text-sm text-zinc-500">Internal CMS</div>
 
-      <div className="flex items-center gap-3 text-sm">
-        <span className="text-zinc-600">Signed in as</span>
-        <span className="font-medium text-zinc-900">Test User</span>
+      <div className="flex items-center gap-4">
+        <div className="flex items-center gap-3 text-sm">
+          <div className="text-right">
+            <div className="font-medium text-zinc-900">
+              {user?.fullName || user?.email}
+            </div>
+            <div className="text-xs text-zinc-500">{user?.email}</div>
+          </div>
+          {user?.role && (
+            <span
+              className={`px-2 py-1 text-xs font-medium rounded ${getRoleBadgeColor(
+                user.role
+              )}`}
+            >
+              {user.role}
+            </span>
+          )}
+        </div>
+        <button
+          onClick={handleLogout}
+          className="px-3 py-1.5 text-sm text-zinc-600 hover:text-zinc-900 hover:bg-zinc-100 rounded transition-colors"
+        >
+          Logout
+        </button>
       </div>
     </header>
   );
