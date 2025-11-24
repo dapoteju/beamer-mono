@@ -9,6 +9,7 @@ import {
   deletePublisherProfile,
   getPublisherOrganisations,
   getPublisherDropdownOptions,
+  getPublisherLocationHistory,
 } from "./publishers.service";
 
 export const publishersRouter = Router();
@@ -80,6 +81,40 @@ publishersRouter.get("/dropdown", requireAuth, async (req: AuthRequest, res: Res
 
     const options = await getPublisherDropdownOptions();
     res.json(options);
+  } catch (err) {
+    next(err);
+  }
+});
+
+// GET /api/publishers/:id/location-history - Get location history for all screens of a publisher
+publishersRouter.get("/:id/location-history", requireAuth, async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const publisherId = req.params.id;
+    
+    if (req.user!.orgType === "advertiser") {
+      return res.status(403).json({ error: "Forbidden" });
+    }
+
+    const publisher = await getPublisherProfile(publisherId);
+    if (!publisher) {
+      return res.status(404).json({ error: "Publisher profile not found" });
+    }
+
+    if (req.user!.orgType === "publisher" && publisher.organisationId !== req.user!.orgId) {
+      return res.status(403).json({ error: "Forbidden" });
+    }
+
+    let from = req.query.from ? new Date(req.query.from as string) : undefined;
+    let to = req.query.to ? new Date(req.query.to as string) : undefined;
+
+    if (!from || !to) {
+      to = new Date();
+      from = new Date(to.getTime() - 24 * 60 * 60 * 1000);
+    }
+
+    const locationHistory = await getPublisherLocationHistory(publisherId, from, to);
+
+    res.json(locationHistory);
   } catch (err) {
     next(err);
   }

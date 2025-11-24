@@ -1,6 +1,6 @@
 // src/modules/screens/screens.service.ts
 import { db } from "../../db/client";
-import { screens, organisations, players, heartbeats, playEvents, creatives, campaigns, regions, vehicles, publisherProfiles } from "../../db/schema";
+import { screens, organisations, players, heartbeats, playEvents, creatives, campaigns, regions, vehicles, publisherProfiles, screenLocationHistory } from "../../db/schema";
 import { eq, desc, and, gte, sql, isNull } from "drizzle-orm";
 
 // Phase 3B: Screen code generation helper
@@ -115,6 +115,8 @@ export async function listScreensWithPlayerInfo(filters?: {
       venueAddress: screens.venueAddress,
       latitude: screens.latitude,
       longitude: screens.longitude,
+      // Phase 3B: Last seen timestamp for vehicle screens
+      lastSeenAt: screens.lastSeenAt,
       // Vehicle data (joined)
       vehicle: {
         id: vehicles.id,
@@ -370,6 +372,34 @@ export async function getScreenPlayEvents(
     )
     .orderBy(desc(playEvents.startedAt))
     .limit(limit);
+}
+
+export async function getScreenLocationHistory(
+  screenId: string,
+  from: Date,
+  to: Date
+) {
+  const history = await db
+    .select({
+      recordedAt: screenLocationHistory.recordedAt,
+      latitude: screenLocationHistory.latitude,
+      longitude: screenLocationHistory.longitude,
+    })
+    .from(screenLocationHistory)
+    .where(
+      and(
+        eq(screenLocationHistory.screenId, screenId),
+        gte(screenLocationHistory.recordedAt, from),
+        sql`${screenLocationHistory.recordedAt} <= ${to}`
+      )
+    )
+    .orderBy(screenLocationHistory.recordedAt);
+
+  return history.map(h => ({
+    recordedAt: h.recordedAt.toISOString(),
+    latitude: parseFloat(h.latitude as string),
+    longitude: parseFloat(h.longitude as string),
+  }));
 }
 
 export async function listPlayers() {

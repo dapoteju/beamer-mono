@@ -14,6 +14,7 @@ import PublisherDetail from "../pages/PublisherDetail";
 import Advertisers from "../pages/Advertisers";
 import AdvertiserDetail from "../pages/AdvertiserDetail";
 import Reporting from "../pages/Reporting";
+import InventoryMap from "../pages/InventoryMap";
 import Login from "../pages/Login";
 
 function ProtectedRoute({ children }: { children: ReactElement }) {
@@ -87,6 +88,14 @@ export const router = createBrowserRouter([
         element: (
           <OrgTypeGuard allowedOrgTypes={["beamer_internal", "publisher"]}>
             <ScreenDetail />
+          </OrgTypeGuard>
+        ),
+      },
+      {
+        path: "inventory/map",
+        element: (
+          <OrgTypeGuard allowedOrgTypes={["beamer_internal", "publisher"]}>
+            <InventoryMap />
           </OrgTypeGuard>
         ),
       },

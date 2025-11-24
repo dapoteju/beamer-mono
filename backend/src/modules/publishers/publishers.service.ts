@@ -1,7 +1,7 @@
 // backend/src/modules/publishers/publishers.service.ts
 import { db } from "../../db/client";
-import { publisherProfiles, organisations, screens, vehicles } from "../../db/schema";
-import { eq, sql, and, or } from "drizzle-orm";
+import { publisherProfiles, organisations, screens, vehicles, screenLocationHistory } from "../../db/schema";
+import { eq, sql, and, or, gte } from "drizzle-orm";
 
 export interface PublisherProfileInput {
   publisherType: "organisation" | "individual";
@@ -291,5 +291,46 @@ export async function getPublisherDropdownOptions(): Promise<Array<{
         : `${p.fullName || "Unknown"} (Individual)`,
     publisherType: p.publisherType,
     organisationId: p.organisationId,
+  }));
+}
+
+export async function getPublisherLocationHistory(
+  publisherId: string,
+  from: Date,
+  to: Date
+) {
+  const publisherScreens = await db
+    .select({ id: screens.id })
+    .from(screens)
+    .where(eq(screens.publisherId, publisherId));
+
+  const screenIds = publisherScreens.map(s => s.id);
+
+  if (screenIds.length === 0) {
+    return [];
+  }
+
+  const history = await db
+    .select({
+      screenId: screenLocationHistory.screenId,
+      recordedAt: screenLocationHistory.recordedAt,
+      latitude: screenLocationHistory.latitude,
+      longitude: screenLocationHistory.longitude,
+    })
+    .from(screenLocationHistory)
+    .where(
+      and(
+        sql`${screenLocationHistory.screenId} = ANY(${screenIds})`,
+        gte(screenLocationHistory.recordedAt, from),
+        sql`${screenLocationHistory.recordedAt} <= ${to}`
+      )
+    )
+    .orderBy(screenLocationHistory.recordedAt);
+
+  return history.map(h => ({
+    screenId: h.screenId,
+    recordedAt: h.recordedAt.toISOString(),
+    latitude: parseFloat(h.latitude as string),
+    longitude: parseFloat(h.longitude as string),
   }));
 }

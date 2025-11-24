@@ -1,10 +1,11 @@
 // src/modules/player/player.service.ts
 import { pool } from "../../db";
 import { db } from "../../db";
-import { players, screens, regions } from "../../db/schema";
-import { eq } from "drizzle-orm";
+import { players, screens, regions, screenLocationHistory } from "../../db/schema";
+import { eq, desc } from "drizzle-orm";
 import { nanoid } from "nanoid";
 import crypto from "crypto";
+import { haversineDistance } from "../../utils/geo";
 
 type PlaylistItem = {
   creative_id: string;
@@ -396,6 +397,7 @@ export class PlayerService {
    * Record a heartbeat from a player device.
    * - Looks up the screen_id for the player
    * - Inserts into public.heartbeats
+   * - Phase 3B: Updates screen location and records history for vehicle screens
    */
   async recordHeartbeat(input: HeartbeatInput): Promise<void> {
     const client = await pool.connect();
@@ -451,6 +453,75 @@ export class PlayerService {
           lng,
         ]
       );
+
+      if (lat !== null && lng !== null) {
+        const screenRes = await client.query(
+          `
+          SELECT screen_classification
+          FROM public.screens
+          WHERE id = $1
+          `,
+          [screen_id]
+        );
+
+        if (screenRes.rowCount && screenRes.rowCount > 0) {
+          const screenClassification = screenRes.rows[0].screen_classification;
+
+          await client.query(
+            `
+            UPDATE public.screens
+            SET latitude = $1, longitude = $2, last_seen_at = $3
+            WHERE id = $4
+            `,
+            [lat, lng, input.timestamp, screen_id]
+          );
+
+          if (screenClassification === 'vehicle') {
+            const lastHistoryRes = await client.query(
+              `
+              SELECT recorded_at, latitude, longitude
+              FROM public.screen_location_history
+              WHERE screen_id = $1
+              ORDER BY recorded_at DESC
+              LIMIT 1
+              `,
+              [screen_id]
+            );
+
+            let shouldInsert = false;
+
+            if (lastHistoryRes.rowCount === 0) {
+              shouldInsert = true;
+            } else {
+              const lastHistory = lastHistoryRes.rows[0];
+              const lastRecordedAt = new Date(lastHistory.recorded_at);
+              const currentTime = new Date(input.timestamp);
+              const timeDiffSeconds = (currentTime.getTime() - lastRecordedAt.getTime()) / 1000;
+
+              const lastLat = parseFloat(lastHistory.latitude);
+              const lastLng = parseFloat(lastHistory.longitude);
+              const distanceMeters = haversineDistance(lastLat, lastLng, lat, lng);
+
+              if (timeDiffSeconds >= 300 || distanceMeters > 200) {
+                shouldInsert = true;
+              }
+            }
+
+            if (shouldInsert) {
+              const historyId = `slh_${nanoid(21)}`;
+              await client.query(
+                `
+                INSERT INTO public.screen_location_history
+                  (id, screen_id, player_id, recorded_at, latitude, longitude, source)
+                VALUES
+                  ($1, $2, $3, $4, $5, $6, 'heartbeat')
+                `,
+                [historyId, screen_id, input.player_id, input.timestamp, lat, lng]
+              );
+            }
+          }
+        }
+      }
 
       await client.query("COMMIT");
     } catch (err) {

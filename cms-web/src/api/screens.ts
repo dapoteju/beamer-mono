@@ -35,6 +35,7 @@ export interface Screen {
   venueAddress?: string | null;
   latitude?: number | null;
   longitude?: number | null;
+  lastSeenAt?: string | null;
   // Phase 3A: Publisher profile data
   publisher?: {
     id: string;
@@ -86,6 +87,7 @@ export interface ScreenInfo {
   venueAddress?: string | null;
   latitude?: number | null;
   longitude?: number | null;
+  lastSeenAt?: string | null;
   // Phase 3A: Publisher profile data
   publisher?: {
     id: string;
@@ -279,5 +281,27 @@ export async function createScreen(payload: CreateScreenPayload): Promise<Screen
 
 export async function updateScreen(id: string, payload: UpdateScreenPayload): Promise<ScreenInfo> {
   const response = await apiClient.patch<ScreenInfo>(`/screens/${id}`, payload);
+  return response.data;
+}
+
+export interface LocationHistoryPoint {
+  recordedAt: string;
+  latitude: number;
+  longitude: number;
+}
+
+export async function fetchScreenLocationHistory(
+  screenId: string,
+  from?: string,
+  to?: string
+): Promise<LocationHistoryPoint[]> {
+  const params: any = {};
+  if (from) params.from = from;
+  if (to) params.to = to;
+  
+  const response = await apiClient.get<LocationHistoryPoint[]>(
+    `/screens/${screenId}/location-history`,
+    { params }
+  );
   return response.data;
 }

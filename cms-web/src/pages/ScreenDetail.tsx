@@ -1,17 +1,21 @@
 import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
+import { MapContainer, TileLayer, Polyline, Marker, Popup } from "react-leaflet";
 import {
   fetchScreenDetail,
   fetchScreenHeartbeats,
   fetchScreenPlayEvents,
+  fetchScreenLocationHistory,
 } from "../api/screens";
 import type {
   ScreenDetail as ScreenDetailType,
   Heartbeat,
   PlayEvent,
+  LocationHistoryPoint,
 } from "../api/screens";
 import { ScreenFormModal } from "../components/ScreenFormModal";
 import { useAuthStore } from "../store/authStore";
+import "leaflet/dist/leaflet.css";
 
 export default function ScreenDetail() {
   const { id } = useParams<{ id: string }>();
@@ -21,11 +25,12 @@ export default function ScreenDetail() {
   const [detail, setDetail] = useState<ScreenDetailType | null>(null);
   const [heartbeats, setHeartbeats] = useState<Heartbeat[]>([]);
   const [playEvents, setPlayEvents] = useState<PlayEvent[]>([]);
+  const [locationHistory, setLocationHistory] = useState<LocationHistoryPoint[]>([]);
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const [activeTab, setActiveTab] = useState<"overview" | "play-events" | "heartbeats">(
+  const [activeTab, setActiveTab] = useState<"overview" | "play-events" | "heartbeats" | "movement">(
     "overview"
   );
   const [timeRange, setTimeRange] = useState("24h");
@@ -85,6 +90,20 @@ export default function ScreenDetail() {
     }
   }
 
+  async function loadLocationHistory() {
+    if (!id) return;
+
+    try {
+      const hours = timeRange === "24h" ? 24 : timeRange === "7d" ? 168 : 24;
+      const from = new Date(Date.now() - hours * 60 * 60 * 1000).toISOString();
+
+      const history = await fetchScreenLocationHistory(id, from);
+      setLocationHistory(history);
+    } catch (err: any) {
+      console.error("Failed to fetch location history:", err);
+    }
+  }
+
   useEffect(() => {
     loadScreenDetail();
   }, [id]);
@@ -94,6 +113,8 @@ export default function ScreenDetail() {
       loadPlayEvents();
     } else if (activeTab === "heartbeats") {
       loadHeartbeats();
+    } else if (activeTab === "movement") {
+      loadLocationHistory();
     }
   }, [activeTab, timeRange]);
 
@@ -318,9 +339,21 @@ export default function ScreenDetail() {
               >
                 Heartbeats
               </button>
+              {screen.screenClassification === "vehicle" && (
+                <button
+                  onClick={() => setActiveTab("movement")}
+                  className={`py-4 px-1 border-b-2 font-medium text-sm ${
+                    activeTab === "movement"
+                      ? "border-blue-500 text-blue-600"
+                      : "border-transparent text-zinc-500 hover:text-zinc-700 hover:border-zinc-300"
+                  }`}
+                >
+                  Movement
+                </button>
+              )}
             </nav>
 
-            {(activeTab === "play-events" || activeTab === "heartbeats") && (
+            {(activeTab === "play-events" || activeTab === "heartbeats" || activeTab === "movement") && (
               <div>
                 <select
                   value={timeRange}
@@ -625,6 +658,67 @@ export default function ScreenDetail() {
                       ))}
                     </tbody>
                   </table>
+                </div>
+              )}
+            </div>
+          )}
+
+          {activeTab === "movement" && (
+            <div>
+              <h3 className="text-sm font-semibold text-zinc-900 mb-4">
+                Movement History ({locationHistory.length} points)
+              </h3>
+              {locationHistory.length === 0 ? (
+                <p className="text-sm text-zinc-500">
+                  No movement history available for this period.
+                </p>
+              ) : (
+                <div style={{ height: "500px", width: "100%" }}>
+                  <MapContainer
+                    center={[locationHistory[0].latitude, locationHistory[0].longitude]}
+                    zoom={13}
+                    style={{ height: "100%", width: "100%" }}
+                  >
+                    <TileLayer
+                      url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                      attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+                    />
+                    
+                    <Polyline
+                      positions={locationHistory.map(point => [point.latitude, point.longitude])}
+                      color="blue"
+                      weight={3}
+                      opacity={0.7}
+                    />
+                    
+                    {locationHistory.length > 0 && (
+                      <>
+                        <Marker position={[locationHistory[0].latitude, locationHistory[0].longitude]}>
+                          <Popup>
+                            <div className="text-sm">
+                              <div className="font-bold">Start</div>
+                              <div className="text-xs text-gray-600">
+                                {new Date(locationHistory[0].recordedAt).toLocaleString()}
+                              </div>
+                            </div>
+                          </Popup>
+                        </Marker>
+                        <Marker position={[
+                          locationHistory[locationHistory.length - 1].latitude,
+                          locationHistory[locationHistory.length - 1].longitude
+                        ]}>
+                          <Popup>
+                            <div className="text-sm">
+                              <div className="font-bold">End</div>
+                              <div className="text-xs text-gray-600">
+                                {new Date(locationHistory[locationHistory.length - 1].recordedAt).toLocaleString()}
+                              </div>
+                            </div>
+                          </Popup>
+                        </Marker>
+                      </>
+                    )}
+                  </MapContainer>
                 </div>
               )}
             </div>

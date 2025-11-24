@@ -145,6 +145,9 @@ export const screens = pgTable("screens", {
   // Geographic coordinates (nullable, more precise than existing lat/lng strings)
   latitude: numeric("latitude", { precision: 10, scale: 7 }),
   longitude: numeric("longitude", { precision: 10, scale: 7 }),
+  
+  // Phase 3B: Last known position timestamp (for vehicle screens)
+  lastSeenAt: timestamp("last_seen_at", { withTimezone: true }),
 });
 
 // --- Campaigns ---
@@ -419,6 +422,20 @@ export const bookingFlights = pgTable(
     uniqueBookingFlight: unique().on(table.bookingId, table.flightId),
   })
 );
+
+// --- Screen Location History (Phase 3B) ---
+
+export const screenLocationHistory = pgTable("screen_location_history", {
+  id: text("id").primaryKey(),
+  screenId: uuid("screen_id")
+    .notNull()
+    .references(() => screens.id, { onDelete: "cascade" }),
+  playerId: text("player_id").references(() => players.id),
+  recordedAt: timestamp("recorded_at", { withTimezone: true }).notNull(),
+  latitude: numeric("latitude", { precision: 10, scale: 7 }).notNull(),
+  longitude: numeric("longitude", { precision: 10, scale: 7 }).notNull(),
+  source: text("source").notNull().default("heartbeat"),
+});
 
 // --- Invoices ---
 
