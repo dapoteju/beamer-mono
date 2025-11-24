@@ -6,6 +6,7 @@ import cors from "cors";
 import { json } from "body-parser";
 
 import { healthRouter } from "./modules/health/health.routes";
+import { authRouter } from "./modules/auth/auth.routes";
 import { organisationsRouter } from "./modules/organisations/organisations.routes";
 import { screensRouter } from "./modules/screens/screens.routes";
 import { regionsRouter } from "./modules/regions/regions.routes";
@@ -26,6 +27,7 @@ app.use(json());
 
 // Routes
 app.use("/api/health", healthRouter);
+app.use("/api/auth", authRouter);
 app.use("/api/organisations", organisationsRouter);
 app.use("/api/screens", screensRouter);
 app.use("/api/regions", regionsRouter);
