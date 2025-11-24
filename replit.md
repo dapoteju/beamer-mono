@@ -49,6 +49,8 @@ The project is organized into a monorepo containing distinct applications and li
 - Health checks
 - Organizations management
 - Screens management (with extended metadata for classification and vehicles)
+- Publishers management (Phase 3A)
+- Advertisers management (Phase 3A)
 - Regions management
 - Campaigns management
 - Creatives management
@@ -77,6 +79,16 @@ The project is organized into a monorepo containing distinct applications and li
   - Screen Detail page displays classification-specific metadata in organized sections.
 - **Permissions**: Vehicle dropdown respects organization boundaries (advertisers blocked, publishers see own fleet, internal users see all).
 - **Data flow**: Full end-to-end persistence from CMS form → backend API → database → GET responses → CMS display.
+
+**Publishers & Advertisers Separation (Phase 3A):**
+- **Database restructure**: Added `organisation_category` field to organisations table; created dedicated `publisher_profiles` table with flexible fields for organisational/individual publishers; added nullable `publisherId` FK to screens table.
+- **Backend Publishers module**: Full CRUD API endpoints with permission-based access (beamer_internal sees all, publishers see own profiles, advertisers blocked); validation ensures organisationId references publisher organisations only; returns enriched data with screen/vehicle counts.
+- **Backend Advertisers module**: Full CRUD API endpoints with permission-based access; campaign dependency checks before deletion; simplified data model focused on billing and campaign management.
+- **Screens API enhancements**: Returns publisher profile data in GET responses; persists publisherId in all mutation operations (create/update); maintains backward compatibility with legacy publisherOrgId field during transition.
+- **Frontend Publishers UI**: List page with organisational/individual type badges; detail page showing publisher profile with screen/vehicle counts; create/edit modal with dynamic fields based on publisher type; organisation dropdown for organisational publishers.
+- **Frontend Advertisers UI**: List page with advertiser organisations; detail page showing advertiser details and campaign count; create/edit modal with country dropdown and billing email; delete protection for advertisers with active campaigns.
+- **Navigation updates**: Added Publishers and Advertisers links to internal user navigation; routes protected by org type guards; clean separation from legacy Organisations page.
+- **Migration strategy**: Nullable publisherId field ensures backward compatibility; dual FK support (publisherOrgId + publisherId) during transition; existing screens continue to work without publisher profiles.
 
 ### System Design Choices
 - **Monorepo Architecture**: Centralized repository for all platform components.
