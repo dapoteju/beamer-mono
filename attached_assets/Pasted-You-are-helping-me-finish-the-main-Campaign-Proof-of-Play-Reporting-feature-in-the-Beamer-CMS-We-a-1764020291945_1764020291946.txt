@@ -1,0 +1,299 @@
+You are helping me finish the main Campaign Proof-of-Play Reporting feature in the Beamer CMS.
+
+We already have:
+
+A Campaign Reporting page at /reporting/campaigns
+
+A Delivery view that:
+
+Lets the user select a campaign
+
+Lets the user pick a date range
+
+Calls a backend endpoint like:
+
+GET /api/reports/campaigns/:campaignId?startDate=YYYY-MM-DD&endDate=YYYY-MM-DD
+
+Uses a response with this shape:
+
+type CampaignReport = {
+  campaignId: string;
+  startDate: string;       // ISO date
+  endDate: string;         // ISO date
+  totalImpressions: number;
+  byScreen: { screenId: string; screenName?: string | null; impressions: number }[];
+  byDay: { date: string; impressions: number }[];
+};
+
+
+Renders:
+
+Summary cards:
+
+Total Impressions
+
+Date Range
+
+Number of Active Screens
+
+“Impressions by Day” table
+
+“Impressions by Screen” table
+
+Empty state when totalImpressions = 0
+
+Now I want you to finish this feature to a solid v1 from a product/advertiser point of view.
+
+GOALS
+
+Harden UX states for the Delivery tab:
+
+Clean loading, error, and empty states.
+
+Add CSV export for:
+
+Impressions by Day
+
+Impressions by Screen
+
+Sanity-check with realistic data (via seed script or seed code) so the report looks and behaves like a real campaign.
+
+Charts are optional: if there is already a chart library in the project (e.g. Recharts), add light charts; otherwise skip charts for now and focus on CSV + states.
+
+1. Harden the Delivery Tab UX
+
+Find the existing Campaign Reporting page and Delivery view (e.g. something like CampaignReportingPage, CampaignReportDelivery, or similar under cms-web/src/pages/reporting/).
+
+A. Loading state
+
+When a report is being fetched:
+
+Show a clear loading indicator:
+
+Either a spinner, skeleton, or “Loading report…” message.
+
+The tables should either:
+
+Show a skeleton; or
+
+Hide and only appear when data is loaded.
+
+The Load Report button should show a disabled/loading state while the request is in flight.
+
+Use React Query’s isLoading / isFetching flags where appropriate.
+
+B. Error state
+
+If the report fetch fails:
+
+Show an error alert above the summary section, e.g.:
+
+“We couldn’t load this report. Please try again. If the problem persists, contact support.”
+
+Do not show stale or partial data when there is an error.
+
+Make sure the error clears when:
+
+The user changes the campaign or date range and clicks “Load Report” again.
+
+Use React Query’s isError / error to drive this.
+
+C. Empty state (no impressions)
+
+If:
+
+totalImpressions === 0, and
+
+byDay and byScreen are empty or zeroed,
+
+show a clear empty state message, e.g.:
+
+“No impressions recorded for this campaign during the selected date range.”
+
+The summary cards should still render with 0 and the correct date range, so it looks intentional, not broken.
+
+2. Add CSV Export for By Day & By Screen
+
+Add CSV export functionality to the Delivery tab.
+
+A. UI
+
+Add an “Export CSV” control near the top of the Delivery tab (e.g. top-right above the tables).
+
+This can be:
+
+A primary button with a small dropdown; OR
+
+Two small buttons side-by-side.
+
+Labels:
+
+“Export By Day (CSV)”
+
+“Export By Screen (CSV)”
+
+Disable the export buttons when:
+
+No report has been loaded yet; OR
+
+totalImpressions === 0.
+
+B. Implementation
+
+Implement CSV export on the client side using the already loaded report data.
+
+Create a small utility, e.g.:
+
+cms-web/src/utils/csv.ts (or reuse any existing CSV util)
+
+A helper like:
+
+export function downloadCsv(filename: string, rows: string[][]): void {
+  // Convert rows to CSV string, build Blob, trigger download
+}
+
+
+For By Day export, generate headers and rows like:
+
+Headers: ["Date", "Impressions"]
+
+Rows: one per byDay record, with:
+
+Date as YYYY-MM-DD or a nicely formatted string
+
+Impressions as integer
+
+For By Screen export:
+
+Headers: ["Screen Name or ID", "Screen ID", "Impressions"]
+
+Rows: one per byScreen record, with:
+
+screenName || screenId for human readable
+
+screenId
+
+impressions as integer
+
+Use a filename pattern like:
+
+campaign-{campaignId}-by-day-{startDate}-{endDate}.csv
+
+campaign-{campaignId}-by-screen-{startDate}-{endDate}.csv
+
+Make sure the CSV handles commas, line breaks, and UTF-8 encoding correctly.
+
+3. Seed Realistic Data for Campaign Reports
+
+We already have a basic seeding setup for campaigns and possibly play events. Extend or add a seed script so that the Campaign Reporting page has real-looking data.
+
+If a seed script already exists (e.g. backend/scripts/seed.ts), extend it. If not, create a simple one.
+
+A. Seed at least 2–3 campaigns with PoP data
+
+In the backend:
+
+Create or extend a seeding script that:
+
+Creates at least two advertiser organisations (e.g. “Adidas UK”, “iFitness Lekki”).
+
+Creates at least 4–6 screens.
+
+Creates:
+
+One large, active campaign with:
+
+Multiple screens
+
+Date range ~30 days around “now”
+
+A decent number of play events (e.g. 1,000–10,000 across the period)
+
+One short local campaign with:
+
+Fewer screens
+
+7–10 days of activity
+
+Lower but non-zero impressions
+
+One future campaign with:
+
+Dates in the future
+
+No play events (good to test the empty state condition)
+
+For each active/past campaign:
+
+Create play_events rows that map to the existing Drizzle schema.
+
+For each day in the range:
+
+Distribute random impressions across screens (e.g. 20–300 events/day/screen).
+
+Timestamps within the day, respecting any flight time windows if they exist.
+
+B. Idempotency and environment guard
+
+Make the seed script idempotent:
+
+Check for existing orgs/campaigns by name before inserting.
+
+Reuse existing records if found.
+
+Add a basic safety check so the script:
+
+Does not run in production by default (unless an explicit env var is set).
+
+C. NPM script
+
+Ensure there is a package.json script like:
+
+"scripts": {
+  "seed": "ts-node ./backend/scripts/seed.ts"
+}
+
+
+(or whatever path matches your backend structure).
+
+4. Optional: Light Charts (Only If Chart Library Exists)
+
+Check if the project already uses a charting library (e.g. Recharts).
+
+If yes, add:
+
+A simple line chart for “Impressions by Day”.
+
+A simple bar chart for “Impressions by Screen”.
+
+If no charting library is installed, skip this step for now and focus on CSV + UX states only.
+
+Charts should be:
+
+Read-only
+
+Placed near the tables (above or next to them)
+
+Using the same byDay and byScreen data already on the page
+
+5. Permissions & Scoping
+
+Do not change existing permission logic.
+
+Advertiser users → only see and export reports for their own campaigns.
+
+Internal users → can see and export for any campaign.
+
+Reuse the same auth/organisation scoping already applied to the Campaign Reporting page.
+
+6. Deliverables
+
+When done, please summarise:
+
+Files created/modified (with paths).
+
+How loading/error/empty states are handled now.
+
+How CSV export works (which functions, where they live).
+
+How to run the seed script to populate demo data (commands and any env requirements).

@@ -4,6 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import { fetchCampaigns } from "../api/campaigns";
 import { getCampaignReport, type CampaignReport } from "../api/reports";
 import { useAuthStore } from "../store/authStore";
+import { downloadCsv } from "../utils/csv";
 
 export default function CampaignReporting() {
   const { user } = useAuthStore();
@@ -79,6 +80,36 @@ export default function CampaignReporting() {
       month: "short",
       day: "numeric",
     });
+  }
+
+  function handleExportByDay() {
+    if (!reportData || reportData.byDay.length === 0) return;
+
+    const rows: (string | number)[][] = [
+      ["Date", "Impressions"],
+      ...reportData.byDay.map((day) => [day.date, day.impressions]),
+    ];
+
+    const filename = `campaign-${reportData.campaignId}-by-day-${reportData.startDate}-${reportData.endDate}.csv`;
+    downloadCsv(filename, rows);
+  }
+
+  function handleExportByScreen() {
+    if (!reportData || reportData.byScreen.length === 0) return;
+
+    const rows: (string | number)[][] = [
+      ["Screen Name or ID", "Screen ID", "Impressions"],
+      ...reportData.byScreen
+        .sort((a, b) => b.impressions - a.impressions)
+        .map((screen) => [
+          screen.screenName || screen.screenId,
+          screen.screenId,
+          screen.impressions,
+        ]),
+    ];
+
+    const filename = `campaign-${reportData.campaignId}-by-screen-${reportData.startDate}-${reportData.endDate}.csv`;
+    downloadCsv(filename, rows);
   }
 
   return (
@@ -168,26 +199,76 @@ export default function CampaignReporting() {
         </div>
 
         {reportError && (
-          <div className="mt-4 p-3 bg-red-50 border border-red-200 rounded-md text-sm text-red-700">
-            {reportError}
+          <div className="mt-4 p-4 bg-red-50 border border-red-200 rounded-md">
+            <p className="text-sm font-medium text-red-800">Error Loading Report</p>
+            <p className="text-sm text-red-700 mt-1">
+              {reportError}
+            </p>
+            <p className="text-xs text-red-600 mt-2">
+              If the problem persists, contact support.
+            </p>
           </div>
         )}
       </div>
 
-      {reportData && (
+      {isLoadingReport && !reportData && (
+        <div className="bg-white rounded-lg border border-zinc-200 p-12">
+          <div className="flex flex-col items-center justify-center space-y-4">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+            <p className="text-sm text-zinc-600">Loading report...</p>
+          </div>
+        </div>
+      )}
+
+      {reportData && !isLoadingReport && (
         <>
           {reportData.totalImpressions === 0 ? (
-            <div className="bg-white rounded-lg border border-zinc-200 p-6">
-              <p className="text-sm text-zinc-500 text-center">
-                No impressions recorded for this campaign during the selected date range.
-              </p>
+            <div className="bg-white rounded-lg border border-zinc-200 p-12">
+              <div className="text-center">
+                <svg
+                  className="mx-auto h-12 w-12 text-zinc-400"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"
+                  />
+                </svg>
+                <h3 className="mt-4 text-sm font-medium text-zinc-900">No Impressions</h3>
+                <p className="mt-2 text-sm text-zinc-500">
+                  No impressions recorded for this campaign during the selected date range.
+                </p>
+                <p className="mt-1 text-xs text-zinc-400">
+                  {formatDate(reportData.startDate)} to {formatDate(reportData.endDate)}
+                </p>
+              </div>
             </div>
           ) : (
             <>
               <div className="bg-white rounded-lg border border-zinc-200 p-6">
-                <h2 className="text-lg font-semibold text-zinc-900 mb-4">
-                  Summary
-                </h2>
+                <div className="flex items-center justify-between mb-4">
+                  <h2 className="text-lg font-semibold text-zinc-900">Summary</h2>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={handleExportByDay}
+                      disabled={reportData.byDay.length === 0}
+                      className="px-3 py-1.5 text-sm bg-white border border-zinc-300 text-zinc-700 rounded-md hover:bg-zinc-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      Export By Day (CSV)
+                    </button>
+                    <button
+                      onClick={handleExportByScreen}
+                      disabled={reportData.byScreen.length === 0}
+                      className="px-3 py-1.5 text-sm bg-white border border-zinc-300 text-zinc-700 rounded-md hover:bg-zinc-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      Export By Screen (CSV)
+                    </button>
+                  </div>
+                </div>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   <div className="bg-zinc-50 rounded-lg p-4">
                     <p className="text-xs font-medium text-zinc-500 uppercase">
