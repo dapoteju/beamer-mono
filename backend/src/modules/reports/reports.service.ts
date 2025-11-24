@@ -180,7 +180,7 @@ export async function getCampaignReport(
       screenType: screens.screenType,
       screenClassification: screens.screenClassification,
       publisherName: sql<string>`COALESCE(${publisherProfiles.fullName}, ${organisations.name}, 'Unknown')`,
-      publisherType: sql<string>`COALESCE(${publisherProfiles.publisherType}, ${organisations.type}, 'Unknown')`,
+      publisherType: sql<string>`COALESCE(${publisherProfiles.publisherType}::text, ${organisations.type}::text, 'Unknown')`,
       impressions: sql<number>`COUNT(*)::int`,
     })
     .from(playEvents)
