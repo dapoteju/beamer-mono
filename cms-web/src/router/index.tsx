@@ -5,6 +5,8 @@ import { useAuthStore } from "../store/authStore";
 
 import Dashboard from "../pages/Dashboard";
 import Campaigns from "../pages/Campaigns";
+import CampaignNew from "../pages/CampaignNew";
+import CampaignDetail from "../pages/CampaignDetail";
 import Screens from "../pages/Screens";
 import ScreenDetail from "../pages/ScreenDetail";
 import Organisations from "../pages/Organisations";
@@ -75,6 +77,8 @@ export const router = createBrowserRouter([
       { index: true, element: <Navigate to="/dashboard" replace /> },
       { path: "dashboard", element: <Dashboard /> },
       { path: "campaigns", element: <Campaigns /> },
+      { path: "campaigns/new", element: <CampaignNew /> },
+      { path: "campaigns/:id", element: <CampaignDetail /> },
       {
         path: "screens",
         element: (

@@ -52,7 +52,8 @@ The project is organized into a monorepo containing distinct applications and li
 - Publishers management (Phase 3A)
 - Advertisers management (Phase 3A)
 - Regions management
-- Campaigns management
+- **Campaigns management** (Phase 4)
+- **Flights management** (Phase 4)
 - Creatives management
 - Bookings management
 - Invoices management
@@ -90,6 +91,17 @@ The project is organized into a monorepo containing distinct applications and li
 - **Frontend Screens UI alignment**: Refactored ScreenFormModal to use publisher profiles instead of legacy organisation dropdown; publisher dropdown shows enriched labels (type badge + name); Screens list displays Publisher column with type badges; ScreenDetail shows publisher info with type and organisation fallback; backward compatibility maintained for legacy screens without publisher profiles.
 - **Navigation updates**: Added Publishers and Advertisers links to internal user navigation; routes protected by org type guards; clean separation from legacy Organisations page.
 - **Migration strategy**: Nullable publisherId field ensures backward compatibility; dual FK support (publisherOrgId + publisherId) during transition; existing screens continue to work without publisher profiles; internal users select publisher from dropdown (updating both publisherId and publisherOrgId); publisher users create/edit with auto-populated org ID.
+
+**Campaigns & Flights Management (Phase 4):**
+- **Backend Campaigns API**: Full CRUD operations with permission-based access; GET /api/campaigns with filtering by status, date range, search; GET /api/campaigns/:id returns campaign with flights and total impressions stats; PUT /api/campaigns/:id for updates; PATCH /api/campaigns/:id/status for quick status changes; advertiser users scoped to their org, internal users see all campaigns with optional org_id filtering.
+- **Backend Flights API**: Nested creation under campaigns via POST /api/campaigns/:campaignId/flights; GET /api/campaigns/:campaignId/flights lists all flights for a campaign; standalone PUT /api/flights/:id and PATCH /api/flights/:id/status endpoints for updates; flights support screen and screen_group targeting with flexible targeting; permission checks inherited from parent campaign.
+- **Backend Bookings API**: Full CRUD with filtering by campaign and advertiser; permission-based access matching campaigns module; supports multiple billing models (CPM, flat fee, revenue share).
+- **Frontend Campaigns UI**: List page with search, status filter, and advertiser column for internal users; "New Campaign" form with advertiser selection (internal users only), validation, date range checks; Campaign detail page with overview tab showing all campaign fields, flights tab with inline flight management, bookings placeholder tab; status quick-change dropdown in detail header.
+- **Frontend Flights UI**: Flights table within campaign detail showing flight name, status badges, start/end datetimes, target type/ID; "Add Flight" button opens modal with datetime pickers, target selection; flight edit modal preloads existing data; flights list refreshes after mutations.
+- **Frontend Campaign Forms**: Create form validates dates, budget, required fields; edit modal (CampaignFormModal) for updating all campaign fields except advertiser; targeting JSON textarea with validation; currency dropdown (NGN, USD, GBP, EUR).
+- **Permissions**: Advertisers create campaigns for their own org (advertiserOrgId auto-set); internal users select advertiser from dropdown; advertiser users see only their campaigns; internal users see all campaigns or filter by org_id; flight permissions inherited from parent campaign.
+- **Data Flow**: Campaign detail endpoint returns {campaign, flights, stats: {totalImpressions}}; frontend types match backend response structure; null-safe access to stats.totalImpressions with default to 0; flight mutations use standalone /api/flights/:id endpoints.
+- **Navigation**: Campaigns link visible to internal users and advertisers; routes: /campaigns (list), /campaigns/new (create), /campaigns/:id (detail with tabs).
 
 ### System Design Choices
 - **Monorepo Architecture**: Centralized repository for all platform components.
