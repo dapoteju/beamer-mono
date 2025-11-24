@@ -1,0 +1,219 @@
+You previously created (or started) a seed script for Proof-of-Play and campaign flows.
+
+Now, I want to expand the seeding so that the entire Beamer CMS has realistic, coherent data for core journeys: organisations, users, screens, campaigns, targeting, players, heartbeats, and play events.
+
+Context
+
+Backend: Node + TypeScript + Drizzle + PostgreSQL.
+
+We have tables for (names may vary slightly; inspect the schema!):
+
+organisations
+
+users
+
+publishers (if separate)
+
+screens
+
+screen_groups / screen_group_screens (if present)
+
+campaigns
+
+bookings
+
+flights
+
+targeting / campaign_targeting (cities, regions, screen groups, time windows)
+
+players
+
+heartbeats
+
+play_events
+
+Player IDs are text, not UUID.
+
+We already started a seed.ts script; please extend and refactor it rather than starting over.
+
+Goals
+
+Seed three end-to-end storylines:
+
+A large brand (e.g. “Adidas UK”)
+
+A local brand (e.g. “iFitness Lekki”)
+
+A future campaign with no play yet
+
+Make the data useful across:
+
+Campaign list & detail
+
+Flights & bookings tabs
+
+TargetingDetails UI (cities, regions, screen groups, time windows)
+
+Inventory list & map
+
+Proof-of-Play reports
+
+Player / heartbeat views
+
+Keep the script idempotent and safe to run in dev/staging.
+
+Required steps
+
+Refactor seed script structure
+
+In backend/scripts/seed.ts (or equivalent), break logic into functions:
+
+seedOrganisationsAndUsers
+
+seedScreensAndGroups
+
+seedCampaignsFlightsTargeting
+
+seedPlayersAndHeartbeats
+
+seedPlayEvents
+
+Call them in order from a main run() function.
+
+Organisations & Users
+
+Upsert:
+
+Internal org: “Beamer”
+
+Advertiser org: “Adidas UK”
+
+Advertiser org: “iFitness Lekki”
+
+For each advertiser org, create 1–2 advertiser users.
+
+For Beamer, create at least one internal admin user.
+
+Make sure roles and organisation IDs line up with your auth model.
+
+Screens & Screen Groups
+
+Create 15–20 screens total:
+
+Assign to appropriate publishers/organisations.
+
+Give each:
+
+Name (e.g. “Lekki-Phase1-01”)
+
+City / region fields if they exist
+
+Create 3–4 screen groups (e.g. “Lekki Fitness Loop”, “City Centre Commuters”) and attach relevant screens.
+
+Seed lastSeenAt to within last 24h for most screens, and more than 24h for 2–3 “offline” screens.
+
+Campaigns, Bookings, Flights, Targeting
+For Adidas UK:
+
+Campaign A: past (ended ~7 days ago)
+
+Campaign B: active (started ~7 days ago, ends ~7 days from now)
+
+Campaign C: future (starts in ~3 days, ends in ~14 days)
+
+For iFitness Lekki:
+
+Campaign D: short local burst (7 days around “now”).
+
+For each campaign:
+
+Create at least 1 booking that links the campaign to a set of screens.
+
+Create 1–3 flights with:
+
+Date ranges aligned with the campaign dates
+
+Time windows (e.g. all-day vs morning/evening)
+
+Create a targeting record for:
+
+Cities
+
+Regions
+
+Screen groups
+
+Time windows
+
+Make sure the targeting model matches the existing Drizzle types so the TargetingDetails component has realistic data.
+
+Players & Heartbeats
+
+For each screen, create a player row with:
+
+A simple NanoID-based playerId string
+
+Link to the screen
+
+Generate heartbeats:
+
+For most players: heartbeats within the last 24h
+
+For 2–3 “offline” screens: last heartbeat > 48h ago
+
+If GPS location is supported, use coordinates that roughly cluster by city/region.
+
+Play Events (Proof-of-Play)
+
+For Adidas Campaign B (active):
+
+Generate play events for last 14 days.
+
+For each day:
+
+For each targeted screen:
+
+Random 50–500 events spread across the flight time windows.
+
+For Adidas Campaign A (past):
+
+Generate a stable 7–10 days of plays.
+
+For iFitness Campaign D:
+
+Generate a smaller number of events (~20–100/day per screen).
+
+For Adidas Campaign C (future):
+
+Do not generate play events.
+
+Ensure all foreign keys (campaignId, screenId, playerId, timestamps) are valid.
+
+Idempotency & Environment Guard
+
+Use natural keys (organisation name, campaign name, screen name) to check if a record already exists before inserting.
+
+Reuse existing rows where possible.
+
+Add a safety check:
+
+Do not run seeding when NODE_ENV === 'production' unless an env var like ALLOW_SEED_DEMO=true is set.
+
+Logging
+
+At the end, log a summary:
+
+Number of organisations, users, screens, campaigns, flights, players, heartbeats, and play events created or reused.
+
+Finally, update package.json (if needed) with a script:
+
+"scripts": {
+  "seed": "ts-node ./backend/scripts/seed.ts"
+}
+
+
+Reply with a summary of:
+
+Files changed
+
+Any assumptions made about schema names / columns
