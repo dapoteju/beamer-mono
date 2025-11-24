@@ -1,0 +1,87 @@
+I now have authentication and org-type–aware navigation working in cms-web, with roles and org types coming from the backend. I want you to implement the Organisations management UI and backend API end-to-end.
+
+Here’s what I need you to do:
+
+Backend – Organisations API
+
+In the backend, create REST endpoints for organisations:
+
+GET /organisations – return a list of all organisations with:
+
+id, name, type, country, billing_email, created_at
+
+GET /organisations/:id – return a single organisation by id, including:
+
+basic fields above
+
+(optional) a list of related screens, campaigns, or bookings if that’s easy
+
+Protect these routes so that:
+
+Only users belonging to an org with type beamer_internal and role admin or ops can call them.
+
+Other users should get 403.
+
+Use the existing auth/JWT middleware you just implemented so the CMS can pass the token.
+
+Frontend – Organisations List Page
+
+In cms-web, update the Organisations page so it no longer shows placeholder text.
+
+It should:
+
+Call the new GET /organisations endpoint using the existing auth token.
+
+Show the results in a table:
+
+Columns: Name, Type, Country, Billing Email, Created At.
+
+Type should be rendered as a badge (same colour scheme as the sidebar/org-type badges you just implemented: Internal = cyan, Advertiser = green, Publisher = orange).
+
+Show a loading state and an error state.
+
+Clicking on an organisation row should navigate to /organisations/:id.
+
+Frontend – Organisation Detail Page
+
+Create a new page at route /organisations/:id.
+
+It should:
+
+Fetch GET /organisations/:id.
+
+Display:
+
+Name, type, country, billing_email, created_at in a summary card.
+
+A tabbed or sectioned layout with:
+
+“Overview” tab: just the basic info.
+
+(Optional but nice) “Screens” tab: if backend returns related screens, show them in a table.
+
+(Optional) “Campaigns” tab for advertiser orgs if easy.
+
+This route must be protected in the same way as /organisations (internal org only).
+
+Respect Org-Type Nav & Guards
+
+Make sure the existing org-type based navigation and guards remain intact:
+
+Only internal org users see the “Organisations” nav item.
+
+If an advertiser or publisher tries to manually navigate to /organisations or /organisations/:id, they should be redirected back to /dashboard.
+
+Developer Experience
+
+Reuse whatever HTTP client / React Query / token handling you already set up in cms-web.
+
+Keep the UI consistent with the existing layout and Tailwind styling.
+
+When you’re done, tell me:
+
+Which files you changed.
+
+What API URLs the CMS is now using for organisations.
+
+How to test: step-by-step path in the UI.
