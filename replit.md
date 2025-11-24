@@ -1,7 +1,7 @@
 # Replit Project: Beamer Mono
 
 ## Overview
-Beamer Mono is a monorepo for the Beamer Player platform, a digital signage and advertising solution. It provides multiple delivery methods, including a web-based CMS and planned Electron desktop applications. The project aims to deliver a robust platform for managing digital advertising campaigns. The backend API and CMS Frontend are currently operational, with a focus on user and screen management.
+Beamer Mono is a monorepo for the Beamer Player platform, a digital signage and advertising solution. It provides a web-based CMS and is planned to include Electron desktop applications. The project's primary purpose is to deliver a robust platform for managing digital advertising campaigns, with current operations focused on user and screen management, authentication, API modules, and comprehensive reporting. The business vision is to provide multiple delivery methods for digital signage and advertising.
 
 ## User Preferences
 - None specified yet
@@ -9,130 +9,46 @@ Beamer Mono is a monorepo for the Beamer Player platform, a digital signage and 
 ## System Architecture
 
 ### Project Structure
-The project is organized into a monorepo containing distinct applications and libraries:
+The project is organized as a monorepo with distinct applications and libraries:
 - `backend/`: Express API server (TypeScript + Drizzle ORM)
-- `cms-web/`: CMS Frontend (React + Vite + TypeScript + Tailwind v4)
+- `cms-web/`: CMS Frontend (React + Vite + TypeScript + Tailwind)
 - `player-core/`: Core TypeScript library (planned)
 - `player-electron/`: Electron desktop application (planned)
 - `player-web-sim/`: Web simulator (planned)
 
 ### Technology Stack
+- **Backend**: Node.js 20, Express 5.1.0, TypeScript 5.9.3, Drizzle 0.44.7 (for PostgreSQL)
+- **Frontend (CMS Web)**: React 19.2.0, Vite 7.2.4, TypeScript 5.9.3, Tailwind CSS 4.1.17, Zustand 5.0.8, TanStack Query 5.90.10, Axios 1.13.2, React Router DOM 7.9.6, Recharts 3.5.0
 
-**Backend:**
-- **Runtime**: Node.js 20
-- **Framework**: Express 5.1.0
-- **Language**: TypeScript 5.9.3
-- **Database ORM**: Drizzle 0.44.7 (for PostgreSQL)
-- **Dev Server**: Nodemon + ts-node
-
-**Frontend (CMS Web):**
-- **Framework**: React 19.2.0
-- **Build Tool**: Vite 7.2.4
-- **Language**: TypeScript 5.9.3
-- **Styling**: Tailwind CSS 4.1.17
-- **State Management**: Zustand 5.0.8 (with localStorage persistence)
-- **Data Fetching**: TanStack Query 5.90.10
-- **HTTP Client**: Axios 1.13.2
-- **Routing**: React Router DOM 7.9.6
+### UI/UX Decisions
+- Tailwind CSS for utility-first styling.
+- Responsive design for charts and forms.
+- Colored badges for screen types and publisher types for visual clarity.
+- Dynamic form sections based on user selections (e.g., screen classification, publisher type).
+- Interactive charts (Line Chart, Bar Chart) using Recharts for campaign reporting.
 
 ### Feature Specifications
-
-**Authentication System:**
-- JWT-based authentication with 7-day token expiration.
-- Bcrypt password hashing (10 salt rounds).
-- Role-based access control: `admin`, `ops`, `viewer`.
-- Protected registration: only admins can create new users.
-- Initial admin user: `admin@beamer.com` / `beamer123`.
-- CMS Frontend handles login, protected routes, session persistence via localStorage, and user display in the topbar. Axios is used for API communication with automatic auth header injection.
-
-**API Modules:**
-- Health checks
-- Organizations management
-- Screens management (with extended metadata for classification and vehicles)
-- Publishers management (Phase 3A)
-- Advertisers management (Phase 3A)
-- Regions management
-- **Campaigns management** (Phase 4)
-- **Flights management** (Phase 4)
-- Creatives management
-- Bookings management
-- Invoices management
-- Player API
-- Reports
-
-**Screens & Players Management:**
-- Complete CRUD operations for screens with permission-based access.
-- Atomic transactions for data integrity during player assignment/reassignment.
-- Player swapping logic ensures one-player-per-screen business rule.
-- Comprehensive validation includes region existence, publisher organization type, and player existence.
-- Permissions: `beamer_internal` admin/ops can create screens; `beamer_internal` (all roles) and `publisher` (their own) can edit screens; `beamer_internal` can change publisher organization.
-
-**Screen Classification & Extended Metadata (Phase 2):**
-- **Three screen types**: Vehicle-mounted, Billboard/Static, and Indoor displays.
-- **Vehicle screens**: Link to vehicles table with vehicle selection dropdown. Displays make, model, license plate information.
-- **Billboard screens**: Include structure type, size description, illumination type, and address fields.
-- **Indoor screens**: Store venue name, venue type, venue address, and optional GPS coordinates.
-- **Backward compatibility**: All classification fields are nullable; existing screens work without metadata.
-- **CMS UI enhancements**:
-  - Type column in Screens list with colored badges (green for vehicle, blue for billboard, purple for indoor).
-  - Classification filter dropdown for easy categorization.
-  - Dynamic form sections in create/edit modal based on selected classification type.
-  - Screen Detail page displays classification-specific metadata in organized sections.
-- **Permissions**: Vehicle dropdown respects organization boundaries (advertisers blocked, publishers see own fleet, internal users see all).
-- **Data flow**: Full end-to-end persistence from CMS form → backend API → database → GET responses → CMS display.
-
-**Publishers & Advertisers Separation (Phase 3A):**
-- **Database restructure**: Added `organisation_category` field to organisations table; created dedicated `publisher_profiles` table with flexible fields for organisational/individual publishers; added nullable `publisherId` FK to screens table.
-- **Backend Publishers module**: Full CRUD API endpoints with permission-based access (beamer_internal sees all, publishers see own profiles, advertisers blocked); validation ensures organisationId references publisher organisations only; returns enriched data with screen/vehicle counts; added GET /api/publishers/dropdown endpoint for publisher selection in screens.
-- **Backend Advertisers module**: Full CRUD API endpoints with permission-based access; campaign dependency checks before deletion; simplified data model focused on billing and campaign management.
-- **Screens API enhancements**: Returns publisher profile data in GET responses; persists publisherId in all mutation operations (create/update); maintains backward compatibility with legacy publisherOrgId field during transition.
-- **Frontend Publishers UI**: List page with organisational/individual type badges; detail page showing publisher profile with screen/vehicle counts; create/edit modal with dynamic fields based on publisher type; organisation dropdown for organisational publishers.
-- **Frontend Advertisers UI**: List page with advertiser organisations; detail page showing advertiser details and campaign count; create/edit modal with country dropdown and billing email; delete protection for advertisers with active campaigns.
-- **Frontend Screens UI alignment**: Refactored ScreenFormModal to use publisher profiles instead of legacy organisation dropdown; publisher dropdown shows enriched labels (type badge + name); Screens list displays Publisher column with type badges; ScreenDetail shows publisher info with type and organisation fallback; backward compatibility maintained for legacy screens without publisher profiles.
-- **Navigation updates**: Added Publishers and Advertisers links to internal user navigation; routes protected by org type guards; clean separation from legacy Organisations page.
-- **Migration strategy**: Nullable publisherId field ensures backward compatibility; dual FK support (publisherOrgId + publisherId) during transition; existing screens continue to work without publisher profiles; internal users select publisher from dropdown (updating both publisherId and publisherOrgId); publisher users create/edit with auto-populated org ID.
-
-**Campaigns & Flights Management (Phase 4):**
-- **Backend Campaigns API**: Full CRUD operations with permission-based access; GET /api/campaigns with filtering by status, date range, search; GET /api/campaigns/:id returns campaign with flights and total impressions stats; PUT /api/campaigns/:id for updates; PATCH /api/campaigns/:id/status for quick status changes; advertiser users scoped to their org, internal users see all campaigns with optional org_id filtering.
-- **Backend Flights API**: Nested creation under campaigns via POST /api/campaigns/:campaignId/flights; GET /api/campaigns/:campaignId/flights lists all flights for a campaign; standalone PUT /api/flights/:id and PATCH /api/flights/:id/status endpoints for updates; flights support screen and screen_group targeting with flexible targeting; permission checks inherited from parent campaign.
-- **Backend Bookings API**: Full CRUD with filtering by campaign and advertiser; permission-based access matching campaigns module; supports multiple billing models (CPM, flat fee, revenue share).
-- **Frontend Campaigns UI**: List page with search, status filter, and advertiser column for internal users; "New Campaign" form with advertiser selection (internal users only), validation, date range checks; Campaign detail page with overview tab showing all campaign fields, flights tab with inline flight management, bookings placeholder tab; status quick-change dropdown in detail header.
-- **Frontend Flights UI**: Flights table within campaign detail showing flight name, status badges, start/end datetimes, target type/ID; "Add Flight" button opens modal with datetime pickers, target selection; flight edit modal preloads existing data; flights list refreshes after mutations.
-- **Frontend Campaign Forms**: Create form validates dates, budget, required fields; edit modal (CampaignFormModal) for updating all campaign fields except advertiser; targeting JSON textarea with validation; currency dropdown (NGN, USD, GBP, EUR).
-- **Permissions**: Advertisers create campaigns for their own org (advertiserOrgId auto-set); internal users select advertiser from dropdown; advertiser users see only their campaigns; internal users see all campaigns or filter by org_id; flight permissions inherited from parent campaign.
-- **Data Flow**: Campaign detail endpoint returns {campaign, flights, stats: {totalImpressions}}; frontend types match backend response structure; null-safe access to stats.totalImpressions with default to 0; flight mutations use standalone /api/flights/:id endpoints.
-- **Navigation**: Campaigns link visible to internal users and advertisers; routes: /campaigns (list), /campaigns/new (create), /campaigns/:id (detail with tabs).
-
-**Campaign Reporting & Proof-of-Play (Phase 5):**
-- **Backend Reports API**: GET /api/reports/campaigns/:id endpoint with optional startDate/endDate query params; returns campaign summary, impressions by region, and impressions by flight; permission-based access (advertiser users see only their campaigns, internal users see all).
-- **Frontend Reporting UI**: Campaign Reporting page at /reporting/campaigns with campaign selector dropdown, date range picker (start/end dates), and "Load Report" button; displays summary cards (total impressions, date range, number of regions); shows data tables for impressions by region (region name + count) and impressions by flight (flight name + count); "View Report" button added to Campaign Detail page header for quick access.
-- **API Integration**: New cms-web/src/api/reports.ts helper with TypeScript interfaces (CampaignReport, ImpressionsByRegion, ImpressionsByFlight) and getCampaignReport() function; follows standard response pattern (response.data.data).
-- **Permissions**: Campaign dropdown automatically filtered by backend based on JWT (advertiser users only see their org's campaigns, internal users see all active campaigns); server-side enforcement ensures data isolation.
-- **Navigation**: Link to Campaign Reporting added to main Reporting page; route: /reporting/campaigns (protected, requires authentication).
-
-**Comprehensive Seed Script (Development):**
-- **Location**: backend/scripts/seed.ts (run via `npm run seed` in backend directory).
-- **UUID Generation**: Uses deterministicUUID() to generate RFC 4122-compliant UUIDs from human-readable names (e.g., "campaign-adidas-summer-2025" → consistent UUID); ensures version 5 format with proper variant bits.
-- **Idempotency**: Safe to re-run; uses natural key lookups (org names, campaign names) and .onConflictDoNothing() to prevent duplicates.
-- **Performance**: Batch inserts (500 records at a time) for play events; completes ~26k play events in ~1 minute.
-- **Seed Data Created**: 5 organisations (Beamer Internal, Adidas UK, iFitness Lekki, LagosCabs, Capital OOH); 7 users (password: demo123); 2 publisher profiles; 6 vehicles; 3 regions; 18 screens (vehicle/billboard/indoor); 4 screen groups; 4 campaigns; 4 bookings; 5 flights; 4 creatives; 18 players; 84+ heartbeats; 26k+ play events.
-- **Storylines**: Adidas UK (3 campaigns: past/active/future); iFitness Lekki (active local campaign); LagosCabs & Capital OOH (publisher infrastructure with screens/vehicles).
-- **Login Credentials**: admin@beamer.com / demo123 (Internal Admin); marketing@adidas.co.uk / demo123 (Adidas Advertiser); admin@ifitness.ng / demo123 (iFitness Advertiser).
-- **Safety**: Environment guard prevents accidental production seeding unless ALLOW_SEED_DEMO=true is set.
+- **Authentication**: JWT-based with 7-day expiration, Bcrypt hashing, and role-based access control (`admin`, `ops`, `viewer`). Protected registration.
+- **API Modules**: Comprehensive API for health checks, organizations, screens, publishers, advertisers, regions, campaigns, flights, creatives, bookings, invoices, and reports.
+- **Screens & Players Management**: Full CRUD for screens with permission-based access, atomic transactions, player swapping logic, and comprehensive validation. Supports three screen types (Vehicle-mounted, Billboard/Static, Indoor) with extended metadata and dynamic CMS UI.
+- **Publishers & Advertisers Separation**: Database restructuring to differentiate publishers and advertisers. Dedicated CRUD API endpoints and refined UI for managing both, ensuring permission-based access and data integrity.
+- **Campaigns & Flights Management**: Full CRUD for campaigns and nested flights with permission-based access, filtering, status management, and targeting capabilities (screen/screen_group).
+- **Campaign Reporting**: API endpoint for campaign summaries with raw play event data. Frontend reporting page with campaign selector, date range picker, summary cards, data tables, and interactive charts (line and bar charts) for daily and screen-level impressions. Includes CSV export functionality.
+- **Development Tools**: Comprehensive seed script (`backend/scripts/seed.ts`) for deterministic and idempotent generation of extensive demo data, including organizations, users, publishers, screens, campaigns, and play events.
 
 ### System Design Choices
 - **Monorepo Architecture**: Centralized repository for all platform components.
-- **Microservice-like Separation**: Distinct `backend` and `cms-web` applications.
-- **Database Management**: PostgreSQL with Drizzle ORM for schema management and migrations. `npm run db:push` is the designated method for schema updates.
-- **Frontend Development**: React with Vite for fast development and hot module replacement. Tailwind CSS for utility-first styling.
-- **API Connectivity**: Vite proxy forwards `/api` requests from the frontend to the backend API.
-- **Authentication**: Stateless JWTs for scalability, with client-side token management.
-- **Data Integrity**: Transaction-based updates for critical operations like screen management.
-- **Role-Based Access Control**: Granular permissions implemented at the API level.
+- **Microservice-like Separation**: Distinct backend and CMS web applications.
+- **Database Management**: PostgreSQL with Drizzle ORM for schema management, using `npm run db:push` for updates.
+- **Frontend Development**: React with Vite for fast development and HMR, Tailwind CSS for styling.
+- **API Connectivity**: Vite proxy for seamless frontend-backend communication.
+- **Authentication**: Stateless JWTs for scalability and client-side token management.
+- **Data Integrity**: Transaction-based updates for critical operations.
+- **Role-Based Access Control**: Granular permissions enforced at the API level.
 
 ## External Dependencies
 
-- **Database**: PostgreSQL (provided via Replit integration)
+- **Database**: PostgreSQL (via Replit integration)
 - **Authentication**: JWT (JSON Web Tokens)
 - **HTTP Client**: Axios
 - **State Management**: Zustand
