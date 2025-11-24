@@ -17,6 +17,7 @@ import {
   heartbeats,
   playEvents,
   bookingFlights,
+  screenLocationHistory,
 } from "../src/db/schema";
 import { eq, and } from "drizzle-orm";
 import bcrypt from "bcrypt";
@@ -73,6 +74,7 @@ const counts = {
   players: 0,
   heartbeats: 0,
   playEvents: 0,
+  screenLocationHistory: 0,
 };
 
 // Helper: Generate dates relative to now
@@ -1051,6 +1053,143 @@ async function seedPlayEvents(
 }
 
 // =====================================================
+// 8. SCREEN LOCATION HISTORY (GPS Mobility Data)
+// =====================================================
+
+// Lagos area waypoints for realistic movement simulation
+const LAGOS_ROUTES = {
+  lekki_vi: [
+    { lat: 6.4281, lng: 3.4219 }, // Lekki
+    { lat: 6.4350, lng: 3.4100 }, // Along Lekki-Epe
+    { lat: 6.4400, lng: 3.4000 },
+    { lat: 6.4450, lng: 3.3900 },
+    { lat: 6.4500, lng: 3.3800 },
+    { lat: 6.4550, lng: 3.3700 },
+    { lat: 6.4531, lng: 3.3950 }, // Victoria Island
+    { lat: 6.4350, lng: 3.4100 }, // Back towards Lekki
+    { lat: 6.4281, lng: 3.4219 }, // Return
+  ],
+  ikeja_mainland: [
+    { lat: 6.5833, lng: 3.3561 }, // Ikeja GRA
+    { lat: 6.5700, lng: 3.3500 },
+    { lat: 6.5600, lng: 3.3450 },
+    { lat: 6.5500, lng: 3.3400 },
+    { lat: 6.5400, lng: 3.3500 }, // Towards Yaba
+    { lat: 6.5300, lng: 3.3600 },
+    { lat: 6.5158, lng: 3.3776 }, // Yaba
+    { lat: 6.5300, lng: 3.3600 }, // Return
+    { lat: 6.5500, lng: 3.3400 },
+    { lat: 6.5833, lng: 3.3561 }, // Back to Ikeja
+  ],
+  ajah_express: [
+    { lat: 6.4667, lng: 3.5667 }, // Ajah
+    { lat: 6.4600, lng: 3.5500 },
+    { lat: 6.4550, lng: 3.5300 },
+    { lat: 6.4500, lng: 3.5100 },
+    { lat: 6.4475, lng: 3.4702 }, // Lekki Phase 1
+    { lat: 6.4500, lng: 3.5100 },
+    { lat: 6.4550, lng: 3.5300 },
+    { lat: 6.4600, lng: 3.5500 },
+    { lat: 6.4667, lng: 3.5667 }, // Back to Ajah
+  ],
+  surulere_loop: [
+    { lat: 6.4963, lng: 3.3611 }, // Surulere
+    { lat: 6.4900, lng: 3.3550 },
+    { lat: 6.4850, lng: 3.3500 },
+    { lat: 6.4800, lng: 3.3450 },
+    { lat: 6.4750, lng: 3.3400 },
+    { lat: 6.4700, lng: 3.3500 },
+    { lat: 6.4750, lng: 3.3550 },
+    { lat: 6.4850, lng: 3.3580 },
+    { lat: 6.4963, lng: 3.3611 }, // Return
+  ],
+};
+
+async function seedScreenLocationHistory(
+  screenIdMap: Map<string, string>,
+  playerIdMap: Map<string, string>
+) {
+  console.log("\n📍 Seeding screen location history (GPS mobility data)...");
+
+  // Vehicle screens with their routes
+  const vehicleScreenRoutes: { screenCode: string; route: { lat: number; lng: number }[] }[] = [
+    { screenCode: "SCR-LC-001", route: LAGOS_ROUTES.lekki_vi },
+    { screenCode: "SCR-LC-002", route: LAGOS_ROUTES.ikeja_mainland },
+    { screenCode: "SCR-LC-003", route: LAGOS_ROUTES.lekki_vi },
+    { screenCode: "SCR-LC-004", route: LAGOS_ROUTES.ikeja_mainland },
+    { screenCode: "SCR-LC-005", route: LAGOS_ROUTES.ajah_express },
+    { screenCode: "SCR-LC-006", route: LAGOS_ROUTES.surulere_loop },
+  ];
+
+  const now = new Date();
+  const locationRecords: {
+    id: string;
+    screenId: string;
+    playerId: string | null;
+    recordedAt: Date;
+    latitude: string;
+    longitude: string;
+    source: string;
+  }[] = [];
+
+  for (const { screenCode, route } of vehicleScreenRoutes) {
+    const screenId = screenIdMap.get(screenCode);
+    const playerId = playerIdMap.get(screenCode);
+
+    if (!screenId) {
+      console.log(`   ⚠️ Screen ${screenCode} not found, skipping`);
+      continue;
+    }
+
+    // Generate GPS points for the last 14 days
+    for (let dayOffset = -14; dayOffset <= 0; dayOffset++) {
+      const day = new Date(now);
+      day.setDate(day.getDate() + dayOffset);
+
+      // Generate 3-5 trips per day
+      const tripsPerDay = randomBetween(3, 5);
+
+      for (let trip = 0; trip < tripsPerDay; trip++) {
+        // Each trip starts at different hours (6am-8pm)
+        const startHour = 6 + trip * 3;
+        
+        // Traverse the route with some variation
+        for (let pointIdx = 0; pointIdx < route.length; pointIdx++) {
+          const point = route[pointIdx];
+          
+          // Add some random variation to the GPS coordinates (+/- 0.002 degrees ~ 200m)
+          const latVariation = (Math.random() - 0.5) * 0.004;
+          const lngVariation = (Math.random() - 0.5) * 0.004;
+
+          const recordedAt = new Date(day);
+          recordedAt.setHours(startHour, pointIdx * 8 + randomBetween(0, 5), randomBetween(0, 59));
+
+          locationRecords.push({
+            id: `loc-${screenCode}-${dayOffset + 14}-${trip}-${pointIdx}`,
+            screenId,
+            playerId: playerId || null,
+            recordedAt,
+            latitude: (point.lat + latVariation).toFixed(7),
+            longitude: (point.lng + lngVariation).toFixed(7),
+            source: "heartbeat",
+          });
+        }
+      }
+    }
+  }
+
+  // Insert in batches of 100
+  const batchSize = 100;
+  for (let i = 0; i < locationRecords.length; i += batchSize) {
+    const batch = locationRecords.slice(i, i + batchSize);
+    await db.insert(screenLocationHistory).values(batch).onConflictDoNothing();
+    counts.screenLocationHistory += batch.length;
+  }
+
+  console.log(`✓ Created ${counts.screenLocationHistory} screen location history records`);
+}
+
+// =====================================================
 // MAIN EXECUTION
 // =====================================================
 
@@ -1083,6 +1222,9 @@ async function run() {
     // Step 7: Play Events
     await seedPlayEvents(screenIdMap, playerIdMap, campaignData);
 
+    // Step 8: Screen Location History (GPS Mobility Data)
+    await seedScreenLocationHistory(screenIdMap, playerIdMap);
+
     // Final Summary
     console.log("\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
     console.log("✅ SEEDING COMPLETE!");
@@ -1102,6 +1244,7 @@ async function run() {
     console.log(`   • Players: ${counts.players}`);
     console.log(`   • Heartbeats: ${counts.heartbeats}`);
     console.log(`   • Play Events: ${counts.playEvents}`);
+    console.log(`   • Location History: ${counts.screenLocationHistory}`);
 
     console.log("\n🎯 Storylines:");
     console.log("   1. Adidas UK - 3 campaigns (past, active, future)");
