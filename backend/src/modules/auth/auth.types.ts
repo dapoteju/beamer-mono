@@ -4,6 +4,8 @@ export interface User {
   fullName: string;
   orgId: string;
   role: "admin" | "ops" | "viewer";
+  orgType: "advertiser" | "publisher" | "beamer_internal";
+  orgName: string;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -18,6 +20,7 @@ export interface JWTPayload {
   email: string;
   orgId: string;
   role: "admin" | "ops" | "viewer";
+  orgType: "advertiser" | "publisher" | "beamer_internal";
 }
 
 export interface RegisterInput {
