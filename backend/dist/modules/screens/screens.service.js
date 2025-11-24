@@ -24,6 +24,22 @@ exports.updateScreenData = updateScreenData;
 const client_1 = require("../../db/client");
 const schema_1 = require("../../db/schema");
 const drizzle_orm_1 = require("drizzle-orm");
+// Phase 3B: Screen code generation helper
+async function generateScreenCode() {
+    // Query the max numeric part of existing codes
+    const [result] = await client_1.db
+        .select({ maxCode: (0, drizzle_orm_1.sql) `MAX(code)` })
+        .from(schema_1.screens);
+    const maxCode = result?.maxCode;
+    if (!maxCode || !maxCode.startsWith('SCR-')) {
+        return 'SCR-00001';
+    }
+    // Extract numeric part and increment
+    const numericPart = parseInt(maxCode.substring(4), 10);
+    const nextNumber = numericPart + 1;
+    // Zero-pad to 5 digits
+    return `SCR-${nextNumber.toString().padStart(5, '0')}`;
+}
 async function listScreens(filters) {
     const conditions = [];
     if (filters?.publisherOrgId) {
@@ -38,6 +54,7 @@ async function listScreens(filters) {
     const query = client_1.db
         .select({
         id: schema_1.screens.id,
+        code: schema_1.screens.code, // Phase 3B: Screen code
         name: schema_1.screens.name,
         city: schema_1.screens.city,
         regionCode: schema_1.screens.regionCode,
@@ -66,6 +83,7 @@ async function listScreensWithPlayerInfo(filters) {
     const query = client_1.db
         .select({
         id: schema_1.screens.id,
+        code: schema_1.screens.code, // Phase 3B: Screen code
         name: schema_1.screens.name,
         city: schema_1.screens.city,
         regionCode: schema_1.screens.regionCode,
@@ -118,12 +136,15 @@ async function listScreensWithPlayerInfo(filters) {
     return query;
 }
 async function createScreen(input) {
+    // Phase 3B: Auto-generate screen code
+    const code = await generateScreenCode();
     const [created] = await client_1.db
         .insert(schema_1.screens)
         .values({
+        code, // Phase 3B: Auto-generated code
         publisherOrgId: input.publisherOrgId,
         publisherId: input.publisherId || null, // Phase 3A
-        name: input.name,
+        name: input.name || null, // Phase 3B: Name is optional
         screenType: input.screenType,
         resolutionWidth: input.resolutionWidth,
         resolutionHeight: input.resolutionHeight,
@@ -469,14 +490,17 @@ async function getVehiclesList(publisherOrgId) {
 }
 // Updated createScreen function with simpler interface for CMS
 async function createScreenForCMS(input) {
+    // Phase 3B: Auto-generate screen code
+    const code = await generateScreenCode();
     // Create screen with a temporary placeholder initially
     // We'll update it after player assignment if needed
     const [created] = await client_1.db
         .insert(schema_1.screens)
         .values({
+        code, // Phase 3B: Auto-generated code
         publisherOrgId: input.publisherOrgId,
         publisherId: input.publisherId || null, // Phase 3A
-        name: input.name,
+        name: input.name || null, // Phase 3B: Name is optional
         city: input.city,
         regionCode: input.regionCode,
         status: input.status || 'active',

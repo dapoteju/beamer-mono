@@ -419,7 +419,7 @@ export async function getScreenReport(
 
   return {
     screen_id: screenData.id,
-    screen_name: screenData.name,
+    screen_name: screenData.name || screenData.code || 'Unknown', // Phase 3B: Name is optional, fallback to code
     screen_type: screenData.screenType,
     city: screenData.city,
     region_code: screenData.regionCode,

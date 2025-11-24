@@ -3,6 +3,27 @@ import { db } from "../../db/client";
 import { screens, organisations, players, heartbeats, playEvents, creatives, campaigns, regions, vehicles, publisherProfiles } from "../../db/schema";
 import { eq, desc, and, gte, sql, isNull } from "drizzle-orm";
 
+// Phase 3B: Screen code generation helper
+async function generateScreenCode(): Promise<string> {
+  // Query the max numeric part of existing codes
+  const [result] = await db
+    .select({ maxCode: sql<string>`MAX(code)` })
+    .from(screens);
+
+  const maxCode = result?.maxCode;
+  
+  if (!maxCode || !maxCode.startsWith('SCR-')) {
+    return 'SCR-00001';
+  }
+  
+  // Extract numeric part and increment
+  const numericPart = parseInt(maxCode.substring(4), 10);
+  const nextNumber = numericPart + 1;
+  
+  // Zero-pad to 5 digits
+  return `SCR-${nextNumber.toString().padStart(5, '0')}`;
+}
+
 export async function listScreens(filters?: {
   publisherOrgId?: string;
   regionCode?: string;
@@ -23,6 +44,7 @@ export async function listScreens(filters?: {
   const query = db
     .select({
       id: screens.id,
+      code: screens.code, // Phase 3B: Screen code
       name: screens.name,
       city: screens.city,
       regionCode: screens.regionCode,
@@ -60,6 +82,7 @@ export async function listScreensWithPlayerInfo(filters?: {
   const query = db
     .select({
       id: screens.id,
+      code: screens.code, // Phase 3B: Screen code
       name: screens.name,
       city: screens.city,
       regionCode: screens.regionCode,
@@ -117,7 +140,7 @@ export async function listScreensWithPlayerInfo(filters?: {
 export async function createScreen(input: {
   publisherOrgId: string;
   publisherId?: string; // Phase 3A
-  name: string;
+  name?: string; // Phase 3B: Name is now optional (code is the primary identifier)
   screenType: string;
   resolutionWidth: number;
   resolutionHeight: number;
@@ -126,12 +149,16 @@ export async function createScreen(input: {
   lat: string;
   lng: string;
 }) {
+  // Phase 3B: Auto-generate screen code
+  const code = await generateScreenCode();
+  
   const [created] = await db
     .insert(screens)
     .values({
+      code, // Phase 3B: Auto-generated code
       publisherOrgId: input.publisherOrgId,
       publisherId: input.publisherId || null, // Phase 3A
-      name: input.name,
+      name: input.name || null, // Phase 3B: Name is optional
       screenType: input.screenType,
       resolutionWidth: input.resolutionWidth,
       resolutionHeight: input.resolutionHeight,
@@ -545,7 +572,7 @@ export async function getVehiclesList(publisherOrgId?: string): Promise<Array<{
 
 // Updated createScreen function with simpler interface for CMS
 export async function createScreenForCMS(input: {
-  name: string;
+  name?: string; // Phase 3B: Name is now optional (code is the primary identifier)
   city: string;
   regionCode: string;
   publisherOrgId: string;
@@ -565,14 +592,18 @@ export async function createScreenForCMS(input: {
   latitude?: number;
   longitude?: number;
 }) {
+  // Phase 3B: Auto-generate screen code
+  const code = await generateScreenCode();
+  
   // Create screen with a temporary placeholder initially
   // We'll update it after player assignment if needed
   const [created] = await db
     .insert(screens)
     .values({
+      code, // Phase 3B: Auto-generated code
       publisherOrgId: input.publisherOrgId,
       publisherId: input.publisherId || null, // Phase 3A
-      name: input.name,
+      name: input.name || null, // Phase 3B: Name is optional
       city: input.city,
       regionCode: input.regionCode,
       status: input.status || 'active',

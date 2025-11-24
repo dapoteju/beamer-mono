@@ -105,6 +105,7 @@ screensRouter.get("/", requireAuth, async (req: AuthRequest, res: Response, next
     const now = new Date();
     const formattedScreens = screens.map((screen) => ({
       id: screen.id,
+      code: screen.code, // Phase 3B: Screen code
       name: screen.name,
       city: screen.city,
       region: screen.regionCode,
@@ -177,11 +178,26 @@ screensRouter.post("/", requireAuth, async (req: AuthRequest, res: Response, nex
       longitude,
     } = req.body;
 
-    // Validate required fields
-    if (!name || !city || !regionCode || !publisherOrgId) {
+    // Phase 3B: Validate required fields (name is now optional, code is auto-generated)
+    // For publisher users, publisherOrgId must be their own org ID
+    // For internal users, publisherOrgId is optional
+    let finalPublisherOrgId = publisherOrgId;
+    
+    if (req.user!.orgType === "publisher") {
+      // Publisher users must create screens for their own organization
+      finalPublisherOrgId = req.user!.orgId;
+    } else if (!publisherOrgId && req.user!.orgType === "beamer_internal") {
+      // Internal users can create screens without a publisher (unassigned)
+      // This is handled by keeping publisherOrgId required in schema but allowing null service-layer logic
+      return res.status(400).json({ 
+        error: "Internal users must provide publisherOrgId. Optional publisher assignment coming soon.",
+      });
+    }
+    
+    if (!city || !regionCode) {
       return res.status(400).json({ 
         error: "Missing required fields",
-        required: ["name", "city", "regionCode", "publisherOrgId"]
+        required: ["city", "regionCode"]
       });
     }
 
@@ -191,12 +207,14 @@ screensRouter.post("/", requireAuth, async (req: AuthRequest, res: Response, nex
       return res.status(400).json({ error: "Invalid regionCode. Region does not exist." });
     }
 
-    // Validate publisherOrgId is a publisher organisation
-    const orgValidation = await validatePublisherOrg(publisherOrgId);
-    if (!orgValidation.valid) {
-      return res.status(400).json({ 
-        error: `Invalid publisherOrgId. ${orgValidation.type ? `Organisation is of type "${orgValidation.type}", must be "publisher".` : "Organisation does not exist."}`
-      });
+    // Validate publisherOrgId is a publisher organisation (if provided)
+    if (finalPublisherOrgId) {
+      const orgValidation = await validatePublisherOrg(finalPublisherOrgId);
+      if (!orgValidation.valid) {
+        return res.status(400).json({ 
+          error: `Invalid publisherOrgId. ${orgValidation.type ? `Organisation is of type "${orgValidation.type}", must be "publisher".` : "Organisation does not exist."}`
+        });
+      }
     }
 
     // If playerId provided, validate it's available
@@ -209,10 +227,10 @@ screensRouter.post("/", requireAuth, async (req: AuthRequest, res: Response, nex
     }
 
     const created = await createScreenForCMS({
-      name,
+      name, // Phase 3B: Name is now optional
       city,
       regionCode,
-      publisherOrgId,
+      publisherOrgId: finalPublisherOrgId, // Use validated/finalized publisherOrgId
       publisherId, // Phase 3A
       status,
       playerId,

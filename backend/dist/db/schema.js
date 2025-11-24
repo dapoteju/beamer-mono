@@ -76,10 +76,14 @@ exports.vehicles = (0, pg_core_1.pgTable)("vehicles", {
 // --- Screens ---
 exports.screens = (0, pg_core_1.pgTable)("screens", {
     id: (0, pg_core_1.uuid)("id").primaryKey().defaultRandom(),
+    // Phase 3B: Auto-generated screen code (primary identifier)
+    code: (0, pg_core_1.text)("code").notNull().unique(),
+    // Publisher org ID remains NOT NULL for data integrity (Phase 3A dual-FK strategy)
     publisherOrgId: (0, pg_core_1.uuid)("publisher_org_id")
         .notNull()
         .references(() => exports.organisations.id),
-    name: (0, pg_core_1.varchar)("name", { length: 255 }).notNull(),
+    // Phase 3B: Name is now optional (code is the primary identifier)
+    name: (0, pg_core_1.varchar)("name", { length: 255 }),
     screenType: (0, pg_core_1.varchar)("screen_type", { length: 50 }).notNull(), // taxi_top, billboard, etc.
     resolutionWidth: (0, pg_core_1.integer)("resolution_width").notNull(),
     resolutionHeight: (0, pg_core_1.integer)("resolution_height").notNull(),
