@@ -79,45 +79,68 @@ export async function fetchPlaylist(
 
 
 export async function sendPlaybackEvent(auth_token: string, event: PlaybackEvent) {
-  const res = await fetch(`${BASE_URL}/events/playbacks`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      ...authHeader(auth_token),
-    },
-    body: JSON.stringify(event),
-  });
+  console.log("Sending playback event:", event);
 
-  // Optional: you can inspect the response if needed
   try {
-    const json = await res.json();
-    if (json.status !== "success") {
-      console.error("Playback event error:", json);
+    const res = await fetch(`${BASE_URL}/events/playbacks`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        ...authHeader(auth_token),
+      },
+      body: JSON.stringify(event),
+    });
+
+    const text = await res.text();
+    console.log("Playback response status:", res.status, "body:", text);
+
+    let json: any = null;
+    try {
+      json = JSON.parse(text);
+    } catch {
+      // non-JSON response
     }
-  } catch {
-    // ignore body parse issues for now
+
+    if (!res.ok || (json && json.status !== "success")) {
+      console.error("Playback event error:", json || text);
+    }
+  } catch (err) {
+    console.error("Playback event network error:", err);
   }
 }
+
 
 export async function sendHeartbeat(
   auth_token: string,
   hb: HeartbeatEvent
 ) {
-  const res = await fetch(`${BASE_URL}/heartbeat`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      ...authHeader(auth_token),
-    },
-    body: JSON.stringify(hb),
-  });
+  console.log("Sending heartbeat:", hb);
 
   try {
-    const json = await res.json();
-    if (json.status !== "success") {
-      console.error("Heartbeat error:", json);
+    const res = await fetch(`${BASE_URL}/heartbeat`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        ...authHeader(auth_token),
+      },
+      body: JSON.stringify(hb),
+    });
+
+    const text = await res.text();
+    console.log("Heartbeat response status:", res.status, "body:", text);
+
+    let json: any = null;
+    try {
+      json = JSON.parse(text);
+    } catch {
+      // ignore
     }
-  } catch {
-    // ignore
+
+    if (!res.ok || (json && json.status !== "success")) {
+      console.error("Heartbeat error:", json || text);
+    }
+  } catch (err) {
+    console.error("Heartbeat network error:", err);
   }
 }
+

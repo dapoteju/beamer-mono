@@ -1,0 +1,189 @@
+You are helping me extend the Beamer CMS frontend to add Proof-of-Play reporting for campaigns.
+
+Context
+
+Stack: React + TypeScript.
+
+Backend already exposes reporting endpoints with optional date ranges. For campaigns, the endpoint shape is:
+
+GET /api/reports/campaigns/:campaignId?startDate=YYYY-MM-DD&endDate=YYYY-MM-DD
+
+It returns (or can easily be adapted to return) something like:
+
+{
+  campaignId: string;
+  startDate: string;
+  endDate: string;
+  totalImpressions: number;
+  byScreen: { screenId: string; screenName?: string; impressions: number }[];
+  byDay: { date: string; impressions: number }[];
+}
+
+
+We already have:
+
+Campaigns list and detail pages
+
+Flights and bookings tabs
+
+Auth + org scoping
+
+Play events & reporting logic working on the backend
+
+Goal of this task
+
+Create a Reporting → Campaigns UI that lets an internal or advertiser user:
+
+Select a campaign
+
+Pick a date range
+
+See a summary of Proof of Play:
+
+Total impressions
+
+Impressions by day
+
+Impressions by screen
+
+This should be read-only and focused on clarity, not fancy charts (MVP first).
+
+1. Navigation & Routing
+
+Add a new top-level nav item in the CMS sidebar:
+
+Label: Reporting
+
+Icon: reuse an existing generic analytics icon if available
+
+Under Reporting, add a route:
+
+/reporting/campaigns → “Campaign Reporting” page
+
+You don’t need nested routes yet; a single page is fine.
+
+2. Campaign Reporting Page ( /reporting/campaigns )
+
+Layout structure:
+
+A. Filters Panel (top of page)
+
+Campaign selector:
+
+For internal users:
+
+A searchable dropdown listing all campaigns (name + advertiser)
+
+Data from GET /api/campaigns?status=active (or all statuses if easier)
+
+For advertiser users:
+
+Only their own campaigns
+
+Date range picker:
+
+Two inputs: startDate and endDate
+
+Default: last 7 days, or the entire campaign period if you can easily get it from the selected campaign
+
+“Load Report” button to trigger fetch
+
+B. Summary section
+
+Once a campaign + date range are selected and data is loaded:
+
+Show key metrics in simple stat cards:
+
+Total Impressions
+
+Date Range (start → end)
+
+Number of Screens that recorded impressions
+
+C. Breakdown sections
+
+Two sub-sections below the summary:
+
+By Day
+
+Table:
+
+Date	Impressions
+
+Data from byDay array (sorted ascending by date)
+
+By Screen
+
+Table:
+
+| Screen Name (or ID) | Impressions |
+
+Use screenName if available, otherwise show screenId
+
+Sort descending by impressions
+
+3. API Integration
+
+Create a small API helper in something like cms-web/src/api/reports.ts:
+
+getCampaignReport({ campaignId, startDate, endDate })
+
+Calls GET /api/reports/campaigns/:campaignId?startDate=...&endDate=...
+
+Returns typed data (create proper TypeScript interfaces)
+
+Use React Query (TanStack Query) for:
+
+Fetching the campaign list for the dropdown
+
+Fetching the report when:
+
+A campaign is selected
+
+AND both dates are set
+
+AND the user clicks “Load Report”
+
+4. Bonus UX (if simple to add)
+
+If easy, also:
+
+Add a “View Report” button in the Campaign Detail header that navigates to:
+
+/reporting/campaigns?campaignId=:id
+
+and preselects that campaign in the reporting page.
+
+5. Permissions
+
+Respect existing auth context:
+
+Advertiser org users → only see their own campaigns in the dropdown and only load reports for their campaigns.
+
+Internal users → can see all campaigns and load reports for any of them.
+
+You can reuse the same logic used in the Campaigns list for scoping.
+
+6. Deliverables
+
+New Reporting navigation item.
+
+New /reporting/campaigns page with:
+
+Campaign selector
+
+Date range inputs
+
+“Load Report” button
+
+Summary stat cards
+
+“By Day” table
+
+“By Screen” table
+
+New reports.ts API helper with typed responses.
+
+Optional: “View Report” button from Campaign Detail to this page with preselected campaign.
+
+Brief summary of files created/modified.
