@@ -7,6 +7,7 @@ interface AppConfig {
   nodeEnv: NodeEnv;
   port: number;
   databaseUrl: string;
+  jwtSecret: string;
 }
 
 const getEnv = (key: string, defaultValue?: string): string => {
@@ -21,6 +22,7 @@ const config: AppConfig = {
   nodeEnv: (process.env.NODE_ENV as NodeEnv) || 'development',
   port: Number(getEnv('PORT', '3000')),
   databaseUrl: getEnv('DATABASE_URL'),
+  jwtSecret: getEnv('JWT_SECRET'),
 };
 
 export default config;

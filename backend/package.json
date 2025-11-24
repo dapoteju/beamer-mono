@@ -11,6 +11,7 @@
     "db:migrate": "drizzle-kit migrate",
     "db:push": "drizzle-kit push",
     "db:studio": "drizzle-kit studio",
+    "seed:admin": "ts-node scripts/seed-admin.ts",
     "test:booking-report": "ts-node scripts/test-booking-report.ts"
   },
   "keywords": [],

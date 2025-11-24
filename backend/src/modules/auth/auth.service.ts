@@ -4,8 +4,9 @@ import { db } from "../../db/client";
 import { users, organisations } from "../../db/schema";
 import { eq } from "drizzle-orm";
 import { User, AuthResponse, JWTPayload, RegisterInput, LoginInput } from "./auth.types";
+import config from "../../config/config";
 
-const JWT_SECRET = process.env.JWT_SECRET || "dev-secret-change-in-production";
+const JWT_SECRET = config.jwtSecret;
 const SALT_ROUNDS = 10;
 const JWT_EXPIRES_IN = "7d";
 
