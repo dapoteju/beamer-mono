@@ -64,6 +64,20 @@ The project is organized into a monorepo containing distinct applications and li
 - Comprehensive validation includes region existence, publisher organization type, and player existence.
 - Permissions: `beamer_internal` admin/ops can create screens; `beamer_internal` (all roles) and `publisher` (their own) can edit screens; `beamer_internal` can change publisher organization.
 
+**Screen Classification & Extended Metadata (Phase 2):**
+- **Three screen types**: Vehicle-mounted, Billboard/Static, and Indoor displays.
+- **Vehicle screens**: Link to vehicles table with vehicle selection dropdown. Displays make, model, license plate information.
+- **Billboard screens**: Include structure type, size description, illumination type, and address fields.
+- **Indoor screens**: Store venue name, venue type, venue address, and optional GPS coordinates.
+- **Backward compatibility**: All classification fields are nullable; existing screens work without metadata.
+- **CMS UI enhancements**:
+  - Type column in Screens list with colored badges (green for vehicle, blue for billboard, purple for indoor).
+  - Classification filter dropdown for easy categorization.
+  - Dynamic form sections in create/edit modal based on selected classification type.
+  - Screen Detail page displays classification-specific metadata in organized sections.
+- **Permissions**: Vehicle dropdown respects organization boundaries (advertisers blocked, publishers see own fleet, internal users see all).
+- **Data flow**: Full end-to-end persistence from CMS form → backend API → database → GET responses → CMS display.
+
 ### System Design Choices
 - **Monorepo Architecture**: Centralized repository for all platform components.
 - **Microservice-like Separation**: Distinct `backend` and `cms-web` applications.
