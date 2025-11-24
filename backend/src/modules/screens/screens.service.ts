@@ -424,29 +424,6 @@ export async function updatePlayerScreenAssignment(playerId: string, newScreenId
     .where(eq(players.id, playerId));
 }
 
-// Swap two players between screens (atomic transaction)
-export async function swapPlayersAssignment(playerAId: string, playerBId: string): Promise<void> {
-  return await db.transaction(async (tx) => {
-    // Get current screen assignments
-    const [playerA] = await tx.select({ screenId: players.screenId }).from(players).where(eq(players.id, playerAId));
-    const [playerB] = await tx.select({ screenId: players.screenId }).from(players).where(eq(players.id, playerBId));
-    
-    if (!playerA || !playerB) {
-      throw new Error("One or both players not found");
-    }
-
-    // Check if they're already on the same screen (no swap needed)
-    if (playerA.screenId === playerB.screenId) {
-      // Both players already on same screen - this shouldn't happen but handle gracefully
-      return;
-    }
-
-    // Atomic swap - both updates must succeed or both rollback
-    await tx.update(players).set({ screenId: playerB.screenId }).where(eq(players.id, playerAId));
-    await tx.update(players).set({ screenId: playerA.screenId }).where(eq(players.id, playerBId));
-  });
-}
-
 export async function getAvailablePlayers(): Promise<Array<{ id: string; currentScreenId: string | null; currentScreenName: string | null }>> {
   return db
     .select({

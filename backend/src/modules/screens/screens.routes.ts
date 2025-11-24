@@ -17,7 +17,6 @@ import {
   getAvailablePlayers,
   getPublisherOrganisations,
   getRegionsList,
-  swapPlayersAssignment,
 } from "./screens.service";
 import { requireAuth, AuthRequest } from "../../middleware/auth";
 import { db } from "../../db/client";

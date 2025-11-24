@@ -14,7 +14,6 @@ exports.validatePublisherOrg = validatePublisherOrg;
 exports.getPlayerAssignment = getPlayerAssignment;
 exports.unassignPlayerFromScreen = unassignPlayerFromScreen;
 exports.updatePlayerScreenAssignment = updatePlayerScreenAssignment;
-exports.swapPlayersAssignment = swapPlayersAssignment;
 exports.getAvailablePlayers = getAvailablePlayers;
 exports.getPublisherOrganisations = getPublisherOrganisations;
 exports.getRegionsList = getRegionsList;
@@ -363,25 +362,6 @@ async function updatePlayerScreenAssignment(playerId, newScreenId) {
         .update(schema_1.players)
         .set({ screenId: newScreenId })
         .where((0, drizzle_orm_1.eq)(schema_1.players.id, playerId));
-}
-// Swap two players between screens (atomic transaction)
-async function swapPlayersAssignment(playerAId, playerBId) {
-    return await client_1.db.transaction(async (tx) => {
-        // Get current screen assignments
-        const [playerA] = await tx.select({ screenId: schema_1.players.screenId }).from(schema_1.players).where((0, drizzle_orm_1.eq)(schema_1.players.id, playerAId));
-        const [playerB] = await tx.select({ screenId: schema_1.players.screenId }).from(schema_1.players).where((0, drizzle_orm_1.eq)(schema_1.players.id, playerBId));
-        if (!playerA || !playerB) {
-            throw new Error("One or both players not found");
-        }
-        // Check if they're already on the same screen (no swap needed)
-        if (playerA.screenId === playerB.screenId) {
-            // Both players already on same screen - this shouldn't happen but handle gracefully
-            return;
-        }
-        // Atomic swap - both updates must succeed or both rollback
-        await tx.update(schema_1.players).set({ screenId: playerB.screenId }).where((0, drizzle_orm_1.eq)(schema_1.players.id, playerAId));
-        await tx.update(schema_1.players).set({ screenId: playerA.screenId }).where((0, drizzle_orm_1.eq)(schema_1.players.id, playerBId));
-    });
 }
 async function getAvailablePlayers() {
     return client_1.db

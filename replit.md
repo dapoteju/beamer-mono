@@ -192,7 +192,61 @@ Login and /me endpoints return:
 - `cms-web/src/layouts/AppLayout.tsx` - Updated topbar with real user data and logout
 - `cms-web/src/main.tsx` - Added AuthInitializer for proper hydration
 
+## Screens & Players Management System
+
+### Backend Implementation
+- **Complete CRUD for screens** with permission-based access control
+- **Atomic transactions** for data integrity during player assignment/reassignment
+- **Player swapping logic** to maintain one-player-per-screen business rule
+- **Comprehensive validation**: region existence, publisher org type, player existence
+- **Permission-based operations**:
+  - Create screens: `beamer_internal` admin/ops only
+  - Edit screens: `beamer_internal` all roles, `publisher` their own only
+  - Change publisher org: `beamer_internal` only
+  - View screens: `beamer_internal` all, `publisher` their own
+
+### API Endpoints
+- `POST /api/screens` - Create screen with optional player assignment (internal admin/ops)
+- `PATCH /api/screens/:id` - Update screen with player reassignment support
+- `GET /api/screens/dropdown/regions` - List all regions for dropdown
+- `GET /api/screens/dropdown/publishers` - List publisher organisations for dropdown
+- `GET /api/screens/dropdown/available-players` - List all players with current assignments
+
+### Frontend Implementation
+- **ScreenFormModal**: Reusable modal for create/edit operations
+  - Form validation with error handling
+  - Dropdown fetchers for regions, publishers, and players
+  - Create and edit modes with proper state management
+- **Screens List Page**: Added "Create Screen" button (internal admin/ops only)
+- **Screen Detail Page**: Added "Edit Screen" button with permission checks
+
+### Technical Details
+- **Transaction-based updates**: All screen modifications with player changes wrapped in `db.transaction()` for atomicity
+- **Player swap logic**: When reassigning a player, the system swaps players between screens to maintain one-player-per-screen
+- **Schema limitation**: Players must always be assigned to a screen (NOT NULL constraint on screenId)
+- **Permission enforcement**: `canCreateScreen`, `canEditScreen`, `canChangePublisherOrg` helpers ensure proper access control
+- **Data validation**: Region codes, publisher org types, and player existence validated before operations
+
+### Files
+- Backend service: `backend/src/modules/screens/screens.service.ts`
+- Backend routes: `backend/src/modules/screens/screens.routes.ts`
+- Frontend API client: `cms-web/src/api/screens.ts`
+- Frontend form modal: `cms-web/src/components/ScreenFormModal.tsx`
+- Frontend screens list: `cms-web/src/pages/Screens.tsx`
+- Frontend screen detail: `cms-web/src/pages/ScreenDetail.tsx`
+
 ## Recent Changes
+- November 24, 2025: Screens & Players CRUD Implementation
+  - Implemented complete create/edit functionality for screens in CMS
+  - Added atomic transaction-based player assignment/reassignment logic
+  - Created permission-based access control (internal admin/ops can create, internal all roles + publishers can edit own)
+  - Built ScreenFormModal component for reusable create/edit operations
+  - Added helper endpoints for dropdown data (regions, publishers, available players)
+  - Implemented player swapping logic to maintain one-player-per-screen constraint
+  - All operations wrapped in database transactions for data integrity
+  - Frontend integrated with "Create Screen" and "Edit Screen" buttons with proper permissions
+  - TypeScript compiles with no errors, production-ready
+
 - November 24, 2025: Extended Auth System with Organization Context
   - Added orgType and orgName to User response type
   - Extended JWT payload to include orgType for authorization decisions
