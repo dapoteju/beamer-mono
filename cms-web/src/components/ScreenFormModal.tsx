@@ -44,7 +44,8 @@ export function ScreenFormModal({ mode, screenId, initialValues, onClose, onSucc
     name: initialValues?.name || "",
     city: initialValues?.city || "",
     regionCode: initialValues?.regionCode || "",
-    publisherOrgId: initialValues?.publisherOrgId || "",
+    // For publisher users, use their org ID; for internal users, use initialValues or null
+    publisherOrgId: initialValues?.publisherOrgId || (user?.orgType === "publisher" ? user?.orgId : null),
     publisherId: initialValues?.publisherId || "",
     status: initialValues?.status || "active",
     playerId: initialValues?.playerId || "",
@@ -115,7 +116,8 @@ export function ScreenFormModal({ mode, screenId, initialValues, onClose, onSucc
     if (!formData.name.trim()) newErrors.name = "Name is required";
     if (!formData.city.trim()) newErrors.city = "City is required";
     if (!formData.regionCode) newErrors.regionCode = "Region is required";
-    if (!formData.publisherId) newErrors.publisherId = "Publisher is required";
+    // publisherId is optional during transition - only validate for internal users with dropdown
+    if (isInternal && !formData.publisherId) newErrors.publisherId = "Publisher is required";
 
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
@@ -128,15 +130,20 @@ export function ScreenFormModal({ mode, screenId, initialValues, onClose, onSucc
     if (!validate()) return;
 
     if (mode === "create") {
-      // Find selected publisher to get organisationId for backward compatibility
-      const selectedPublisher = publisherOptions.find(p => p.id === formData.publisherId);
+      // For internal users, derive publisherOrgId from selected publisher
+      // For publisher users, use their org ID from form state (already set from user context)
+      let publisherOrgId: string | null | undefined = formData.publisherOrgId;
+      
+      if (isInternal) {
+        const selectedPublisher = publisherOptions.find(p => p.id === formData.publisherId);
+        publisherOrgId = selectedPublisher?.organisationId ?? null as any;
+      }
       
       const payload: CreateScreenPayload = {
         name: formData.name,
         city: formData.city,
         regionCode: formData.regionCode,
-        // Use organisationId from publisher profile if available, otherwise use form value
-        publisherOrgId: selectedPublisher?.organisationId || formData.publisherOrgId,
+        publisherOrgId: publisherOrgId as any,
         publisherId: formData.publisherId || undefined,
         status: formData.status as any,
         playerId: formData.playerId || undefined,
@@ -168,12 +175,20 @@ export function ScreenFormModal({ mode, screenId, initialValues, onClose, onSucc
         venueAddress: formData.venueAddress || undefined,
       };
 
-      // Only include publisherId if user is internal and it changed
-      if (isInternal && formData.publisherId !== initialValues?.publisherId) {
-        payload.publisherId = formData.publisherId || null;
-        // Also update publisherOrgId for backward compatibility - send org ID if available, null if individual
-        const selectedPublisher = publisherOptions.find(p => p.id === formData.publisherId);
-        payload.publisherOrgId = selectedPublisher?.organisationId || undefined;
+      // Handle publisherId changes for internal users
+      if (isInternal && formData.publisherId) {
+        // Only update if publisherId changed
+        if (formData.publisherId !== initialValues?.publisherId) {
+          payload.publisherId = formData.publisherId || null;
+          
+          // Also update publisherOrgId to keep legacy field in sync
+          // Derive from selected publisher (org ID for organisational, null for individual)
+          const selectedPublisher = publisherOptions.find(p => p.id === formData.publisherId);
+          payload.publisherOrgId = selectedPublisher?.organisationId ?? null as any;
+        }
+      } else if (!isInternal) {
+        // Publisher users: always ensure publisherOrgId is sent (their org ID)
+        payload.publisherOrgId = user?.orgId || initialValues?.publisherOrgId as any;
       }
 
       // Handle player assignment
@@ -285,8 +300,8 @@ export function ScreenFormModal({ mode, screenId, initialValues, onClose, onSucc
                   setFormData({ 
                     ...formData, 
                     publisherId: e.target.value,
-                    // Set publisherOrgId from publisher profile if available, otherwise explicitly clear it
-                    publisherOrgId: selectedPublisher?.organisationId || ""
+                    // Set publisherOrgId to org ID if available, null for individual publishers
+                    publisherOrgId: selectedPublisher?.organisationId ?? null
                   });
                 }}
                 className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${
