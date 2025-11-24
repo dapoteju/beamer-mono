@@ -1,14 +1,16 @@
 import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import {
   fetchCampaignDetail,
   updateCampaignStatus,
   type CampaignWithStats,
   type CampaignStatus,
 } from "../api/campaigns";
+import { fetchBookings, type Booking } from "../api/bookings";
 import { CampaignFormModal } from "../components/CampaignFormModal";
 import { FlightFormModal } from "../components/FlightFormModal";
+import BookingFormModal from "../components/BookingFormModal";
 
 export default function CampaignDetail() {
   const { id } = useParams<{ id: string }>();
@@ -22,6 +24,14 @@ export default function CampaignDetail() {
   const [showEditModal, setShowEditModal] = useState(false);
   const [showFlightModal, setShowFlightModal] = useState(false);
   const [editingFlightId, setEditingFlightId] = useState<string | null>(null);
+  const [showBookingModal, setShowBookingModal] = useState(false);
+  const [editingBooking, setEditingBooking] = useState<Booking | null>(null);
+
+  const { data: bookings = [] } = useQuery({
+    queryKey: ["bookings", id],
+    queryFn: () => fetchBookings(id),
+    enabled: !!id,
+  });
 
   async function loadCampaign() {
     if (!id) return;
@@ -113,6 +123,46 @@ export default function CampaignDetail() {
   function handleEditFlight(flightId: string) {
     setEditingFlightId(flightId);
     setShowFlightModal(true);
+  }
+
+  function handleEditBooking(booking: Booking) {
+    setEditingBooking(booking);
+    setShowBookingModal(true);
+  }
+
+  function handleAddBooking() {
+    setEditingBooking(null);
+    setShowBookingModal(true);
+  }
+
+  function getBillingModelLabel(model: string): string {
+    switch (model) {
+      case "fixed":
+        return "Fixed";
+      case "cpm":
+        return "CPM";
+      case "cpd":
+        return "CPD";
+      case "share_of_loop":
+        return "Share of Loop";
+      default:
+        return model;
+    }
+  }
+
+  function getBookingStatusBadgeColor(status: string): string {
+    switch (status) {
+      case "pending":
+        return "bg-yellow-100 text-yellow-800";
+      case "active":
+        return "bg-green-100 text-green-800";
+      case "completed":
+        return "bg-blue-100 text-blue-800";
+      case "cancelled":
+        return "bg-red-100 text-red-800";
+      default:
+        return "bg-zinc-100 text-zinc-800";
+    }
   }
 
   if (loading) {
@@ -380,8 +430,92 @@ export default function CampaignDetail() {
       )}
 
       {activeTab === "bookings" && (
-        <div className="bg-white border border-zinc-200 rounded-lg p-8 text-center text-zinc-600">
-          Bookings management coming soon
+        <div>
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-lg font-semibold text-zinc-900">Bookings</h3>
+            <button
+              onClick={handleAddBooking}
+              className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700"
+            >
+              Add Booking
+            </button>
+          </div>
+
+          {bookings.length === 0 ? (
+            <div className="bg-white border border-zinc-200 rounded-lg p-12 text-center">
+              <p className="text-zinc-600 mb-4">
+                No bookings have been added for this campaign yet.
+              </p>
+              <button
+                onClick={handleAddBooking}
+                className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700"
+              >
+                Add Booking
+              </button>
+            </div>
+          ) : (
+            <div className="bg-white border border-zinc-200 rounded-lg overflow-hidden">
+              <table className="w-full">
+                <thead className="bg-zinc-50 border-b border-zinc-200">
+                  <tr>
+                    <th className="text-left px-4 py-3 text-xs font-medium text-zinc-700 uppercase">
+                      Billing Model
+                    </th>
+                    <th className="text-left px-4 py-3 text-xs font-medium text-zinc-700 uppercase">
+                      Rate
+                    </th>
+                    <th className="text-left px-4 py-3 text-xs font-medium text-zinc-700 uppercase">
+                      Start Date
+                    </th>
+                    <th className="text-left px-4 py-3 text-xs font-medium text-zinc-700 uppercase">
+                      End Date
+                    </th>
+                    <th className="text-left px-4 py-3 text-xs font-medium text-zinc-700 uppercase">
+                      Status
+                    </th>
+                    <th className="text-left px-4 py-3 text-xs font-medium text-zinc-700 uppercase">
+                      Actions
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-zinc-200">
+                  {bookings.map((booking) => (
+                    <tr key={booking.id} className="hover:bg-zinc-50">
+                      <td className="px-4 py-3 text-sm font-medium text-zinc-900">
+                        {getBillingModelLabel(booking.billingModel)}
+                      </td>
+                      <td className="px-4 py-3 text-sm text-zinc-700">
+                        {formatCurrency(booking.rate, booking.currency)}
+                      </td>
+                      <td className="px-4 py-3 text-sm text-zinc-700">
+                        {formatDate(booking.startDate)}
+                      </td>
+                      <td className="px-4 py-3 text-sm text-zinc-700">
+                        {formatDate(booking.endDate)}
+                      </td>
+                      <td className="px-4 py-3">
+                        <span
+                          className={`inline-block px-2 py-1 text-xs font-medium rounded ${getBookingStatusBadgeColor(
+                            booking.status
+                          )}`}
+                        >
+                          {booking.status}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3">
+                        <button
+                          onClick={() => handleEditBooking(booking)}
+                          className="text-sm text-blue-600 hover:text-blue-700"
+                        >
+                          Edit
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
         </div>
       )}
 
@@ -419,6 +553,19 @@ export default function CampaignDetail() {
             setShowFlightModal(false);
             setEditingFlightId(null);
             loadCampaign();
+          }}
+        />
+      )}
+
+      {showBookingModal && (
+        <BookingFormModal
+          isOpen={showBookingModal}
+          campaignId={campaign.id}
+          advertiserOrgId={campaign.advertiserOrgId}
+          booking={editingBooking}
+          onClose={() => {
+            setShowBookingModal(false);
+            setEditingBooking(null);
           }}
         />
       )}

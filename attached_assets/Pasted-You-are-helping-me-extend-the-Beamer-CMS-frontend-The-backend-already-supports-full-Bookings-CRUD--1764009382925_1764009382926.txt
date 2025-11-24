@@ -1,0 +1,181 @@
+You are helping me extend the Beamer CMS frontend.
+The backend already supports full Bookings CRUD.
+
+🎯 Goal of this task
+
+Inside the existing Campaign Detail page, replace the current Bookings placeholder with a complete MVP Bookings management panel:
+
+The UI must support:
+
+Viewing bookings for a campaign
+
+Creating bookings
+
+Editing bookings
+
+Use modals or drawers (consistent with the Flights UI you just built).
+
+📌 1. Data Source
+
+Backend endpoints:
+
+GET /api/bookings?campaignId=:campaignId
+POST /api/bookings
+GET /api/bookings/:id
+PUT /api/bookings/:id
+
+
+Bookings fields follow the backend types:
+
+billingModel: "fixed" | "cpm" | "cpd" | "share_of_loop"
+
+rate (number)
+
+currency ("NGN" | "USD" | "GBP" | "EUR")
+
+agreedImpressions? (optional)
+
+agreedAmountMinor? (optional)
+
+startDate (date)
+
+endDate (date)
+
+status: "pending" | "active" | "completed" | "cancelled"
+
+advertiserOrgId (should be attached automatically based on campaign)
+
+campaignId (passed automatically)
+
+Follow the same permission model as campaigns:
+
+Advertisers → see only their own bookings
+
+Internal users → see all
+
+📄 2. Bookings Tab UI Requirements
+
+Inside the Campaign Detail page, replace the placeholder with:
+
+A Bookings Table:
+
+Columns should include:
+
+Billing Model
+
+Rate (formatted with currency)
+
+Start Date
+
+End Date
+
+Status (badge)
+
+Actions (edit)
+
+Add “New Booking” button:
+
+Top right corner of the bookings tab.
+
+Empty State:
+
+If no bookings exist:
+
+No bookings have been added for this campaign yet.
+[Add Booking]
+
+📝 3. Create Booking Modal
+
+Fields required:
+
+billingModel (select: fixed, cpm, cpd, share_of_loop)
+
+rate (number input)
+
+currency (select: NGN, USD, GBP, EUR)
+
+agreedImpressions (optional number)
+
+agreedAmountMinor (optional number)
+
+startDate (date)
+
+endDate (date)
+
+status (pending, active, completed, cancelled)
+
+Behavior:
+
+Form should auto-attach:
+
+campaignId (from URL)
+
+advertiserOrgId (derived from the campaign detail API response)
+
+After successful POST:
+
+Close modal
+
+Refetch bookings list
+
+✏️ 4. Edit Booking Modal
+
+Triggered from "Edit" button on each row.
+
+Fields same as Create modal, pre-filled.
+
+Submit → PUT /api/bookings/:id
+
+On success:
+
+Close modal
+
+Refresh bookings list
+
+🎨 5. Styling Requirements
+
+Use same modal/form styling as Flights modals.
+
+Use same table component as Campaign/Flights lists.
+
+Use same badge component for status colors:
+
+pending → yellow
+
+active → green
+
+completed → blue
+
+cancelled → red
+
+🔐 6. Permissions
+
+Respect the same logic as campaigns:
+
+Advertiser users can only manage bookings belonging to their org.
+
+Internal users can view & edit all bookings.
+
+If needed, surface advertiserOrgId from campaign detail response.
+
+📦 Deliverables
+
+Replit should produce:
+
+A complete Bookings tab UI:
+
+Table view
+
+Create booking modal
+
+Edit booking modal
+
+API integration using React Query
+
+File summary:
+
+Components created
+
+Files modified
+
+Routes touched
