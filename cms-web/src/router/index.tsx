@@ -7,6 +7,7 @@ import Dashboard from "../pages/Dashboard";
 import Campaigns from "../pages/Campaigns";
 import Screens from "../pages/Screens";
 import Organisations from "../pages/Organisations";
+import OrganisationDetail from "../pages/OrganisationDetail";
 import Reporting from "../pages/Reporting";
 import Login from "../pages/Login";
 
@@ -74,6 +75,14 @@ export const router = createBrowserRouter([
         element: (
           <OrgTypeGuard allowedOrgTypes={["beamer_internal"]}>
             <Organisations />
+          </OrgTypeGuard>
+        ),
+      },
+      {
+        path: "organisations/:id",
+        element: (
+          <OrgTypeGuard allowedOrgTypes={["beamer_internal"]}>
+            <OrganisationDetail />
           </OrgTypeGuard>
         ),
       },
