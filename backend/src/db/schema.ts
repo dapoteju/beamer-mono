@@ -100,10 +100,18 @@ export const vehicles = pgTable("vehicles", {
 
 export const screens = pgTable("screens", {
   id: uuid("id").primaryKey().defaultRandom(),
+  
+  // Phase 3B: Auto-generated screen code (primary identifier)
+  code: text("code").notNull().unique(),
+  
+  // Publisher org ID remains NOT NULL for data integrity (Phase 3A dual-FK strategy)
   publisherOrgId: uuid("publisher_org_id")
     .notNull()
     .references(() => organisations.id),
-  name: varchar("name", { length: 255 }).notNull(),
+  
+  // Phase 3B: Name is now optional (code is the primary identifier)
+  name: varchar("name", { length: 255 }),
+  
   screenType: varchar("screen_type", { length: 50 }).notNull(), // taxi_top, billboard, etc.
   resolutionWidth: integer("resolution_width").notNull(),
   resolutionHeight: integer("resolution_height").notNull(),
