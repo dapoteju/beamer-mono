@@ -5,6 +5,17 @@ import { fetchCampaigns } from "../api/campaigns";
 import { getCampaignReport, type CampaignReport } from "../api/reports";
 import { useAuthStore } from "../store/authStore";
 import { downloadCsv } from "../utils/csv";
+import {
+  LineChart,
+  Line,
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  ResponsiveContainer,
+} from "recharts";
 
 export default function CampaignReporting() {
   const { user } = useAuthStore();
@@ -307,31 +318,76 @@ export default function CampaignReporting() {
                     No daily impression data available.
                   </p>
                 ) : (
-                  <div className="overflow-x-auto">
-                    <table className="w-full">
-                      <thead className="bg-zinc-50 border-b border-zinc-200">
-                        <tr>
-                          <th className="text-left px-4 py-3 text-xs font-medium text-zinc-700 uppercase tracking-wider">
-                            Date
-                          </th>
-                          <th className="text-right px-4 py-3 text-xs font-medium text-zinc-700 uppercase tracking-wider">
-                            Impressions
-                          </th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-zinc-200">
-                        {reportData.byDay.map((day) => (
-                          <tr key={day.date} className="hover:bg-zinc-50">
-                            <td className="px-4 py-3 text-sm text-zinc-900">
-                              {formatDate(day.date)}
-                            </td>
-                            <td className="px-4 py-3 text-sm text-zinc-900 text-right font-medium">
-                              {day.impressions.toLocaleString()}
-                            </td>
+                  <div>
+                    <div className="mb-6">
+                      <ResponsiveContainer width="100%" height={300}>
+                        <LineChart
+                          data={reportData.byDay.map((day) => ({
+                            date: formatDate(day.date),
+                            impressions: day.impressions,
+                          }))}
+                          margin={{ top: 5, right: 20, left: 10, bottom: 5 }}
+                        >
+                          <CartesianGrid strokeDasharray="3 3" stroke="#e4e4e7" />
+                          <XAxis
+                            dataKey="date"
+                            tick={{ fontSize: 12 }}
+                            stroke="#71717a"
+                          />
+                          <YAxis
+                            tick={{ fontSize: 12 }}
+                            stroke="#71717a"
+                            tickFormatter={(value: number) => value.toLocaleString()}
+                          />
+                          <Tooltip
+                            contentStyle={{
+                              backgroundColor: "#ffffff",
+                              border: "1px solid #e4e4e7",
+                              borderRadius: "0.375rem",
+                              fontSize: "0.875rem",
+                            }}
+                            formatter={(value: number) => [
+                              value.toLocaleString(),
+                              "Impressions",
+                            ]}
+                          />
+                          <Line
+                            type="monotone"
+                            dataKey="impressions"
+                            stroke="#3b82f6"
+                            strokeWidth={2}
+                            dot={{ fill: "#3b82f6", r: 4 }}
+                            activeDot={{ r: 6 }}
+                          />
+                        </LineChart>
+                      </ResponsiveContainer>
+                    </div>
+                    <div className="overflow-x-auto">
+                      <table className="w-full">
+                        <thead className="bg-zinc-50 border-b border-zinc-200">
+                          <tr>
+                            <th className="text-left px-4 py-3 text-xs font-medium text-zinc-700 uppercase tracking-wider">
+                              Date
+                            </th>
+                            <th className="text-right px-4 py-3 text-xs font-medium text-zinc-700 uppercase tracking-wider">
+                              Impressions
+                            </th>
                           </tr>
-                        ))}
-                      </tbody>
-                    </table>
+                        </thead>
+                        <tbody className="divide-y divide-zinc-200">
+                          {reportData.byDay.map((day) => (
+                            <tr key={day.date} className="hover:bg-zinc-50">
+                              <td className="px-4 py-3 text-sm text-zinc-900">
+                                {formatDate(day.date)}
+                              </td>
+                              <td className="px-4 py-3 text-sm text-zinc-900 text-right font-medium">
+                                {day.impressions.toLocaleString()}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
                   </div>
                 )}
               </div>
@@ -345,33 +401,77 @@ export default function CampaignReporting() {
                     No screen impression data available.
                   </p>
                 ) : (
-                  <div className="overflow-x-auto">
-                    <table className="w-full">
-                      <thead className="bg-zinc-50 border-b border-zinc-200">
-                        <tr>
-                          <th className="text-left px-4 py-3 text-xs font-medium text-zinc-700 uppercase tracking-wider">
-                            Screen Name
-                          </th>
-                          <th className="text-right px-4 py-3 text-xs font-medium text-zinc-700 uppercase tracking-wider">
-                            Impressions
-                          </th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-zinc-200">
-                        {reportData.byScreen
-                          .sort((a, b) => b.impressions - a.impressions)
-                          .map((screen) => (
-                            <tr key={screen.screenId} className="hover:bg-zinc-50">
-                              <td className="px-4 py-3 text-sm text-zinc-900">
-                                {screen.screenName || screen.screenId}
-                              </td>
-                              <td className="px-4 py-3 text-sm text-zinc-900 text-right font-medium">
-                                {screen.impressions.toLocaleString()}
-                              </td>
-                            </tr>
-                          ))}
-                      </tbody>
-                    </table>
+                  <div>
+                    <div className="mb-6">
+                      <ResponsiveContainer width="100%" height={300}>
+                        <BarChart
+                          data={reportData.byScreen
+                            .sort((a, b) => b.impressions - a.impressions)
+                            .slice(0, 10)
+                            .map((screen) => ({
+                              name: screen.screenName || screen.screenId,
+                              impressions: screen.impressions,
+                            }))}
+                          margin={{ top: 5, right: 20, left: 10, bottom: 5 }}
+                        >
+                          <CartesianGrid strokeDasharray="3 3" stroke="#e4e4e7" />
+                          <XAxis
+                            dataKey="name"
+                            tick={{ fontSize: 12 }}
+                            stroke="#71717a"
+                            angle={-45}
+                            textAnchor="end"
+                            height={80}
+                          />
+                          <YAxis
+                            tick={{ fontSize: 12 }}
+                            stroke="#71717a"
+                            tickFormatter={(value: number) => value.toLocaleString()}
+                          />
+                          <Tooltip
+                            contentStyle={{
+                              backgroundColor: "#ffffff",
+                              border: "1px solid #e4e4e7",
+                              borderRadius: "0.375rem",
+                              fontSize: "0.875rem",
+                            }}
+                            formatter={(value: number) => [
+                              value.toLocaleString(),
+                              "Impressions",
+                            ]}
+                          />
+                          <Bar dataKey="impressions" fill="#3b82f6" radius={[4, 4, 0, 0]} />
+                        </BarChart>
+                      </ResponsiveContainer>
+                    </div>
+                    <div className="overflow-x-auto">
+                      <table className="w-full">
+                        <thead className="bg-zinc-50 border-b border-zinc-200">
+                          <tr>
+                            <th className="text-left px-4 py-3 text-xs font-medium text-zinc-700 uppercase tracking-wider">
+                              Screen Name
+                            </th>
+                            <th className="text-right px-4 py-3 text-xs font-medium text-zinc-700 uppercase tracking-wider">
+                              Impressions
+                            </th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-zinc-200">
+                          {reportData.byScreen
+                            .sort((a, b) => b.impressions - a.impressions)
+                            .map((screen) => (
+                              <tr key={screen.screenId} className="hover:bg-zinc-50">
+                                <td className="px-4 py-3 text-sm text-zinc-900">
+                                  {screen.screenName || screen.screenId}
+                                </td>
+                                <td className="px-4 py-3 text-sm text-zinc-900 text-right font-medium">
+                                  {screen.impressions.toLocaleString()}
+                                </td>
+                              </tr>
+                            ))}
+                        </tbody>
+                      </table>
+                    </div>
                   </div>
                 )}
               </div>
