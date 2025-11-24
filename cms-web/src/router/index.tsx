@@ -9,6 +9,10 @@ import Screens from "../pages/Screens";
 import ScreenDetail from "../pages/ScreenDetail";
 import Organisations from "../pages/Organisations";
 import OrganisationDetail from "../pages/OrganisationDetail";
+import Publishers from "../pages/Publishers";
+import PublisherDetail from "../pages/PublisherDetail";
+import Advertisers from "../pages/Advertisers";
+import AdvertiserDetail from "../pages/AdvertiserDetail";
 import Reporting from "../pages/Reporting";
 import Login from "../pages/Login";
 
@@ -99,6 +103,38 @@ export const router = createBrowserRouter([
         element: (
           <OrgTypeGuard allowedOrgTypes={["beamer_internal"]}>
             <OrganisationDetail />
+          </OrgTypeGuard>
+        ),
+      },
+      {
+        path: "publishers",
+        element: (
+          <OrgTypeGuard allowedOrgTypes={["beamer_internal"]}>
+            <Publishers />
+          </OrgTypeGuard>
+        ),
+      },
+      {
+        path: "publishers/:id",
+        element: (
+          <OrgTypeGuard allowedOrgTypes={["beamer_internal"]}>
+            <PublisherDetail />
+          </OrgTypeGuard>
+        ),
+      },
+      {
+        path: "advertisers",
+        element: (
+          <OrgTypeGuard allowedOrgTypes={["beamer_internal"]}>
+            <Advertisers />
+          </OrgTypeGuard>
+        ),
+      },
+      {
+        path: "advertisers/:id",
+        element: (
+          <OrgTypeGuard allowedOrgTypes={["beamer_internal"]}>
+            <AdvertiserDetail />
           </OrgTypeGuard>
         ),
       },
