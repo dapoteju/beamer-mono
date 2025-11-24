@@ -1,6 +1,6 @@
 // src/modules/screens/screens.service.ts
 import { db } from "../../db/client";
-import { screens, organisations, players, heartbeats, playEvents, creatives, campaigns, regions } from "../../db/schema";
+import { screens, organisations, players, heartbeats, playEvents, creatives, campaigns, regions, vehicles } from "../../db/schema";
 import { eq, desc, and, gte, sql, isNull } from "drizzle-orm";
 
 export async function listScreens(filters?: {
@@ -72,10 +72,31 @@ export async function listScreensWithPlayerInfo(filters?: {
         FROM ${heartbeats} h 
         WHERE h.screen_id = ${screens.id}
       )`,
+      // Phase 1: Extended metadata (nullable fields)
+      screenClassification: screens.screenClassification,
+      vehicleId: screens.vehicleId,
+      structureType: screens.structureType,
+      sizeDescription: screens.sizeDescription,
+      illuminationType: screens.illuminationType,
+      address: screens.address,
+      venueName: screens.venueName,
+      venueType: screens.venueType,
+      venueAddress: screens.venueAddress,
+      latitude: screens.latitude,
+      longitude: screens.longitude,
+      // Vehicle data (joined)
+      vehicle: {
+        id: vehicles.id,
+        licencePlate: vehicles.licencePlate,
+        make: vehicles.make,
+        model: vehicles.model,
+        colour: vehicles.colour,
+      },
     })
     .from(screens)
     .leftJoin(organisations, eq(screens.publisherOrgId, organisations.id))
-    .leftJoin(players, eq(players.screenId, screens.id));
+    .leftJoin(players, eq(players.screenId, screens.id))
+    .leftJoin(vehicles, eq(screens.vehicleId, vehicles.id));
 
   if (conditions.length > 0) {
     return query.where(and(...conditions));
@@ -133,9 +154,33 @@ export async function getScreenDetail(screenId: string) {
       resolutionHeight: screens.resolutionHeight,
       lat: screens.lat,
       lng: screens.lng,
+      // Phase 1: Extended metadata (nullable fields)
+      screenClassification: screens.screenClassification,
+      vehicleId: screens.vehicleId,
+      structureType: screens.structureType,
+      sizeDescription: screens.sizeDescription,
+      illuminationType: screens.illuminationType,
+      address: screens.address,
+      venueName: screens.venueName,
+      venueType: screens.venueType,
+      venueAddress: screens.venueAddress,
+      latitude: screens.latitude,
+      longitude: screens.longitude,
+      // Vehicle data (joined)
+      vehicle: {
+        id: vehicles.id,
+        identifier: vehicles.identifier,
+        licencePlate: vehicles.licencePlate,
+        make: vehicles.make,
+        model: vehicles.model,
+        year: vehicles.year,
+        colour: vehicles.colour,
+        notes: vehicles.notes,
+      },
     })
     .from(screens)
     .leftJoin(organisations, eq(screens.publisherOrgId, organisations.id))
+    .leftJoin(vehicles, eq(screens.vehicleId, vehicles.id))
     .where(eq(screens.id, screenId));
 
   if (!screen) return null;

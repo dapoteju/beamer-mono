@@ -77,10 +77,31 @@ async function listScreensWithPlayerInfo(filters) {
         FROM ${schema_1.heartbeats} h 
         WHERE h.screen_id = ${schema_1.screens.id}
       )`,
+        // Phase 1: Extended metadata (nullable fields)
+        screenClassification: schema_1.screens.screenClassification,
+        vehicleId: schema_1.screens.vehicleId,
+        structureType: schema_1.screens.structureType,
+        sizeDescription: schema_1.screens.sizeDescription,
+        illuminationType: schema_1.screens.illuminationType,
+        address: schema_1.screens.address,
+        venueName: schema_1.screens.venueName,
+        venueType: schema_1.screens.venueType,
+        venueAddress: schema_1.screens.venueAddress,
+        latitude: schema_1.screens.latitude,
+        longitude: schema_1.screens.longitude,
+        // Vehicle data (joined)
+        vehicle: {
+            id: schema_1.vehicles.id,
+            licencePlate: schema_1.vehicles.licencePlate,
+            make: schema_1.vehicles.make,
+            model: schema_1.vehicles.model,
+            colour: schema_1.vehicles.colour,
+        },
     })
         .from(schema_1.screens)
         .leftJoin(schema_1.organisations, (0, drizzle_orm_1.eq)(schema_1.screens.publisherOrgId, schema_1.organisations.id))
-        .leftJoin(schema_1.players, (0, drizzle_orm_1.eq)(schema_1.players.screenId, schema_1.screens.id));
+        .leftJoin(schema_1.players, (0, drizzle_orm_1.eq)(schema_1.players.screenId, schema_1.screens.id))
+        .leftJoin(schema_1.vehicles, (0, drizzle_orm_1.eq)(schema_1.screens.vehicleId, schema_1.vehicles.id));
     if (conditions.length > 0) {
         return query.where((0, drizzle_orm_1.and)(...conditions));
     }
@@ -122,9 +143,33 @@ async function getScreenDetail(screenId) {
         resolutionHeight: schema_1.screens.resolutionHeight,
         lat: schema_1.screens.lat,
         lng: schema_1.screens.lng,
+        // Phase 1: Extended metadata (nullable fields)
+        screenClassification: schema_1.screens.screenClassification,
+        vehicleId: schema_1.screens.vehicleId,
+        structureType: schema_1.screens.structureType,
+        sizeDescription: schema_1.screens.sizeDescription,
+        illuminationType: schema_1.screens.illuminationType,
+        address: schema_1.screens.address,
+        venueName: schema_1.screens.venueName,
+        venueType: schema_1.screens.venueType,
+        venueAddress: schema_1.screens.venueAddress,
+        latitude: schema_1.screens.latitude,
+        longitude: schema_1.screens.longitude,
+        // Vehicle data (joined)
+        vehicle: {
+            id: schema_1.vehicles.id,
+            identifier: schema_1.vehicles.identifier,
+            licencePlate: schema_1.vehicles.licencePlate,
+            make: schema_1.vehicles.make,
+            model: schema_1.vehicles.model,
+            year: schema_1.vehicles.year,
+            colour: schema_1.vehicles.colour,
+            notes: schema_1.vehicles.notes,
+        },
     })
         .from(schema_1.screens)
         .leftJoin(schema_1.organisations, (0, drizzle_orm_1.eq)(schema_1.screens.publisherOrgId, schema_1.organisations.id))
+        .leftJoin(schema_1.vehicles, (0, drizzle_orm_1.eq)(schema_1.screens.vehicleId, schema_1.vehicles.id))
         .where((0, drizzle_orm_1.eq)(schema_1.screens.id, screenId));
     if (!screen)
         return null;

@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.invoices = exports.bookingFlights = exports.screenGroupMembers = exports.screenGroups = exports.heartbeats = exports.playEvents = exports.players = exports.creativeApprovals = exports.users = exports.regions = exports.creatives = exports.flightCreatives = exports.flights = exports.bookings = exports.campaigns = exports.screens = exports.organisations = exports.userRoleEnum = exports.screenStatusEnum = exports.orgTypeEnum = void 0;
+exports.invoices = exports.bookingFlights = exports.screenGroupMembers = exports.screenGroups = exports.heartbeats = exports.playEvents = exports.players = exports.creativeApprovals = exports.users = exports.regions = exports.creatives = exports.flightCreatives = exports.flights = exports.bookings = exports.campaigns = exports.screens = exports.vehicles = exports.organisations = exports.userRoleEnum = exports.screenStatusEnum = exports.orgTypeEnum = void 0;
 // src/db/schema.ts
 const pg_core_1 = require("drizzle-orm/pg-core");
 // --- Enums ---
@@ -30,6 +30,26 @@ exports.organisations = (0, pg_core_1.pgTable)("organisations", {
         .defaultNow()
         .notNull(),
 });
+// --- Vehicles (Phase 1: Vehicle metadata) ---
+exports.vehicles = (0, pg_core_1.pgTable)("vehicles", {
+    id: (0, pg_core_1.text)("id").primaryKey(),
+    publisherOrgId: (0, pg_core_1.uuid)("publisher_org_id")
+        .notNull()
+        .references(() => exports.organisations.id),
+    identifier: (0, pg_core_1.text)("identifier"),
+    licencePlate: (0, pg_core_1.text)("licence_plate"),
+    make: (0, pg_core_1.text)("make"),
+    model: (0, pg_core_1.text)("model"),
+    year: (0, pg_core_1.text)("year"),
+    colour: (0, pg_core_1.text)("colour"),
+    notes: (0, pg_core_1.text)("notes"),
+    createdAt: (0, pg_core_1.timestamp)("created_at", { withTimezone: true })
+        .defaultNow()
+        .notNull(),
+    updatedAt: (0, pg_core_1.timestamp)("updated_at", { withTimezone: true })
+        .defaultNow()
+        .notNull(),
+});
 // --- Screens ---
 exports.screens = (0, pg_core_1.pgTable)("screens", {
     id: (0, pg_core_1.uuid)("id").primaryKey().defaultRandom(),
@@ -48,6 +68,21 @@ exports.screens = (0, pg_core_1.pgTable)("screens", {
     createdAt: (0, pg_core_1.timestamp)("created_at", { withTimezone: true })
         .defaultNow()
         .notNull(),
+    // Phase 1: Extended metadata (all nullable, non-breaking)
+    screenClassification: (0, pg_core_1.text)("screen_classification").default("vehicle"), // vehicle, billboard, indoor
+    vehicleId: (0, pg_core_1.text)("vehicle_id").references(() => exports.vehicles.id),
+    // Billboard/static OOH metadata
+    structureType: (0, pg_core_1.text)("structure_type"),
+    sizeDescription: (0, pg_core_1.text)("size_description"),
+    illuminationType: (0, pg_core_1.text)("illumination_type"),
+    address: (0, pg_core_1.text)("address"),
+    // Indoor metadata
+    venueName: (0, pg_core_1.text)("venue_name"),
+    venueType: (0, pg_core_1.text)("venue_type"),
+    venueAddress: (0, pg_core_1.text)("venue_address"),
+    // Geographic coordinates (nullable, more precise than existing lat/lng strings)
+    latitude: (0, pg_core_1.numeric)("latitude", { precision: 10, scale: 7 }),
+    longitude: (0, pg_core_1.numeric)("longitude", { precision: 10, scale: 7 }),
 });
 // --- Campaigns ---
 exports.campaigns = (0, pg_core_1.pgTable)("campaigns", {

@@ -1,0 +1,158 @@
+I want to extend the Beamer backend to support richer screen classification and vehicle metadata without breaking the existing CRUD implementation that is already fully functional.
+
+The CMS must continue working exactly as it does now.
+
+This phase must limit itself to:
+
+non-destructive database migrations
+
+optional/nullable new fields
+
+extended GET responses only
+
+zero changes to POST or PATCH behavior
+
+Do NOT modify screen creation or update logic.
+Do NOT break player assignment logic.
+Do NOT break publisher logic.
+Do NOT modify field names currently used by the CMS.
+
+1. DATABASE MIGRATION (Safe Additions Only)
+1.1 Create a new vehicles table
+
+Add this table (ALL fields nullable except id and publisher_id):
+
+vehicles
+  id             text primary key
+  publisher_id   text not null references publishers(id)
+  identifier     text
+  licence_plate  text
+  make           text
+  model          text
+  year           text
+  colour         text
+  notes          text
+  created_at     timestamp default now()
+  updated_at     timestamp default now()
+
+1.2 Add new nullable fields to screens
+
+Add the following columns to screens (all NULLABLE):
+
+screen_type       text   -- default = 'vehicle'
+vehicle_id        text references vehicles(id)
+
+-- Billboard/static OOH metadata
+structure_type    text
+size_description  text
+illumination_type text
+address           text
+
+-- Indoor metadata
+venue_name        text
+venue_type        text
+venue_address     text
+
+latitude          numeric
+longitude         numeric
+
+1.3 Default migration
+
+For all existing screens:
+
+Set screen_type = 'vehicle'
+
+Leave all new fields NULL
+
+Do NOT auto-create vehicle records yet (Phase 2)
+
+This makes all updates backward-compatible.
+
+2. BACKEND API CHANGES (Non-Breaking)
+
+DO NOT modify POST or PATCH logic in this phase.
+DO NOT add validation for new fields yet.
+DO NOT change required fields.
+
+ONLY extend the GET responses:
+
+2.1 Update /api/screens (list)
+
+Add to each returned screen:
+
+screen_type
+vehicle: {
+  id,
+  licence_plate,
+  make,
+  model,
+  colour
+} | null
+
+structure_type
+size_description
+illumination_type
+address
+venue_name
+venue_type
+venue_address
+latitude
+longitude
+
+2.2 Update /api/screens/:id (detail)
+
+Add the same fields as above.
+
+For vehicle screens:
+
+Return the joined vehicle object if vehicle_id exists.
+
+If no vehicle is linked:
+
+Return vehicle: null.
+
+DO NOT change any existing fields.
+
+3. INTERNAL TYPES
+
+Update backend TypeScript interfaces/types for:
+
+Screen
+
+ScreenDetail
+
+But ONLY by adding optional fields.
+
+Do not remove or rename existing properties.
+
+4. TESTING REQUIREMENTS
+
+After implementing Phase 1, confirm:
+
+Database compiles and migrates.
+
+Backend compiles (no TypeScript errors).
+
+CMS still works normally:
+
+Screens list loads
+
+Screen detail loads
+
+Create/Edit screens still work
+
+Player assignment still works
+
+GET /api/screens and GET /api/screens/:id now include new fields in JSON.
+
+Finally, provide:
+
+Updated DB schema
+
+Backend files modified
+
+Example JSON for:
+
+vehicle-type screen
+
+billboard-type screen (with mock data)

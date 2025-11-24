@@ -47,6 +47,28 @@ export const organisations = pgTable("organisations", {
     .notNull(),
 });
 
+// --- Vehicles (Phase 1: Vehicle metadata) ---
+
+export const vehicles = pgTable("vehicles", {
+  id: text("id").primaryKey(),
+  publisherOrgId: uuid("publisher_org_id")
+    .notNull()
+    .references(() => organisations.id),
+  identifier: text("identifier"),
+  licencePlate: text("licence_plate"),
+  make: text("make"),
+  model: text("model"),
+  year: text("year"),
+  colour: text("colour"),
+  notes: text("notes"),
+  createdAt: timestamp("created_at", { withTimezone: true })
+    .defaultNow()
+    .notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true })
+    .defaultNow()
+    .notNull(),
+});
+
 // --- Screens ---
 
 export const screens = pgTable("screens", {
@@ -66,6 +88,25 @@ export const screens = pgTable("screens", {
   createdAt: timestamp("created_at", { withTimezone: true })
     .defaultNow()
     .notNull(),
+  
+  // Phase 1: Extended metadata (all nullable, non-breaking)
+  screenClassification: text("screen_classification").default("vehicle"), // vehicle, billboard, indoor
+  vehicleId: text("vehicle_id").references(() => vehicles.id),
+  
+  // Billboard/static OOH metadata
+  structureType: text("structure_type"),
+  sizeDescription: text("size_description"),
+  illuminationType: text("illumination_type"),
+  address: text("address"),
+  
+  // Indoor metadata
+  venueName: text("venue_name"),
+  venueType: text("venue_type"),
+  venueAddress: text("venue_address"),
+  
+  // Geographic coordinates (nullable, more precise than existing lat/lng strings)
+  latitude: numeric("latitude", { precision: 10, scale: 7 }),
+  longitude: numeric("longitude", { precision: 10, scale: 7 }),
 });
 
 // --- Campaigns ---
