@@ -28,6 +28,30 @@ function ProtectedRoute({ children }: { children: ReactElement }) {
   return children;
 }
 
+function OrgTypeGuard({
+  children,
+  allowedOrgTypes,
+}: {
+  children: ReactElement;
+  allowedOrgTypes: string[];
+}) {
+  const { user, hasHydrated } = useAuthStore();
+
+  if (!hasHydrated) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-zinc-100">
+        <div className="text-zinc-600">Loading...</div>
+      </div>
+    );
+  }
+
+  if (!user || !allowedOrgTypes.includes(user.orgType)) {
+    return <Navigate to="/dashboard" replace />;
+  }
+
+  return children;
+}
+
 export const router = createBrowserRouter([
   {
     path: "/login",
@@ -45,7 +69,14 @@ export const router = createBrowserRouter([
       { path: "dashboard", element: <Dashboard /> },
       { path: "campaigns", element: <Campaigns /> },
       { path: "screens", element: <Screens /> },
-      { path: "organisations", element: <Organisations /> },
+      {
+        path: "organisations",
+        element: (
+          <OrgTypeGuard allowedOrgTypes={["beamer_internal"]}>
+            <Organisations />
+          </OrgTypeGuard>
+        ),
+      },
       { path: "reporting", element: <Reporting /> },
     ],
   },
