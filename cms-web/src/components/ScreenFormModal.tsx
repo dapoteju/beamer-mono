@@ -6,8 +6,9 @@ import type {
   Region,
   Publisher,
   Player,
+  VehicleOption,
 } from "../api/screens";
-import { fetchRegions, fetchPublishers, fetchPlayers, createScreen, updateScreen } from "../api/screens";
+import { fetchRegions, fetchPublishers, fetchPlayers, fetchVehicles, createScreen, updateScreen } from "../api/screens";
 import { useAuthStore } from "../store/authStore";
 
 interface ScreenFormModalProps {
@@ -20,6 +21,15 @@ interface ScreenFormModalProps {
     publisherOrgId: string;
     status: string;
     playerId: string | null;
+    screenClassification?: "vehicle" | "billboard" | "indoor" | "other";
+    vehicleId?: string | null;
+    structureType?: string | null;
+    sizeDescription?: string | null;
+    illuminationType?: string | null;
+    address?: string | null;
+    venueName?: string | null;
+    venueType?: string | null;
+    venueAddress?: string | null;
   };
   onClose: () => void;
   onSuccess: () => void;
@@ -36,6 +46,15 @@ export function ScreenFormModal({ mode, screenId, initialValues, onClose, onSucc
     publisherOrgId: initialValues?.publisherOrgId || "",
     status: initialValues?.status || "active",
     playerId: initialValues?.playerId || "",
+    screenClassification: (initialValues?.screenClassification || "vehicle") as "vehicle" | "billboard" | "indoor" | "other",
+    vehicleId: initialValues?.vehicleId || "",
+    structureType: initialValues?.structureType || "",
+    sizeDescription: initialValues?.sizeDescription || "",
+    illuminationType: initialValues?.illuminationType || "",
+    address: initialValues?.address || "",
+    venueName: initialValues?.venueName || "",
+    venueType: initialValues?.venueType || "",
+    venueAddress: initialValues?.venueAddress || "",
   });
 
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -55,6 +74,11 @@ export function ScreenFormModal({ mode, screenId, initialValues, onClose, onSucc
   const { data: players = [] } = useQuery<Player[]>({
     queryKey: ["players"],
     queryFn: fetchPlayers,
+  });
+
+  const { data: vehicles = [] } = useQuery<VehicleOption[]>({
+    queryKey: ["vehicles"],
+    queryFn: fetchVehicles,
   });
 
   // Create mutation
@@ -109,6 +133,15 @@ export function ScreenFormModal({ mode, screenId, initialValues, onClose, onSucc
         publisherOrgId: formData.publisherOrgId,
         status: formData.status as any,
         playerId: formData.playerId || undefined,
+        screenClassification: formData.screenClassification,
+        vehicleId: formData.vehicleId || undefined,
+        structureType: formData.structureType || undefined,
+        sizeDescription: formData.sizeDescription || undefined,
+        illuminationType: formData.illuminationType || undefined,
+        address: formData.address || undefined,
+        venueName: formData.venueName || undefined,
+        venueType: formData.venueType || undefined,
+        venueAddress: formData.venueAddress || undefined,
       };
       createMutation.mutate(payload);
     } else {
@@ -117,6 +150,15 @@ export function ScreenFormModal({ mode, screenId, initialValues, onClose, onSucc
         city: formData.city,
         regionCode: formData.regionCode,
         status: formData.status as any,
+        screenClassification: formData.screenClassification,
+        vehicleId: formData.vehicleId || undefined,
+        structureType: formData.structureType || undefined,
+        sizeDescription: formData.sizeDescription || undefined,
+        illuminationType: formData.illuminationType || undefined,
+        address: formData.address || undefined,
+        venueName: formData.venueName || undefined,
+        venueType: formData.venueType || undefined,
+        venueAddress: formData.venueAddress || undefined,
       };
 
       // Only include publisherOrgId if user is internal and it changed
@@ -250,6 +292,135 @@ export function ScreenFormModal({ mode, screenId, initialValues, onClose, onSucc
             )}
             {errors.publisherOrgId && <p className="text-red-500 text-sm mt-1">{errors.publisherOrgId}</p>}
           </div>
+
+          {/* Screen Classification */}
+          <div>
+            <label className="block text-sm font-medium text-zinc-700 mb-1">Screen Type</label>
+            <select
+              value={formData.screenClassification}
+              onChange={(e) => setFormData({ ...formData, screenClassification: e.target.value as any })}
+              className="w-full px-3 py-2 border border-zinc-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
+              <option value="vehicle">Vehicle</option>
+              <option value="billboard">Billboard</option>
+              <option value="indoor">Indoor</option>
+              <option value="other">Other</option>
+            </select>
+          </div>
+
+          {/* Vehicle Section (only show if classification is vehicle) */}
+          {formData.screenClassification === "vehicle" && (
+            <div className="p-4 bg-blue-50 border border-blue-200 rounded-md">
+              <h3 className="text-sm font-semibold text-zinc-900 mb-3">Vehicle Details</h3>
+              <div>
+                <label className="block text-sm font-medium text-zinc-700 mb-1">Vehicle</label>
+                <select
+                  value={formData.vehicleId}
+                  onChange={(e) => setFormData({ ...formData, vehicleId: e.target.value })}
+                  className="w-full px-3 py-2 border border-zinc-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+                >
+                  <option value="">No vehicle assigned</option>
+                  {vehicles.map((vehicle) => {
+                    const label = [
+                      vehicle.licencePlate,
+                      vehicle.make,
+                      vehicle.model,
+                      vehicle.publisherOrgName && `[${vehicle.publisherOrgName}]`,
+                    ].filter(Boolean).join(" • ");
+                    return (
+                      <option key={vehicle.id} value={vehicle.id}>
+                        {label || vehicle.id}
+                      </option>
+                    );
+                  })}
+                </select>
+              </div>
+            </div>
+          )}
+
+          {/* Billboard Section (only show if classification is billboard) */}
+          {formData.screenClassification === "billboard" && (
+            <div className="p-4 bg-amber-50 border border-amber-200 rounded-md space-y-3">
+              <h3 className="text-sm font-semibold text-zinc-900">Billboard Details</h3>
+              <div>
+                <label className="block text-sm font-medium text-zinc-700 mb-1">Structure Type</label>
+                <input
+                  type="text"
+                  value={formData.structureType}
+                  onChange={(e) => setFormData({ ...formData, structureType: e.target.value })}
+                  className="w-full px-3 py-2 border border-zinc-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+                  placeholder="e.g., Digital Billboard, Static Poster"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-zinc-700 mb-1">Size Description</label>
+                <input
+                  type="text"
+                  value={formData.sizeDescription}
+                  onChange={(e) => setFormData({ ...formData, sizeDescription: e.target.value })}
+                  className="w-full px-3 py-2 border border-zinc-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+                  placeholder="e.g., 48ft x 14ft"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-zinc-700 mb-1">Illumination Type</label>
+                <input
+                  type="text"
+                  value={formData.illuminationType}
+                  onChange={(e) => setFormData({ ...formData, illuminationType: e.target.value })}
+                  className="w-full px-3 py-2 border border-zinc-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+                  placeholder="e.g., LED Backlit, Non-illuminated"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-zinc-700 mb-1">Address</label>
+                <input
+                  type="text"
+                  value={formData.address}
+                  onChange={(e) => setFormData({ ...formData, address: e.target.value })}
+                  className="w-full px-3 py-2 border border-zinc-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+                  placeholder="e.g., Airport Approach Road, Ikeja"
+                />
+              </div>
+            </div>
+          )}
+
+          {/* Indoor Section (only show if classification is indoor) */}
+          {formData.screenClassification === "indoor" && (
+            <div className="p-4 bg-green-50 border border-green-200 rounded-md space-y-3">
+              <h3 className="text-sm font-semibold text-zinc-900">Indoor / Venue Details</h3>
+              <div>
+                <label className="block text-sm font-medium text-zinc-700 mb-1">Venue Name</label>
+                <input
+                  type="text"
+                  value={formData.venueName}
+                  onChange={(e) => setFormData({ ...formData, venueName: e.target.value })}
+                  className="w-full px-3 py-2 border border-zinc-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+                  placeholder="e.g., The Palms Shopping Mall"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-zinc-700 mb-1">Venue Type</label>
+                <input
+                  type="text"
+                  value={formData.venueType}
+                  onChange={(e) => setFormData({ ...formData, venueType: e.target.value })}
+                  className="w-full px-3 py-2 border border-zinc-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+                  placeholder="e.g., Shopping Center - Food Court"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-zinc-700 mb-1">Venue Address</label>
+                <input
+                  type="text"
+                  value={formData.venueAddress}
+                  onChange={(e) => setFormData({ ...formData, venueAddress: e.target.value })}
+                  className="w-full px-3 py-2 border border-zinc-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+                  placeholder="e.g., Bisway St, Lekki Phase 1"
+                />
+              </div>
+            </div>
+          )}
 
           {/* Status */}
           <div>

@@ -1,5 +1,16 @@
 import apiClient from "./client";
 
+export interface Vehicle {
+  id: string;
+  licencePlate?: string | null;
+  make?: string | null;
+  model?: string | null;
+  colour?: string | null;
+  identifier?: string | null;
+  publisherOrgId?: string;
+  publisherOrgName?: string | null;
+}
+
 export interface Screen {
   id: string;
   name: string;
@@ -11,6 +22,18 @@ export interface Screen {
   playerId: string | null;
   lastHeartbeatAt: string | null;
   isOnline: boolean;
+  // Phase 2: Extended metadata
+  screenClassification?: "vehicle" | "billboard" | "indoor" | "other";
+  vehicle?: Vehicle | null;
+  structureType?: string | null;
+  sizeDescription?: string | null;
+  illuminationType?: string | null;
+  address?: string | null;
+  venueName?: string | null;
+  venueType?: string | null;
+  venueAddress?: string | null;
+  latitude?: number | null;
+  longitude?: number | null;
 }
 
 export interface ScreenPlayer {
@@ -35,6 +58,19 @@ export interface ScreenInfo {
   resolutionHeight: number;
   lat: string;
   lng: string;
+  // Phase 2: Extended metadata
+  screenClassification?: "vehicle" | "billboard" | "indoor" | "other";
+  vehicleId?: string | null;
+  vehicle?: Vehicle | null;
+  structureType?: string | null;
+  sizeDescription?: string | null;
+  illuminationType?: string | null;
+  address?: string | null;
+  venueName?: string | null;
+  venueType?: string | null;
+  venueAddress?: string | null;
+  latitude?: number | null;
+  longitude?: number | null;
 }
 
 export interface ScreenStats {
@@ -131,6 +167,17 @@ export interface Player {
   currentScreenName: string | null;
 }
 
+export interface VehicleOption {
+  id: string;
+  identifier: string | null;
+  licencePlate: string | null;
+  make: string | null;
+  model: string | null;
+  colour: string | null;
+  publisherOrgId: string;
+  publisherOrgName: string | null;
+}
+
 export async function fetchRegions(): Promise<Region[]> {
   const response = await apiClient.get<Region[]>("/screens/dropdown/regions");
   return response.data;
@@ -146,6 +193,11 @@ export async function fetchPlayers(): Promise<Player[]> {
   return response.data;
 }
 
+export async function fetchVehicles(): Promise<VehicleOption[]> {
+  const response = await apiClient.get<VehicleOption[]>("/screens/dropdown/vehicles");
+  return response.data;
+}
+
 // CRUD operations
 
 export interface CreateScreenPayload {
@@ -155,6 +207,18 @@ export interface CreateScreenPayload {
   publisherOrgId: string;
   status?: 'active' | 'inactive' | 'maintenance';
   playerId?: string;
+  // Phase 2: Extended metadata (optional)
+  screenClassification?: "vehicle" | "billboard" | "indoor" | "other";
+  vehicleId?: string | null;
+  structureType?: string | null;
+  sizeDescription?: string | null;
+  illuminationType?: string | null;
+  address?: string | null;
+  venueName?: string | null;
+  venueType?: string | null;
+  venueAddress?: string | null;
+  latitude?: number | null;
+  longitude?: number | null;
 }
 
 export interface UpdateScreenPayload {
@@ -164,6 +228,18 @@ export interface UpdateScreenPayload {
   publisherOrgId?: string;
   status?: 'active' | 'inactive' | 'maintenance';
   playerId?: string | null;
+  // Phase 2: Extended metadata (optional)
+  screenClassification?: "vehicle" | "billboard" | "indoor" | "other";
+  vehicleId?: string | null;
+  structureType?: string | null;
+  sizeDescription?: string | null;
+  illuminationType?: string | null;
+  address?: string | null;
+  venueName?: string | null;
+  venueType?: string | null;
+  venueAddress?: string | null;
+  latitude?: number | null;
+  longitude?: number | null;
 }
 
 export async function createScreen(payload: CreateScreenPayload): Promise<ScreenInfo> {
