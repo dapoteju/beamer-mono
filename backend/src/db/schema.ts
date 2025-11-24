@@ -28,6 +28,12 @@ export const screenStatusEnum = pgEnum("screen_status", [
   "maintenance",
 ]);
 
+export const userRoleEnum = pgEnum("user_role", [
+  "admin",
+  "ops",
+  "viewer",
+]);
+
 // --- Organisations ---
 
 export const organisations = pgTable("organisations", {
@@ -173,9 +179,16 @@ export const regions = pgTable("regions", {
 export const users = pgTable("users", {
   id: uuid("id").primaryKey().defaultRandom(),
   email: varchar("email", { length: 255 }).notNull().unique(),
-  name: varchar("name", { length: 255 }).notNull(),
-  role: text("role").notNull(),
+  passwordHash: text("password_hash").notNull(),
+  fullName: varchar("full_name", { length: 255 }).notNull(),
+  orgId: uuid("org_id")
+    .notNull()
+    .references(() => organisations.id),
+  role: userRoleEnum("role").notNull(),
   createdAt: timestamp("created_at", { withTimezone: true })
+    .defaultNow()
+    .notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true })
     .defaultNow()
     .notNull(),
 });
