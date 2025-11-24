@@ -1,0 +1,457 @@
+PHASE 3B — Location History + Inventory Map MVP (Vehicle Screens Only)
+
+PROMPT START
+
+We’ve already implemented:
+
+Extended screen metadata (classification, vehicles, lat/long)
+
+Classification-aware CMS UI
+
+Publishers & Advertisers separation
+
+Screens wired to publisher_profiles
+
+Screen codes (NanoID-based with type prefix)
+
+Optional publisher on screen creation
+
+Clean Inventory / Publishers / Advertisers navigation
+
+Now I want you to implement Phase 3B: Location History + Inventory Map (MVP).
+
+Key constraints:
+
+Only vehicle screens should generate location history.
+
+Location history must be sampled (not every heartbeat) to avoid massive data growth.
+
+Backward compatibility must be preserved.
+
+Existing behaviour (heartbeats, screens, campaigns, players, PoP) must continue working.
+
+1. BACKEND — LOCATION HISTORY MODEL
+1.1 Create screen_location_history table
+
+Create a new table:
+
+screen_location_history
+  id            text primary key
+  screen_id     text not null references screens(id) on delete cascade
+  player_id     text null references players(id)
+  recorded_at   timestamptz not null
+  latitude      numeric not null
+  longitude     numeric not null
+  source        text not null default 'heartbeat'
+
+
+Indexes:
+
+Index on (screen_id, recorded_at) for history queries.
+
+Optionally, an index on recorded_at for future retention/cleanup.
+
+Important logic constraint:
+
+We will only insert rows into this table for screens where:
+
+screen.screenClassification = 'vehicle'
+
+Static screens (billboard/indoor/other) must not generate history rows.
+
+1.2 Extend screens with last-known position metadata
+
+We already have latitude and longitude on screens from Phase 1.
+
+Add:
+
+lastSeenAt timestamptz null
+
+
+Define semantics:
+
+For vehicle screens:
+
+latitude / longitude represent last known location.
+
+lastSeenAt = timestamp of the last heartbeat that included GPS.
+
+For static screens:
+
+latitude / longitude may represent the fixed, manually assigned position.
+
+lastSeenAt may be null or updated less frequently.
+
+Do not rename or drop any existing fields.
+
+2. BACKEND — EXTEND PLAYER HEARTBEAT TO ACCEPT GPS
+
+Locate the existing player heartbeat endpoint
+(e.g. POST /api/player/events/heartbeats or similar in the backend).
+
+Extend it to accept optional GPS:
+
+{
+  "playerId": "PlrA1b2C3",
+  "timestamp": "2025-11-24T12:34:56Z",  // or use server time if not provided
+  "latitude": 6.524379,                 // optional
+  "longitude": 3.379206                 // optional
+}
+
+2.1 Behaviour when GPS is present
+
+When a heartbeat includes latitude and longitude:
+
+Resolve player by playerId (existing behaviour).
+
+Resolve the screen that is currently assigned to this player.
+
+If no screen is linked:
+
+Update only player state as currently implemented.
+
+Skip location handling.
+
+If a screen is linked:
+
+Always update on screens:
+
+latitude = provided latitude
+
+longitude = provided longitude
+
+lastSeenAt = heartbeat timestamp (or now())
+
+If screen.screenClassification === 'vehicle':
+
+Apply sampling rules (below) before inserting into screen_location_history.
+
+2.2 Sampling rules (to avoid DB blow-up)
+
+We do not want to store a row for every heartbeat.
+
+Implement sampling per screen_id:
+
+Fetch the most recent history row for that screen_id from screen_location_history.
+
+Only insert a new row if either:
+
+More than 5 minutes (300 seconds) have passed since last_history.recorded_at, OR
+
+The distance between the last stored point and the new GPS location is greater than 200 meters.
+
+If there is no previous history row for that screen:
+
+Insert the first point immediately.
+
+You can implement distance using a simple Haversine function in Node/TypeScript.
+
+If screen.screenClassification !== 'vehicle':
+
+Still update screens.latitude / screens.longitude / lastSeenAt if you want,
+
+But do not insert into screen_location_history.
+
+3. BACKEND — LOCATION HISTORY API ENDPOINTS
+
+We need two read APIs:
+
+3.1 Per-screen location history
+
+Endpoint:
+
+GET /api/screens/:id/location-history?from=ISO&to=ISO
+
+Behaviour:
+
+Auth required (use existing auth middleware).
+
+Permissions: same as GET /api/screens/:id:
+
+Internal users: can see all screens.
+
+Publisher users: can see only their own screens.
+
+Advertiser users: forbidden.
+
+Time range:
+
+If both from and to are provided:
+
+Filter recorded_at between those.
+
+If missing:
+
+Default to the last 24 hours (e.g. now() - 24h).
+
+Response:
+
+[
+  {
+    recordedAt: string;   // ISO timestamp
+    latitude: number;
+    longitude: number;
+  },
+  ...
+]
+
+
+Return [] if no history.
+
+3.2 Per-publisher location history (for coverage)
+
+Endpoint:
+
+GET /api/publishers/:id/location-history?from=ISO&to=ISO
+
+Behaviour:
+
+Auth required.
+
+Internal users:
+
+Can query history for any publisher.
+
+Publisher users:
+
+Can only query for their own publisher id.
+
+Advertisers:
+
+Forbidden.
+
+Logic:
+
+Select all screen_id belonging to that publisher (screens.publisherId = :id).
+
+Query screen_location_history for those screen_ids within the time window.
+
+Return:
+
+[
+  {
+    screenId: string;
+    recordedAt: string;
+    latitude: number;
+    longitude: number;
+  },
+  ...
+]
+
+
+No aggregation is needed in MVP; just filtered sampled points.
+
+4. FRONTEND — INVENTORY MAP PAGE
+
+Add a new map view under Inventory in the CMS.
+
+4.1 Routing & permissions
+
+Route: /inventory/map (or equivalent in the router).
+
+Visibility:
+
+Internal users: can see all screens.
+
+Publisher users: see only their own screens.
+
+Advertisers: must not have access to the Inventory map.
+
+Use existing route guards based on orgType and role.
+
+4.2 Data source
+
+Use GET /api/screens as the primary data source for the map.
+
+Ensure the Screen type and API client expose:
+
+id
+
+code
+
+latitude
+
+longitude
+
+lastSeenAt
+
+screenClassification
+
+Online/offline status (already implemented)
+
+publisher object (name, type)
+
+If any of these are missing in the current response, extend the backend GET /api/screens` response accordingly (without breaking existing fields).
+
+4.3 Map implementation
+
+Use a React map library, e.g. react-leaflet + leaflet.
+
+Map behaviour:
+
+Only plot markers for screens that have both latitude and longitude.
+
+Marker appearance:
+
+One style/colour for online screens.
+
+Another style/colour for offline screens.
+
+On marker click, show a popup with:
+
+Screen Code (code)
+
+Screen classification (Vehicle/Billboard/Indoor/Other)
+
+Publisher name
+
+Online/offline state
+
+Last seen time (lastSeenAt, human-readable)
+
+A link or button: “View Screen Details” → /screens/:id
+
+4.4 Filters (top of map)
+
+Add controls above the map:
+
+Screen Type:
+
+All / Vehicle / Billboard / Indoor / Other
+
+Publisher:
+
+Dropdown of accessible publishers
+
+Status:
+
+All / Online / Offline
+
+Filters can be implemented client-side based on the full screens array returned from the API.
+
+5. FRONTEND — PER-SCREEN MOVEMENT HISTORY VIEW
+
+On the Screen Detail page:
+
+File: likely cms-web/src/pages/ScreenDetail.tsx
+
+5.1 UI placement
+
+Add a Movement section, either:
+
+As a new tab: Overview | Play Events | Heartbeats | Movement
+
+OR
+
+As a section within Overview if tabs are already crowded.
+
+Choose the approach that best fits the current layout, but do not remove existing functionality.
+
+5.2 Behaviour (only for vehicle screens)
+
+If screen.screenClassification === 'vehicle':
+
+Call GET /api/screens/:id/location-history:
+
+Default range: last 24 hours.
+
+If no points:
+
+Show a simple message: "No movement history available for this period."
+
+If points exist:
+
+Render a small embedded map.
+
+Plot the route as a polyline connecting points ordered by recordedAt.
+
+Optionally:
+
+Mark the start and end points differently.
+
+If screenClassification !== 'vehicle':
+
+You can either hide the Movement section entirely, or show a note:
+
+“Movement history is only tracked for vehicle screens.”
+
+6. FRONTEND — (Optional for now) Use Publisher History Endpoint Later
+
+Implement GET /api/publishers/:id/location-history on the backend,
+but it’s okay not to build a UI for it in this phase.
+
+We’ll use it later for:
+
+Publisher coverage maps
+
+Sales tooling for fleet operators
+
+Just make sure:
+
+Permissions are correct.
+
+It returns the right structure.
+
+7. VALIDATION & NON-BREAKING REQUIREMENTS
+
+After implementing Phase 3B:
+
+Backend:
+
+Compiles successfully (TypeScript ok).
+
+Migrations run cleanly.
+
+Heartbeat endpoint still works with and without GPS.
+
+No behavioural regressions for existing integrations.
+
+Frontend:
+
+Builds successfully.
+
+Screens list & detail still work as before.
+
+Screen creation/edit still works.
+
+Publisher/Screens assignment still works.
+
+New features:
+
+Inventory → Map:
+
+Shows markers for all screens with coordinates.
+
+Filters work (type, publisher, status).
+
+Clicking a marker opens a popup with basic info and a “View Screen” link that works.
+
+Screen Detail:
+
+Vehicle screens show movement history map when data exists.
+
+Non-vehicle screens don’t break.
+
+Data behaviour:
+
+screen_location_history only receives records for screens with screenClassification = 'vehicle'.
+
+Sampling is actually happening (not every heartbeat creates a row).
+
+screens.latitude, screens.longitude, and lastSeenAt update correctly for vehicle screens with GPS.
+
+Finally, summarise:
+
+New DB schema (screen_location_history, lastSeenAt).
+
+Changes to heartbeat handling (files + logic).
+
+Example responses for:
+
+GET /api/screens/:id/location-history
+
+GET /api/publishers/:id/location-history
+
+How the map and movement history behave in the CMS.
+
+PROMPT END
