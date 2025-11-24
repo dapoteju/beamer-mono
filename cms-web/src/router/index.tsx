@@ -6,6 +6,7 @@ import { useAuthStore } from "../store/authStore";
 import Dashboard from "../pages/Dashboard";
 import Campaigns from "../pages/Campaigns";
 import Screens from "../pages/Screens";
+import ScreenDetail from "../pages/ScreenDetail";
 import Organisations from "../pages/Organisations";
 import OrganisationDetail from "../pages/OrganisationDetail";
 import Reporting from "../pages/Reporting";
@@ -69,7 +70,22 @@ export const router = createBrowserRouter([
       { index: true, element: <Navigate to="/dashboard" replace /> },
       { path: "dashboard", element: <Dashboard /> },
       { path: "campaigns", element: <Campaigns /> },
-      { path: "screens", element: <Screens /> },
+      {
+        path: "screens",
+        element: (
+          <OrgTypeGuard allowedOrgTypes={["beamer_internal", "publisher"]}>
+            <Screens />
+          </OrgTypeGuard>
+        ),
+      },
+      {
+        path: "screens/:id",
+        element: (
+          <OrgTypeGuard allowedOrgTypes={["beamer_internal", "publisher"]}>
+            <ScreenDetail />
+          </OrgTypeGuard>
+        ),
+      },
       {
         path: "organisations",
         element: (
