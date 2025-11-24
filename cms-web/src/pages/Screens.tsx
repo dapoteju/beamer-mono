@@ -14,6 +14,7 @@ export default function Screens() {
 
   const [regionFilter, setRegionFilter] = useState("");
   const [publisherFilter, setPublisherFilter] = useState("");
+  const [classificationFilter, setClassificationFilter] = useState("");
   const [showCreateModal, setShowCreateModal] = useState(false);
 
   async function loadScreens() {
@@ -80,6 +81,32 @@ export default function Screens() {
   const uniquePublishers = Array.from(publisherMap.values()).sort((a, b) =>
     a.name.localeCompare(b.name)
   );
+
+  // Client-side filtering for classification
+  const filteredScreens = screens.filter((screen) => {
+    if (classificationFilter && screen.screenClassification !== classificationFilter) {
+      return false;
+    }
+    return true;
+  });
+
+  function getTypeLabel(classification?: string): string {
+    if (!classification) return "Vehicle";
+    switch (classification) {
+      case "vehicle": return "Vehicle";
+      case "billboard": return "Billboard";
+      case "indoor": return "Indoor";
+      case "other": return "Other";
+      default: return "Unknown";
+    }
+  }
+
+  function getTypeBadgeColor(classification?: string): string {
+    if (!classification || classification === "vehicle") return "bg-blue-100 text-blue-800";
+    if (classification === "billboard") return "bg-amber-100 text-amber-800";
+    if (classification === "indoor") return "bg-green-100 text-green-800";
+    return "bg-zinc-100 text-zinc-800";
+  }
 
   if (loading && screens.length === 0) {
     return (
@@ -160,6 +187,23 @@ export default function Screens() {
                 </select>
               </div>
             )}
+
+            <div>
+              <label className="block text-sm font-medium text-zinc-700 mb-1">
+                Screen Type
+              </label>
+              <select
+                value={classificationFilter}
+                onChange={(e) => setClassificationFilter(e.target.value)}
+                className="px-3 py-2 border border-zinc-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                <option value="">All Types</option>
+                <option value="vehicle">Vehicle</option>
+                <option value="billboard">Billboard</option>
+                <option value="indoor">Indoor</option>
+                <option value="other">Other</option>
+              </select>
+            </div>
           </div>
         </div>
 
@@ -169,6 +213,9 @@ export default function Screens() {
               <tr className="bg-zinc-50 border-b border-zinc-200">
                 <th className="px-4 py-3 text-left text-xs font-medium text-zinc-700 uppercase tracking-wider">
                   Screen Name
+                </th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-zinc-700 uppercase tracking-wider">
+                  Type
                 </th>
                 <th className="px-4 py-3 text-left text-xs font-medium text-zinc-700 uppercase tracking-wider">
                   City
@@ -191,14 +238,14 @@ export default function Screens() {
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-zinc-200">
-              {screens.length === 0 ? (
+              {filteredScreens.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="px-4 py-8 text-center text-zinc-500">
+                  <td colSpan={8} className="px-4 py-8 text-center text-zinc-500">
                     No screens found
                   </td>
                 </tr>
               ) : (
-                screens.map((screen) => (
+                filteredScreens.map((screen) => (
                   <tr
                     key={screen.id}
                     onClick={() => handleRowClick(screen.id)}
@@ -206,6 +253,13 @@ export default function Screens() {
                   >
                     <td className="px-4 py-3 text-sm font-medium text-zinc-900">
                       {screen.name}
+                    </td>
+                    <td className="px-4 py-3 text-sm">
+                      <span
+                        className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${getTypeBadgeColor(screen.screenClassification)}`}
+                      >
+                        {getTypeLabel(screen.screenClassification)}
+                      </span>
                     </td>
                     <td className="px-4 py-3 text-sm text-zinc-600">
                       {screen.city}

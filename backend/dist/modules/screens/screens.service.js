@@ -17,6 +17,7 @@ exports.updatePlayerScreenAssignment = updatePlayerScreenAssignment;
 exports.getAvailablePlayers = getAvailablePlayers;
 exports.getPublisherOrganisations = getPublisherOrganisations;
 exports.getRegionsList = getRegionsList;
+exports.getVehiclesList = getVehiclesList;
 exports.createScreenForCMS = createScreenForCMS;
 exports.updateScreenData = updateScreenData;
 // src/modules/screens/screens.service.ts
@@ -437,6 +438,25 @@ async function getRegionsList() {
         .from(schema_1.regions)
         .orderBy(schema_1.regions.name);
 }
+async function getVehiclesList(publisherOrgId) {
+    const query = client_1.db
+        .select({
+        id: schema_1.vehicles.id,
+        identifier: schema_1.vehicles.identifier,
+        licencePlate: schema_1.vehicles.licencePlate,
+        make: schema_1.vehicles.make,
+        model: schema_1.vehicles.model,
+        colour: schema_1.vehicles.colour,
+        publisherOrgId: schema_1.vehicles.publisherOrgId,
+        publisherOrgName: schema_1.organisations.name,
+    })
+        .from(schema_1.vehicles)
+        .leftJoin(schema_1.organisations, (0, drizzle_orm_1.eq)(schema_1.vehicles.publisherOrgId, schema_1.organisations.id));
+    if (publisherOrgId) {
+        return query.where((0, drizzle_orm_1.eq)(schema_1.vehicles.publisherOrgId, publisherOrgId));
+    }
+    return query;
+}
 // Updated createScreen function with simpler interface for CMS
 async function createScreenForCMS(input) {
     // Create screen with a temporary placeholder initially
@@ -455,6 +475,18 @@ async function createScreenForCMS(input) {
         resolutionHeight: 1080,
         lat: '0.0',
         lng: '0.0',
+        // Phase 2: Classification metadata
+        screenClassification: input.screenClassification || 'vehicle',
+        vehicleId: input.vehicleId || null,
+        structureType: input.structureType || null,
+        sizeDescription: input.sizeDescription || null,
+        illuminationType: input.illuminationType || null,
+        address: input.address || null,
+        venueName: input.venueName || null,
+        venueType: input.venueType || null,
+        venueAddress: input.venueAddress || null,
+        latitude: input.latitude ? input.latitude.toString() : null,
+        longitude: input.longitude ? input.longitude.toString() : null,
     })
         .returning();
     // Handle player assignment if provided
@@ -479,6 +511,29 @@ async function updateScreenData(screenId, input, currentPlayerId) {
             updateData.publisherOrgId = input.publisherOrgId;
         if (input.status !== undefined)
             updateData.status = input.status;
+        // Phase 2: Classification metadata
+        if (input.screenClassification !== undefined)
+            updateData.screenClassification = input.screenClassification;
+        if (input.vehicleId !== undefined)
+            updateData.vehicleId = input.vehicleId || null;
+        if (input.structureType !== undefined)
+            updateData.structureType = input.structureType || null;
+        if (input.sizeDescription !== undefined)
+            updateData.sizeDescription = input.sizeDescription || null;
+        if (input.illuminationType !== undefined)
+            updateData.illuminationType = input.illuminationType || null;
+        if (input.address !== undefined)
+            updateData.address = input.address || null;
+        if (input.venueName !== undefined)
+            updateData.venueName = input.venueName || null;
+        if (input.venueType !== undefined)
+            updateData.venueType = input.venueType || null;
+        if (input.venueAddress !== undefined)
+            updateData.venueAddress = input.venueAddress || null;
+        if (input.latitude !== undefined)
+            updateData.latitude = input.latitude ? input.latitude.toString() : null;
+        if (input.longitude !== undefined)
+            updateData.longitude = input.longitude ? input.longitude.toString() : null;
         // Update screen fields if there are any changes
         let updated;
         if (Object.keys(updateData).length > 0) {

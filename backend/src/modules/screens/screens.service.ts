@@ -540,6 +540,18 @@ export async function createScreenForCMS(input: {
   publisherOrgId: string;
   status?: 'active' | 'inactive' | 'maintenance';
   playerId?: string;
+  // Phase 2: Classification metadata
+  screenClassification?: string;
+  vehicleId?: string;
+  structureType?: string;
+  sizeDescription?: string;
+  illuminationType?: string;
+  address?: string;
+  venueName?: string;
+  venueType?: string;
+  venueAddress?: string;
+  latitude?: number;
+  longitude?: number;
 }) {
   // Create screen with a temporary placeholder initially
   // We'll update it after player assignment if needed
@@ -557,6 +569,18 @@ export async function createScreenForCMS(input: {
       resolutionHeight: 1080,
       lat: '0.0',
       lng: '0.0',
+      // Phase 2: Classification metadata
+      screenClassification: input.screenClassification || 'vehicle',
+      vehicleId: input.vehicleId || null,
+      structureType: input.structureType || null,
+      sizeDescription: input.sizeDescription || null,
+      illuminationType: input.illuminationType || null,
+      address: input.address || null,
+      venueName: input.venueName || null,
+      venueType: input.venueType || null,
+      venueAddress: input.venueAddress || null,
+      latitude: input.latitude ? input.latitude.toString() : null,
+      longitude: input.longitude ? input.longitude.toString() : null,
     })
     .returning();
 
@@ -577,6 +601,18 @@ export async function updateScreenData(screenId: string, input: {
   publisherOrgId?: string;
   status?: 'active' | 'inactive' | 'maintenance';
   playerId?: string | null;
+  // Phase 2: Classification metadata
+  screenClassification?: string;
+  vehicleId?: string | null;
+  structureType?: string | null;
+  sizeDescription?: string | null;
+  illuminationType?: string | null;
+  address?: string | null;
+  venueName?: string | null;
+  venueType?: string | null;
+  venueAddress?: string | null;
+  latitude?: number | null;
+  longitude?: number | null;
 }, currentPlayerId?: string) {
   // Wrap entire update operation in a single transaction for atomicity
   return await db.transaction(async (tx) => {
@@ -587,6 +623,19 @@ export async function updateScreenData(screenId: string, input: {
     if (input.regionCode !== undefined) updateData.regionCode = input.regionCode;
     if (input.publisherOrgId !== undefined) updateData.publisherOrgId = input.publisherOrgId;
     if (input.status !== undefined) updateData.status = input.status;
+    
+    // Phase 2: Classification metadata
+    if (input.screenClassification !== undefined) updateData.screenClassification = input.screenClassification;
+    if (input.vehicleId !== undefined) updateData.vehicleId = input.vehicleId || null;
+    if (input.structureType !== undefined) updateData.structureType = input.structureType || null;
+    if (input.sizeDescription !== undefined) updateData.sizeDescription = input.sizeDescription || null;
+    if (input.illuminationType !== undefined) updateData.illuminationType = input.illuminationType || null;
+    if (input.address !== undefined) updateData.address = input.address || null;
+    if (input.venueName !== undefined) updateData.venueName = input.venueName || null;
+    if (input.venueType !== undefined) updateData.venueType = input.venueType || null;
+    if (input.venueAddress !== undefined) updateData.venueAddress = input.venueAddress || null;
+    if (input.latitude !== undefined) updateData.latitude = input.latitude ? input.latitude.toString() : null;
+    if (input.longitude !== undefined) updateData.longitude = input.longitude ? input.longitude.toString() : null;
 
     // Update screen fields if there are any changes
     let updated;

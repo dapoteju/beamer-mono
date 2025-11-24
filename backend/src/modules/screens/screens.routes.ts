@@ -116,6 +116,18 @@ screensRouter.get("/", requireAuth, async (req: AuthRequest, res: Response, next
       isOnline: screen.lastHeartbeatAt
         ? now.getTime() - new Date(screen.lastHeartbeatAt).getTime() < 2 * 60 * 1000
         : false,
+      // Phase 2: Classification metadata
+      screenClassification: screen.screenClassification,
+      vehicle: screen.vehicle,
+      structureType: screen.structureType,
+      sizeDescription: screen.sizeDescription,
+      illuminationType: screen.illuminationType,
+      address: screen.address,
+      venueName: screen.venueName,
+      venueType: screen.venueType,
+      venueAddress: screen.venueAddress,
+      latitude: screen.latitude,
+      longitude: screen.longitude,
     }));
 
     res.json(formattedScreens);
@@ -134,7 +146,26 @@ screensRouter.post("/", requireAuth, async (req: AuthRequest, res: Response, nex
       });
     }
 
-    const { name, city, regionCode, publisherOrgId, status, playerId } = req.body;
+    const { 
+      name, 
+      city, 
+      regionCode, 
+      publisherOrgId, 
+      status, 
+      playerId,
+      // Phase 2: Classification metadata
+      screenClassification,
+      vehicleId,
+      structureType,
+      sizeDescription,
+      illuminationType,
+      address,
+      venueName,
+      venueType,
+      venueAddress,
+      latitude,
+      longitude,
+    } = req.body;
 
     // Validate required fields
     if (!name || !city || !regionCode || !publisherOrgId) {
@@ -174,6 +205,18 @@ screensRouter.post("/", requireAuth, async (req: AuthRequest, res: Response, nex
       publisherOrgId,
       status,
       playerId,
+      // Phase 2: Classification metadata
+      screenClassification,
+      vehicleId,
+      structureType,
+      sizeDescription,
+      illuminationType,
+      address,
+      venueName,
+      venueType,
+      venueAddress,
+      latitude,
+      longitude,
     });
 
     res.status(201).json(created);
@@ -314,7 +357,26 @@ screensRouter.patch("/:id", requireAuth, async (req: AuthRequest, res: Response,
       });
     }
 
-    const { name, city, regionCode, publisherOrgId, status, playerId } = req.body;
+    const { 
+      name, 
+      city, 
+      regionCode, 
+      publisherOrgId, 
+      status, 
+      playerId,
+      // Phase 2: Classification metadata
+      screenClassification,
+      vehicleId,
+      structureType,
+      sizeDescription,
+      illuminationType,
+      address,
+      venueName,
+      venueType,
+      venueAddress,
+      latitude,
+      longitude,
+    } = req.body;
 
     // Build update payload
     const updatePayload: any = {};
@@ -323,6 +385,19 @@ screensRouter.patch("/:id", requireAuth, async (req: AuthRequest, res: Response,
     if (regionCode !== undefined) updatePayload.regionCode = regionCode;
     if (status !== undefined) updatePayload.status = status;
     if (playerId !== undefined) updatePayload.playerId = playerId;
+    
+    // Phase 2: Classification metadata
+    if (screenClassification !== undefined) updatePayload.screenClassification = screenClassification;
+    if (vehicleId !== undefined) updatePayload.vehicleId = vehicleId;
+    if (structureType !== undefined) updatePayload.structureType = structureType;
+    if (sizeDescription !== undefined) updatePayload.sizeDescription = sizeDescription;
+    if (illuminationType !== undefined) updatePayload.illuminationType = illuminationType;
+    if (address !== undefined) updatePayload.address = address;
+    if (venueName !== undefined) updatePayload.venueName = venueName;
+    if (venueType !== undefined) updatePayload.venueType = venueType;
+    if (venueAddress !== undefined) updatePayload.venueAddress = venueAddress;
+    if (latitude !== undefined) updatePayload.latitude = latitude;
+    if (longitude !== undefined) updatePayload.longitude = longitude;
 
     // Publishers cannot change publisherOrgId
     if (publisherOrgId !== undefined) {

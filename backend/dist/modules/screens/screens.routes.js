@@ -86,6 +86,18 @@ exports.screensRouter.get("/", auth_1.requireAuth, async (req, res, next) => {
             isOnline: screen.lastHeartbeatAt
                 ? now.getTime() - new Date(screen.lastHeartbeatAt).getTime() < 2 * 60 * 1000
                 : false,
+            // Phase 2: Classification metadata
+            screenClassification: screen.screenClassification,
+            vehicle: screen.vehicle,
+            structureType: screen.structureType,
+            sizeDescription: screen.sizeDescription,
+            illuminationType: screen.illuminationType,
+            address: screen.address,
+            venueName: screen.venueName,
+            venueType: screen.venueType,
+            venueAddress: screen.venueAddress,
+            latitude: screen.latitude,
+            longitude: screen.longitude,
         }));
         res.json(formattedScreens);
     }
@@ -102,7 +114,9 @@ exports.screensRouter.post("/", auth_1.requireAuth, async (req, res, next) => {
                 error: "Forbidden. Only internal admin/ops users can create screens."
             });
         }
-        const { name, city, regionCode, publisherOrgId, status, playerId } = req.body;
+        const { name, city, regionCode, publisherOrgId, status, playerId, 
+        // Phase 2: Classification metadata
+        screenClassification, vehicleId, structureType, sizeDescription, illuminationType, address, venueName, venueType, venueAddress, latitude, longitude, } = req.body;
         // Validate required fields
         if (!name || !city || !regionCode || !publisherOrgId) {
             return res.status(400).json({
@@ -137,6 +151,18 @@ exports.screensRouter.post("/", auth_1.requireAuth, async (req, res, next) => {
             publisherOrgId,
             status,
             playerId,
+            // Phase 2: Classification metadata
+            screenClassification,
+            vehicleId,
+            structureType,
+            sizeDescription,
+            illuminationType,
+            address,
+            venueName,
+            venueType,
+            venueAddress,
+            latitude,
+            longitude,
         });
         res.status(201).json(created);
     }
@@ -225,6 +251,27 @@ exports.screensRouter.get("/dropdown/players", auth_1.requireAuth, async (req, r
         next(err);
     }
 });
+// GET /api/screens/dropdown/vehicles - Get vehicles for dropdown
+exports.screensRouter.get("/dropdown/vehicles", auth_1.requireAuth, async (req, res, next) => {
+    try {
+        if (!canAccessScreens(req)) {
+            return res.status(403).json({ error: "Forbidden" });
+        }
+        // beamer_internal: can see all vehicles
+        // publisher: can see only vehicles for their organisation
+        // advertiser: forbidden
+        const { orgType, orgId } = req.user;
+        if (orgType === "advertiser") {
+            return res.status(403).json({ error: "Forbidden" });
+        }
+        const publisherFilter = orgType === "publisher" ? orgId : undefined;
+        const vehicles = await (0, screens_service_1.getVehiclesList)(publisherFilter);
+        res.json(vehicles);
+    }
+    catch (err) {
+        next(err);
+    }
+});
 // PATCH /api/screens/:id - Update screen
 exports.screensRouter.patch("/:id", auth_1.requireAuth, async (req, res, next) => {
     try {
@@ -240,7 +287,9 @@ exports.screensRouter.patch("/:id", auth_1.requireAuth, async (req, res, next) =
                 error: "Forbidden. You can only edit screens belonging to your organization."
             });
         }
-        const { name, city, regionCode, publisherOrgId, status, playerId } = req.body;
+        const { name, city, regionCode, publisherOrgId, status, playerId, 
+        // Phase 2: Classification metadata
+        screenClassification, vehicleId, structureType, sizeDescription, illuminationType, address, venueName, venueType, venueAddress, latitude, longitude, } = req.body;
         // Build update payload
         const updatePayload = {};
         if (name !== undefined)
@@ -253,6 +302,29 @@ exports.screensRouter.patch("/:id", auth_1.requireAuth, async (req, res, next) =
             updatePayload.status = status;
         if (playerId !== undefined)
             updatePayload.playerId = playerId;
+        // Phase 2: Classification metadata
+        if (screenClassification !== undefined)
+            updatePayload.screenClassification = screenClassification;
+        if (vehicleId !== undefined)
+            updatePayload.vehicleId = vehicleId;
+        if (structureType !== undefined)
+            updatePayload.structureType = structureType;
+        if (sizeDescription !== undefined)
+            updatePayload.sizeDescription = sizeDescription;
+        if (illuminationType !== undefined)
+            updatePayload.illuminationType = illuminationType;
+        if (address !== undefined)
+            updatePayload.address = address;
+        if (venueName !== undefined)
+            updatePayload.venueName = venueName;
+        if (venueType !== undefined)
+            updatePayload.venueType = venueType;
+        if (venueAddress !== undefined)
+            updatePayload.venueAddress = venueAddress;
+        if (latitude !== undefined)
+            updatePayload.latitude = latitude;
+        if (longitude !== undefined)
+            updatePayload.longitude = longitude;
         // Publishers cannot change publisherOrgId
         if (publisherOrgId !== undefined) {
             if (!canChangePublisherOrg(req)) {

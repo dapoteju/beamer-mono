@@ -200,6 +200,20 @@ export default function ScreenDetail() {
           <h3 className="text-sm font-medium text-zinc-700 mb-3">Screen Info</h3>
           <div className="space-y-2 text-sm">
             <div>
+              <span className="text-zinc-500">Classification:</span>{" "}
+              <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
+                screen.screenClassification === "vehicle" ? "bg-blue-100 text-blue-800" :
+                screen.screenClassification === "billboard" ? "bg-amber-100 text-amber-800" :
+                screen.screenClassification === "indoor" ? "bg-green-100 text-green-800" :
+                "bg-zinc-100 text-zinc-800"
+              }`}>
+                {screen.screenClassification === "vehicle" ? "Vehicle" :
+                 screen.screenClassification === "billboard" ? "Billboard" :
+                 screen.screenClassification === "indoor" ? "Indoor" :
+                 screen.screenClassification || "Vehicle"}
+              </span>
+            </div>
+            <div>
               <span className="text-zinc-500">Type:</span>{" "}
               <span className="text-zinc-900">{screen.screenType}</span>
             </div>
@@ -313,6 +327,101 @@ export default function ScreenDetail() {
         <div className="p-4">
           {activeTab === "overview" && (
             <div>
+              {/* Vehicle Metadata Section */}
+              {screen.screenClassification === "vehicle" && screen.vehicle && (
+                <div className="mb-6 bg-blue-50 border border-blue-200 rounded-lg p-4">
+                  <h3 className="text-sm font-semibold text-zinc-900 mb-3">Vehicle Details</h3>
+                  <div className="grid grid-cols-2 gap-4 text-sm">
+                    {screen.vehicle.licencePlate && (
+                      <div>
+                        <span className="text-zinc-600">Licence Plate:</span>{" "}
+                        <span className="text-zinc-900 font-medium">{screen.vehicle.licencePlate}</span>
+                      </div>
+                    )}
+                    {(screen.vehicle.make || screen.vehicle.model) && (
+                      <div>
+                        <span className="text-zinc-600">Make / Model:</span>{" "}
+                        <span className="text-zinc-900 font-medium">
+                          {[screen.vehicle.make, screen.vehicle.model].filter(Boolean).join(" ")}
+                        </span>
+                      </div>
+                    )}
+                    {screen.vehicle.colour && (
+                      <div>
+                        <span className="text-zinc-600">Colour:</span>{" "}
+                        <span className="text-zinc-900 font-medium">{screen.vehicle.colour}</span>
+                      </div>
+                    )}
+                    {screen.vehicle.publisherOrgName && (
+                      <div>
+                        <span className="text-zinc-600">Fleet:</span>{" "}
+                        <span className="text-zinc-900 font-medium">{screen.vehicle.publisherOrgName}</span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* Billboard Metadata Section */}
+              {screen.screenClassification === "billboard" && (
+                <div className="mb-6 bg-amber-50 border border-amber-200 rounded-lg p-4">
+                  <h3 className="text-sm font-semibold text-zinc-900 mb-3">Billboard Details</h3>
+                  <div className="grid grid-cols-2 gap-4 text-sm">
+                    {screen.structureType && (
+                      <div>
+                        <span className="text-zinc-600">Structure:</span>{" "}
+                        <span className="text-zinc-900 font-medium">{screen.structureType}</span>
+                      </div>
+                    )}
+                    {screen.sizeDescription && (
+                      <div>
+                        <span className="text-zinc-600">Size:</span>{" "}
+                        <span className="text-zinc-900 font-medium">{screen.sizeDescription}</span>
+                      </div>
+                    )}
+                    {screen.illuminationType && (
+                      <div>
+                        <span className="text-zinc-600">Illumination:</span>{" "}
+                        <span className="text-zinc-900 font-medium">{screen.illuminationType}</span>
+                      </div>
+                    )}
+                    {screen.address && (
+                      <div className="col-span-2">
+                        <span className="text-zinc-600">Address:</span>{" "}
+                        <span className="text-zinc-900 font-medium">{screen.address}</span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* Indoor/Venue Metadata Section */}
+              {screen.screenClassification === "indoor" && (
+                <div className="mb-6 bg-green-50 border border-green-200 rounded-lg p-4">
+                  <h3 className="text-sm font-semibold text-zinc-900 mb-3">Indoor / Venue Details</h3>
+                  <div className="grid grid-cols-2 gap-4 text-sm">
+                    {screen.venueName && (
+                      <div>
+                        <span className="text-zinc-600">Venue:</span>{" "}
+                        <span className="text-zinc-900 font-medium">{screen.venueName}</span>
+                      </div>
+                    )}
+                    {screen.venueType && (
+                      <div>
+                        <span className="text-zinc-600">Type:</span>{" "}
+                        <span className="text-zinc-900 font-medium">{screen.venueType}</span>
+                      </div>
+                    )}
+                    {screen.venueAddress && (
+                      <div className="col-span-2">
+                        <span className="text-zinc-600">Address:</span>{" "}
+                        <span className="text-zinc-900 font-medium">{screen.venueAddress}</span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
               <h3 className="text-sm font-semibold text-zinc-900 mb-4">
                 Recent Play Events
               </h3>
@@ -518,6 +627,15 @@ export default function ScreenDetail() {
             publisherOrgId: screen.publisherOrgId,
             status: screen.status,
             playerId: player?.id || null,
+            screenClassification: screen.screenClassification || "vehicle",
+            vehicleId: screen.vehicleId || null,
+            structureType: screen.structureType || null,
+            sizeDescription: screen.sizeDescription || null,
+            illuminationType: screen.illuminationType || null,
+            address: screen.address || null,
+            venueName: screen.venueName || null,
+            venueType: screen.venueType || null,
+            venueAddress: screen.venueAddress || null,
           }}
           onClose={() => setShowEditModal(false)}
           onSuccess={() => {
