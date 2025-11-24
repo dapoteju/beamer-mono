@@ -1,0 +1,146 @@
+I want you to properly implement authentication and user management in my backend.
+Here is the context of my system so you set it up correctly:
+
+SYSTEM CONTEXT
+This project is called Beamer, an OOH CMS + Player system.
+
+Backend is in the backend/ folder.
+
+Frontend (CMS) is in cms-web/.
+
+The database has already been migrated and contains tables like:
+
+organisations
+
+screens
+
+regions
+
+campaigns
+
+creatives
+
+flights
+
+bookings
+
+invoices
+
+creative_approvals
+
+BUT it currently has NO users table and no authentication implemented.
+
+WHAT I WANT YOU TO BUILD
+Please implement a proper authentication system, including:
+
+1. Users Table
+Create a new table called users (or update the existing one if it already exists) with the following fields:
+
+id (text, primary key)
+
+email (text, unique, required)
+
+password_hash (text, required)
+
+full_name (text)
+
+org_id (text, references organisations.id)
+
+role (text, enum: admin, ops, viewer)
+
+created_at (timestamp)
+
+updated_at (timestamp)
+
+Use Drizzle ORM (or whatever ORM is already used in the project).
+
+2. Create a Secure Auth System
+Implement the following backend endpoints:
+
+POST /auth/register
+Input: email, password, full_name, org_id, role
+
+Hash password using bcrypt
+
+Generate short text IDs for users (we already use text IDs, not UUIDs)
+
+Store user in DB
+
+POST /auth/login
+Input: email, password
+
+Validate credentials
+
+Return JWT + user object
+
+JWT should contain: user_id, org_id, role
+
+GET /auth/me
+Should read Authorization header
+
+Verify JWT
+
+Return full user object
+
+POST /auth/logout
+(You can make this a no-op since JWT is stateless.)
+
+3. Add JWT Middleware
+Create middleware to verify JWT for protected routes.
+It should attach req.user with: { id, email, org_id, role }.
+
+4. Seed an Initial Internal User
+Please create 1 initial user in the DB automatically:
+
+org_id: the Beamer internal organisation (create one if not exist)
+
+email: admin@beamer.com
+
+password: beamer123
+
+full_name: Super Admin
+
+role: admin
+
+This allows us to log into the CMS immediately.
+
+5. Make Sure It Integrates With Existing System
+Important requirements:
+
+Do NOT break existing backend routes.
+
+Do NOT modify other tables unless required.
+
+Keep the existing organisation logic intact.
+
+Ensure the /auth/* routes follow the same Express style as the rest of the backend.
+
+Use environment variable JWT_SECRET for signing tokens.
+
+6. Expose Types
+Export TypeScript interfaces/types for:
+
+User
+
+Auth Response
+
+JWT Payload
+
+So CMS can consume them safely.
+
+7. Confirm Integration
+After implementing:
+
+Confirm migrations run
+
+Confirm /auth/register works
+
+Confirm /auth/login works
+
+Confirm /auth/me works using JWT
+
+Confirm initial admin user can log in
+
+Tell me the API URLs I should use in the CMS
+
+PROMPT END
