@@ -3,8 +3,18 @@ import { registerUser, loginUser, getUserById } from "./auth.service";
 import { RegisterInput, LoginInput } from "./auth.types";
 import { AuthRequest } from "../../middleware/auth";
 
-export async function register(req: Request, res: Response) {
+export async function register(req: AuthRequest, res: Response) {
   try {
+    if (!req.user) {
+      res.status(401).json({ error: "Authentication required" });
+      return;
+    }
+
+    if (req.user.role !== "admin") {
+      res.status(403).json({ error: "Only administrators can create new users" });
+      return;
+    }
+
     const input: RegisterInput = {
       email: req.body.email,
       password: req.body.password,
