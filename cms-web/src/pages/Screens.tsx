@@ -268,7 +268,11 @@ export default function Screens() {
                       {screen.region}
                     </td>
                     <td className="px-4 py-3 text-sm text-zinc-600">
-                      {screen.publisherOrgName}
+                      {screen.publisher 
+                        ? screen.publisher.publisherType === "organisation"
+                          ? screen.publisher.organisation?.name || screen.publisherOrgName
+                          : screen.publisher.fullName || screen.publisherOrgName
+                        : screen.publisherOrgName}
                     </td>
                     <td className="px-4 py-3 text-sm">
                       <span

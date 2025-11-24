@@ -4,11 +4,11 @@ import type {
   CreateScreenPayload,
   UpdateScreenPayload,
   Region,
-  Publisher,
   Player,
   VehicleOption,
 } from "../api/screens";
-import { fetchRegions, fetchPublishers, fetchPlayers, fetchVehicles, createScreen, updateScreen } from "../api/screens";
+import { fetchRegions, fetchPlayers, fetchVehicles, createScreen, updateScreen } from "../api/screens";
+import { getPublisherOptions, type PublisherOption } from "../api/publishers";
 import { useAuthStore } from "../store/authStore";
 
 interface ScreenFormModalProps {
@@ -19,6 +19,7 @@ interface ScreenFormModalProps {
     city: string;
     regionCode: string;
     publisherOrgId: string;
+    publisherId?: string | null;
     status: string;
     playerId: string | null;
     screenClassification?: "vehicle" | "billboard" | "indoor" | "other";
@@ -44,6 +45,7 @@ export function ScreenFormModal({ mode, screenId, initialValues, onClose, onSucc
     city: initialValues?.city || "",
     regionCode: initialValues?.regionCode || "",
     publisherOrgId: initialValues?.publisherOrgId || "",
+    publisherId: initialValues?.publisherId || "",
     status: initialValues?.status || "active",
     playerId: initialValues?.playerId || "",
     screenClassification: (initialValues?.screenClassification || "vehicle") as "vehicle" | "billboard" | "indoor" | "other",
@@ -65,9 +67,9 @@ export function ScreenFormModal({ mode, screenId, initialValues, onClose, onSucc
     queryFn: fetchRegions,
   });
 
-  const { data: publishers = [] } = useQuery<Publisher[]>({
-    queryKey: ["publishers"],
-    queryFn: fetchPublishers,
+  const { data: publisherOptions = [] } = useQuery<PublisherOption[]>({
+    queryKey: ["publisherOptions"],
+    queryFn: getPublisherOptions,
     enabled: isInternal,
   });
 
@@ -113,7 +115,7 @@ export function ScreenFormModal({ mode, screenId, initialValues, onClose, onSucc
     if (!formData.name.trim()) newErrors.name = "Name is required";
     if (!formData.city.trim()) newErrors.city = "City is required";
     if (!formData.regionCode) newErrors.regionCode = "Region is required";
-    if (!formData.publisherOrgId) newErrors.publisherOrgId = "Publisher is required";
+    if (!formData.publisherId) newErrors.publisherId = "Publisher is required";
 
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
@@ -131,6 +133,7 @@ export function ScreenFormModal({ mode, screenId, initialValues, onClose, onSucc
         city: formData.city,
         regionCode: formData.regionCode,
         publisherOrgId: formData.publisherOrgId,
+        publisherId: formData.publisherId || undefined,
         status: formData.status as any,
         playerId: formData.playerId || undefined,
         screenClassification: formData.screenClassification,
@@ -161,9 +164,14 @@ export function ScreenFormModal({ mode, screenId, initialValues, onClose, onSucc
         venueAddress: formData.venueAddress || undefined,
       };
 
-      // Only include publisherOrgId if user is internal and it changed
-      if (isInternal && formData.publisherOrgId !== initialValues?.publisherOrgId) {
-        payload.publisherOrgId = formData.publisherOrgId;
+      // Only include publisherId if user is internal and it changed
+      if (isInternal && formData.publisherId !== initialValues?.publisherId) {
+        payload.publisherId = formData.publisherId || null;
+        // Also update publisherOrgId for backward compatibility
+        const selectedPublisher = publisherOptions.find(p => p.id === formData.publisherId);
+        if (selectedPublisher?.organisationId) {
+          payload.publisherOrgId = selectedPublisher.organisationId;
+        }
       }
 
       // Handle player assignment
@@ -269,16 +277,23 @@ export function ScreenFormModal({ mode, screenId, initialValues, onClose, onSucc
             </label>
             {isInternal ? (
               <select
-                value={formData.publisherOrgId}
-                onChange={(e) => setFormData({ ...formData, publisherOrgId: e.target.value })}
+                value={formData.publisherId}
+                onChange={(e) => {
+                  const selectedPublisher = publisherOptions.find(p => p.id === e.target.value);
+                  setFormData({ 
+                    ...formData, 
+                    publisherId: e.target.value,
+                    publisherOrgId: selectedPublisher?.organisationId || ""
+                  });
+                }}
                 className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${
-                  errors.publisherOrgId ? "border-red-500" : "border-zinc-300"
+                  errors.publisherId ? "border-red-500" : "border-zinc-300"
                 }`}
               >
                 <option value="">Select a publisher</option>
-                {publishers.map((publisher) => (
+                {publisherOptions.map((publisher) => (
                   <option key={publisher.id} value={publisher.id}>
-                    {publisher.name}
+                    {publisher.label}
                   </option>
                 ))}
               </select>
@@ -290,7 +305,7 @@ export function ScreenFormModal({ mode, screenId, initialValues, onClose, onSucc
                 className="w-full px-3 py-2 border border-zinc-300 rounded-md bg-zinc-100 text-zinc-600"
               />
             )}
-            {errors.publisherOrgId && <p className="text-red-500 text-sm mt-1">{errors.publisherOrgId}</p>}
+            {errors.publisherId && <p className="text-red-500 text-sm mt-1">{errors.publisherId}</p>}
           </div>
 
           {/* Screen Classification */}
