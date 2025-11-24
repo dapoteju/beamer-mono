@@ -103,6 +103,15 @@ npm run lint         # Run ESLint
 - Node modules and build artifacts are now properly excluded from git
 
 ## Recent Changes
+- November 24, 2025: Database Migration from Legacy Database
+  - Created migration scripts to transfer data from old Replit database
+  - Successfully migrated all data (organisations, regions, screens, campaigns, creatives, bookings, flights, invoices)
+  - Handled schema differences with column mapping (e.g., issue_date → issued_date)
+  - Implemented auto-generation of invoice numbers in format INV-YYYYMMDD-####
+  - Added JSON data sanitization for legacy creative_approvals records
+  - Documented migration process in backend/scripts/README.md
+  - All API endpoints verified working with migrated data
+
 - November 24, 2025: CMS Frontend setup and configuration
   - Configured Vite server to run on port 5000 with host 0.0.0.0
   - Fixed Tailwind CSS v4 PostCSS configuration (installed @tailwindcss/postcss)
