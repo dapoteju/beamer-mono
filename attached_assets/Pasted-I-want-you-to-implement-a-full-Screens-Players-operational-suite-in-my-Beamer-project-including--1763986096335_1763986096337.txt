@@ -1,0 +1,446 @@
+I want you to implement a full Screens & Players operational suite in my Beamer project, including:
+
+Screens & Players management UI in the CMS
+
+Backend APIs for screens, players, heartbeats, and play events (PoP)
+
+Online/offline status derived from heartbeats
+
+Proper permissions based on organisation type & role
+
+Context
+
+Backend is in: backend/
+
+CMS frontend is in: cms-web/
+
+We already have:
+
+Auth with JWT and requireAuth middleware
+
+Users linked to organisations with:
+
+orgType: beamer_internal | advertiser | publisher
+
+role: admin | ops | viewer
+
+Organisation module fully wired (list, detail, create, edit)
+
+Player + proof-of-play + heartbeat tables already exist from the previous work:
+
+screens
+
+players (or equivalent)
+
+heartbeats
+
+play_events (or equivalent playbacks/PoP table)
+
+CMS nav for “Screens & Players” already exists and is:
+
+Visible to:
+
+Beamer internal users
+
+Publisher users
+
+Hidden from advertisers
+
+I now want a full operational suite for Screens & Players, including PoP & heartbeats.
+
+1. Backend — Screens & Players APIs
+1.1 Screens List
+
+Add a route module if needed (e.g. backend/src/modules/screens/screens.routes.ts) and register it under /api/screens.
+
+Implement:
+
+GET /api/screens
+
+Auth:
+
+Use requireAuth.
+
+Behaviour by org type:
+
+beamer_internal: return all screens.
+
+publisher: return only screens belonging to that publisher’s organisation.
+
+advertiser: should not be able to hit this endpoint → return 403 { error: "Forbidden" }.
+
+Response fields per screen:
+
+id
+
+name
+
+city
+
+region (name or code)
+
+publisherOrgName
+
+status (if you have an active/inactive field; otherwise derive as “active” by default)
+
+playerId (if attached)
+
+lastHeartbeatAt (from latest heartbeat for attached player, nullable)
+
+isOnline (boolean: true if last heartbeat is within the last 2 minutes; adjust threshold if needed)
+
+Support basic filters via query params (if easy):
+
+?publisherOrgId=...
+
+?region=...
+
+?status=active|inactive
+
+1.2 Screen Detail
+
+GET /api/screens/:id
+
+Auth:
+
+beamer_internal: can access any screen.
+
+publisher: can only access screens belonging to their org.
+
+advertiser: 403 Forbidden.
+
+Response should include:
+
+screen object:
+
+id, name, city, region, publisherOrgId, publisherOrgName
+
+player object (if attached):
+
+id
+
+lastHeartbeatAt
+
+isOnline
+
+currentPlaylistHash (if stored)
+
+Aggregated PoP stats for this screen (last 24 hours and last 7 days if possible):
+
+playCount24h
+
+playCount7d
+
+Recent play events:
+
+Array of last ~20 events:
+
+timestamp
+
+creativeId
+
+creativeName
+
+campaignId
+
+campaignName
+
+Heartbeat summary:
+
+lastHeartbeatAt
+
+heartbeatCount24h (optional, if easy)
+
+You can reuse existing tables to compute this (join play events with creatives & campaigns where possible).
+
+1.3 Heartbeats Timeline
+
+GET /api/screens/:id/heartbeats
+
+Auth same as screen detail.
+
+Query parameters:
+
+?from= and ?to= (ISO timestamps) — optional; if not provided, default to last 24 hours.
+
+Response:
+
+Array of heartbeats:
+
+timestamp
+
+status or any metadata you already store
+
+This will be used to render a table in the CMS.
+
+If there is a cleaner playerId → screenId relationship, you can expose this endpoint as /api/players/:id/heartbeats instead, but the CMS entry point should be from a screen.
+
+1.4 Play Events (PoP) for Screen
+
+GET /api/screens/:id/play-events
+
+Auth same as screen detail.
+
+Query params:
+
+?from=, ?to= (ISO timestamps) — optional
+
+?limit= — default to e.g. 50
+
+Response:
+
+Array of events:
+
+timestamp
+
+creativeId
+
+creativeName
+
+campaignId
+
+campaignName
+
+Any delivery status field you have (e.g. success, error)
+
+This powers the PoP tab in the CMS.
+
+1.5 Optional: Players Endpoints
+
+If not already present, add:
+
+GET /api/players (internal only) — list players, with:
+
+id
+
+linked screen
+
+lastHeartbeatAt
+
+isOnline
+
+GET /api/players/:id — player detail with:
+
+basic info
+
+linked screen
+
+last heartbeats
+
+recent play events
+
+Permission: only beamer_internal (any role), not publisher/advertiser.
+
+2. Frontend — Screens & Players UI in CMS
+
+Use the existing CMS stack:
+
+React + TypeScript
+
+Tailwind
+
+React Router
+
+React Query / Axios (whatever is already being used for Organisations)
+
+Existing auth/token handling
+
+2.1 Screens List Page
+
+In cms-web/src/pages/Screens.tsx, replace the placeholder with:
+
+A table showing all screens the user is allowed to see.
+
+Columns:
+
+Screen Name
+
+City
+
+Region
+
+Publisher (org name)
+
+Status (Active/Inactive if available)
+
+Online/Offline with pill:
+
+Online: green pill
+
+Offline: red pill
+
+Last Heartbeat (relative time, e.g. “5 min ago” or “—” if never)
+
+Behaviour:
+
+Fetch from GET /api/screens.
+
+Show loading and error states.
+
+Each row is clickable → navigates to /screens/:id.
+
+Add basic filters if easy:
+
+Region filter dropdown
+
+Publisher filter (for Beamer internal only)
+
+Permissions:
+
+beamer_internal: sees all screens.
+
+publisher: sees only its screens.
+
+advertiser: should never see this page; they already don’t get the nav item, but still guard access and redirect to /dashboard if they manually navigate.
+
+2.2 Screen Detail Page
+
+Create a new page:
+
+cms-web/src/pages/ScreenDetail.tsx
+
+Add a route for /screens/:id in cms-web/src/router/index.tsx, protected using the same org-type/role guards as the list page.
+
+Layout:
+
+Top section:
+
+Screen name
+
+City / Region
+
+Publisher name
+
+Online/offline badge
+
+Last heartbeat
+
+Side card or inline section showing player info:
+
+Player ID
+
+Playlist hash (if available)
+
+Last heartbeat
+
+Link: “View recent play events”
+
+Tabs (or sections):
+
+Overview
+
+Show:
+
+Basic screen & player info
+
+PoP summary:
+
+Play count (24h / 7d)
+
+of creatives played
+of campaigns
+
+Play Events (PoP)
+
+Table listing play events from GET /api/screens/:id/play-events:
+
+Time
+
+Creative name
+
+Campaign name
+
+Status
+
+Add basic time range filter if easy:
+
+“Last 24h”, “Last 7 days”, “Custom”
+
+Heartbeats
+
+Table showing heartbeats from GET /api/screens/:id/heartbeats:
+
+Timestamp
+
+(Any extra metadata you have)
+
+This is used for connectivity debugging.
+
+You don’t need charts yet; tables are fine.
+
+2.3 Reuse Patterns from Organisations
+
+Create an API module: cms-web/src/api/screens.ts with functions:
+
+getScreens()
+
+getScreenDetail(id)
+
+getScreenHeartbeats(id, params)
+
+getScreenPlayEvents(id, params)
+
+Use the same auth header logic as api/organisations.ts.
+
+Use React Query (if already used) for fetching + caching.
+
+2.4 Permissions & Redirects
+
+For both /screens and /screens/:id:
+
+Allow only:
+
+beamer_internal (all roles)
+
+publisher (all roles)
+
+Deny:
+
+advertiser → redirect to /dashboard.
+
+Implement this both in:
+
+Route guards in cms-web/src/router/index.tsx
+
+Backend permission checks in the screens routes.
+
+3. Developer Experience & Consistency
+
+Do not break existing routes or auth.
+
+Follow the same error response pattern ({ error: "..." }) used in organisations.
+
+Keep type safety end-to-end:
+
+Define and export types/interfaces for:
+
+Screen
+
+ScreenDetail
+
+ScreenHeartbeat
+
+ScreenPlayEvent
+
+Use consistent Tailwind styling in the CMS.
+
+4. When You’re Done
+
+Please summarise:
+
+All backend files created/modified (paths).
+
+All frontend files created/modified (paths).
+
+The exact API endpoints and their expected request/response formats.
+
+How to test, step-by-step:
+
+As internal user (admin@beamer.com
+ / beamer123)
+
+As publisher user (if one exists; if not, optionally create one).
+
+How online/offline is determined from heartbeats (time threshold used).
+
+PROMPT END
