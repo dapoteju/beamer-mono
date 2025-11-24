@@ -37,8 +37,6 @@ export default function CampaignReporting() {
     }
   }, [searchParams, campaigns]);
 
-  const selectedCampaign = campaigns.find((c) => c.id === selectedCampaignId);
-
   async function handleLoadReport() {
     if (!selectedCampaignId) {
       setReportError("Please select a campaign");
@@ -73,21 +71,14 @@ export default function CampaignReporting() {
   }
 
   function formatDate(dateString: string): string {
+    if (!dateString) return "N/A";
     const date = new Date(dateString);
+    if (isNaN(date.getTime())) return "Invalid Date";
     return date.toLocaleDateString("en-US", {
       year: "numeric",
       month: "short",
       day: "numeric",
     });
-  }
-
-  function formatCurrency(amount: number, currency: string): string {
-    return new Intl.NumberFormat("en-US", {
-      style: "currency",
-      currency: currency || "NGN",
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 0,
-    }).format(amount);
   }
 
   return (
@@ -185,151 +176,125 @@ export default function CampaignReporting() {
 
       {reportData && (
         <>
-          <div className="bg-white rounded-lg border border-zinc-200 p-6">
-            <h2 className="text-lg font-semibold text-zinc-900 mb-4">
-              Summary
-            </h2>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div className="bg-zinc-50 rounded-lg p-4">
-                <p className="text-xs font-medium text-zinc-500 uppercase">
-                  Total Impressions
-                </p>
-                <p className="text-2xl font-semibold text-zinc-900 mt-1">
-                  {reportData.impressions_delivered.toLocaleString()}
-                </p>
-              </div>
-              <div className="bg-zinc-50 rounded-lg p-4">
-                <p className="text-xs font-medium text-zinc-500 uppercase">
-                  Date Range
-                </p>
-                <p className="text-sm font-medium text-zinc-900 mt-1">
-                  {formatDate(startDate)}
-                </p>
-                <p className="text-sm text-zinc-600">to {formatDate(endDate)}</p>
-              </div>
-              <div className="bg-zinc-50 rounded-lg p-4">
-                <p className="text-xs font-medium text-zinc-500 uppercase">
-                  Number of Regions
-                </p>
-                <p className="text-2xl font-semibold text-zinc-900 mt-1">
-                  {reportData.impressions_by_region.length}
-                </p>
-              </div>
+          {reportData.totalImpressions === 0 ? (
+            <div className="bg-white rounded-lg border border-zinc-200 p-6">
+              <p className="text-sm text-zinc-500 text-center">
+                No impressions recorded for this campaign during the selected date range.
+              </p>
             </div>
-
-            {selectedCampaign && (
-              <div className="mt-4 pt-4 border-t border-zinc-200">
-                <h3 className="text-sm font-semibold text-zinc-700 mb-2">
-                  Campaign Details
-                </h3>
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
-                  <div>
-                    <p className="text-zinc-500">Campaign Name</p>
-                    <p className="font-medium text-zinc-900">
-                      {reportData.campaign_name}
+          ) : (
+            <>
+              <div className="bg-white rounded-lg border border-zinc-200 p-6">
+                <h2 className="text-lg font-semibold text-zinc-900 mb-4">
+                  Summary
+                </h2>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div className="bg-zinc-50 rounded-lg p-4">
+                    <p className="text-xs font-medium text-zinc-500 uppercase">
+                      Total Impressions
+                    </p>
+                    <p className="text-2xl font-semibold text-zinc-900 mt-1">
+                      {reportData.totalImpressions.toLocaleString()}
                     </p>
                   </div>
-                  <div>
-                    <p className="text-zinc-500">Status</p>
-                    <p className="font-medium text-zinc-900 capitalize">
-                      {reportData.status}
+                  <div className="bg-zinc-50 rounded-lg p-4">
+                    <p className="text-xs font-medium text-zinc-500 uppercase">
+                      Date Range
                     </p>
-                  </div>
-                  <div>
-                    <p className="text-zinc-500">Total Budget</p>
-                    <p className="font-medium text-zinc-900">
-                      {formatCurrency(
-                        reportData.total_budget,
-                        reportData.currency
-                      )}
+                    <p className="text-sm font-medium text-zinc-900 mt-1">
+                      {formatDate(reportData.startDate)}
                     </p>
+                    <p className="text-sm text-zinc-600">to {formatDate(reportData.endDate)}</p>
                   </div>
-                  <div>
-                    <p className="text-zinc-500">Campaign Period</p>
-                    <p className="font-medium text-zinc-900 text-xs">
-                      {formatDate(reportData.start_date)} -{" "}
-                      {formatDate(reportData.end_date)}
+                  <div className="bg-zinc-50 rounded-lg p-4">
+                    <p className="text-xs font-medium text-zinc-500 uppercase">
+                      Number of Active Screens
+                    </p>
+                    <p className="text-2xl font-semibold text-zinc-900 mt-1">
+                      {reportData.byScreen.length}
                     </p>
                   </div>
                 </div>
               </div>
-            )}
-          </div>
 
-          <div className="bg-white rounded-lg border border-zinc-200 p-6">
-            <h2 className="text-lg font-semibold text-zinc-900 mb-4">
-              Impressions by Region
-            </h2>
-            {reportData.impressions_by_region.length === 0 ? (
-              <p className="text-sm text-zinc-500">
-                No regional impression data available.
-              </p>
-            ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full">
-                  <thead className="bg-zinc-50 border-b border-zinc-200">
-                    <tr>
-                      <th className="text-left px-4 py-3 text-xs font-medium text-zinc-700 uppercase tracking-wider">
-                        Region
-                      </th>
-                      <th className="text-right px-4 py-3 text-xs font-medium text-zinc-700 uppercase tracking-wider">
-                        Impressions
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-zinc-200">
-                    {reportData.impressions_by_region
-                      .sort((a, b) => b.impressions - a.impressions)
-                      .map((region) => (
-                        <tr key={region.region} className="hover:bg-zinc-50">
-                          <td className="px-4 py-3 text-sm text-zinc-900">
-                            {region.region}
-                          </td>
-                          <td className="px-4 py-3 text-sm text-zinc-900 text-right font-medium">
-                            {region.impressions.toLocaleString()}
-                          </td>
+              <div className="bg-white rounded-lg border border-zinc-200 p-6">
+                <h2 className="text-lg font-semibold text-zinc-900 mb-4">
+                  Impressions by Day
+                </h2>
+                {reportData.byDay.length === 0 ? (
+                  <p className="text-sm text-zinc-500">
+                    No daily impression data available.
+                  </p>
+                ) : (
+                  <div className="overflow-x-auto">
+                    <table className="w-full">
+                      <thead className="bg-zinc-50 border-b border-zinc-200">
+                        <tr>
+                          <th className="text-left px-4 py-3 text-xs font-medium text-zinc-700 uppercase tracking-wider">
+                            Date
+                          </th>
+                          <th className="text-right px-4 py-3 text-xs font-medium text-zinc-700 uppercase tracking-wider">
+                            Impressions
+                          </th>
                         </tr>
-                      ))}
-                  </tbody>
-                </table>
+                      </thead>
+                      <tbody className="divide-y divide-zinc-200">
+                        {reportData.byDay.map((day) => (
+                          <tr key={day.date} className="hover:bg-zinc-50">
+                            <td className="px-4 py-3 text-sm text-zinc-900">
+                              {formatDate(day.date)}
+                            </td>
+                            <td className="px-4 py-3 text-sm text-zinc-900 text-right font-medium">
+                              {day.impressions.toLocaleString()}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
               </div>
-            )}
-          </div>
 
-          {reportData.impressions_by_flight.length > 0 && (
-            <div className="bg-white rounded-lg border border-zinc-200 p-6">
-              <h2 className="text-lg font-semibold text-zinc-900 mb-4">
-                Impressions by Flight
-              </h2>
-              <div className="overflow-x-auto">
-                <table className="w-full">
-                  <thead className="bg-zinc-50 border-b border-zinc-200">
-                    <tr>
-                      <th className="text-left px-4 py-3 text-xs font-medium text-zinc-700 uppercase tracking-wider">
-                        Flight Name
-                      </th>
-                      <th className="text-right px-4 py-3 text-xs font-medium text-zinc-700 uppercase tracking-wider">
-                        Impressions
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-zinc-200">
-                    {reportData.impressions_by_flight
-                      .sort((a, b) => b.impressions - a.impressions)
-                      .map((flight) => (
-                        <tr key={flight.flight_id} className="hover:bg-zinc-50">
-                          <td className="px-4 py-3 text-sm text-zinc-900">
-                            {flight.flight_name}
-                          </td>
-                          <td className="px-4 py-3 text-sm text-zinc-900 text-right font-medium">
-                            {flight.impressions.toLocaleString()}
-                          </td>
+              <div className="bg-white rounded-lg border border-zinc-200 p-6">
+                <h2 className="text-lg font-semibold text-zinc-900 mb-4">
+                  Impressions by Screen
+                </h2>
+                {reportData.byScreen.length === 0 ? (
+                  <p className="text-sm text-zinc-500">
+                    No screen impression data available.
+                  </p>
+                ) : (
+                  <div className="overflow-x-auto">
+                    <table className="w-full">
+                      <thead className="bg-zinc-50 border-b border-zinc-200">
+                        <tr>
+                          <th className="text-left px-4 py-3 text-xs font-medium text-zinc-700 uppercase tracking-wider">
+                            Screen Name
+                          </th>
+                          <th className="text-right px-4 py-3 text-xs font-medium text-zinc-700 uppercase tracking-wider">
+                            Impressions
+                          </th>
                         </tr>
-                      ))}
-                  </tbody>
-                </table>
+                      </thead>
+                      <tbody className="divide-y divide-zinc-200">
+                        {reportData.byScreen
+                          .sort((a, b) => b.impressions - a.impressions)
+                          .map((screen) => (
+                            <tr key={screen.screenId} className="hover:bg-zinc-50">
+                              <td className="px-4 py-3 text-sm text-zinc-900">
+                                {screen.screenName || screen.screenId}
+                              </td>
+                              <td className="px-4 py-3 text-sm text-zinc-900 text-right font-medium">
+                                {screen.impressions.toLocaleString()}
+                              </td>
+                            </tr>
+                          ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
               </div>
-            </div>
+            </>
           )}
         </>
       )}

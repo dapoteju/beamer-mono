@@ -1,26 +1,12 @@
 import apiClient from "./client";
 
 export interface CampaignReport {
-  campaign_id: string;
-  campaign_name: string;
-  total_play_events: number;
-  impressions_delivered: number;
-  impressions_by_region: Array<{ region: string; impressions: number }>;
-  impressions_by_flight: Array<{
-    flight_id: string;
-    flight_name: string;
-    impressions: number;
-  }>;
-  compliance_status: Array<{
-    region: string;
-    resolved_status: string;
-    statuses: Array<{ status: string; count: number }>;
-  }>;
-  start_date: string;
-  end_date: string;
-  total_budget: number;
-  currency: string;
-  status: string;
+  campaignId: string;
+  startDate: string;
+  endDate: string;
+  totalImpressions: number;
+  byScreen: Array<{ screenId: string; screenName?: string; impressions: number }>;
+  byDay: Array<{ date: string; impressions: number }>;
 }
 
 export interface CampaignReportParams {

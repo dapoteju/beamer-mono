@@ -13,18 +13,12 @@ import {
 import { eq, sql, and, desc, gte, lte } from "drizzle-orm";
 
 export interface CampaignReport {
-  campaign_id: string;
-  campaign_name: string;
-  total_play_events: number;
-  impressions_delivered: number;
-  impressions_by_region: Array<{ region: string; impressions: number }>;
-  impressions_by_flight: Array<{ flight_id: string; flight_name: string; impressions: number }>;
-  compliance_status: Array<{ region: string; resolved_status: string; statuses: Array<{ status: string; count: number }> }>;
-  start_date: string;
-  end_date: string;
-  total_budget: number;
-  currency: string;
-  status: string;
+  campaignId: string;
+  startDate: string;
+  endDate: string;
+  totalImpressions: number;
+  byScreen: Array<{ screenId: string; screenName?: string; impressions: number }>;
+  byDay: Array<{ date: string; impressions: number }>;
 }
 
 export interface BookingReport {
@@ -144,92 +138,68 @@ export async function getCampaignReport(
 
   const campaignData = campaign[0];
 
+  // Ensure we always have valid date strings
+  const effectiveStartDate = startDate || campaignData.startDate || new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+  const effectiveEndDate = endDate || campaignData.endDate || new Date().toISOString().split('T')[0];
+
   const dateConditions = [];
-  if (startDate) {
-    dateConditions.push(gte(sql`DATE(${playEvents.startedAt})`, startDate));
+  if (effectiveStartDate) {
+    dateConditions.push(gte(sql`DATE(${playEvents.startedAt})`, effectiveStartDate));
   }
-  if (endDate) {
-    dateConditions.push(lte(sql`DATE(${playEvents.startedAt})`, endDate));
+  if (effectiveEndDate) {
+    dateConditions.push(lte(sql`DATE(${playEvents.startedAt})`, effectiveEndDate));
   }
 
   const playEventsWhere = dateConditions.length > 0
     ? and(eq(playEvents.campaignId, campaignId), ...dateConditions)
     : eq(playEvents.campaignId, campaignId);
 
-  const totalPlayEventsResult = await db
+  const totalImpressionsResult = await db
     .select({
       count: sql<number>`COUNT(*)::int`,
     })
     .from(playEvents)
     .where(playEventsWhere);
 
-  const totalPlayEvents = totalPlayEventsResult[0]?.count || 0;
+  const totalImpressions = totalImpressionsResult[0]?.count || 0;
 
-  const impressionsByRegionResult = await db
+  const impressionsByScreenResult = await db
     .select({
-      region: screens.regionCode,
+      screenId: screens.id,
+      screenName: screens.name,
       impressions: sql<number>`COUNT(*)::int`,
     })
     .from(playEvents)
     .innerJoin(screens, eq(playEvents.screenId, screens.id))
     .where(playEventsWhere)
-    .groupBy(screens.regionCode);
+    .groupBy(screens.id, screens.name);
 
-  const flightDateConditions = [];
-  if (startDate) {
-    flightDateConditions.push(gte(sql`DATE(${playEvents.startedAt})`, startDate));
-  }
-  if (endDate) {
-    flightDateConditions.push(lte(sql`DATE(${playEvents.startedAt})`, endDate));
-  }
-
-  const flightWhere = flightDateConditions.length > 0
-    ? and(eq(playEvents.campaignId, campaignId), sql`${playEvents.flightId} IS NOT NULL`, ...flightDateConditions)
-    : and(eq(playEvents.campaignId, campaignId), sql`${playEvents.flightId} IS NOT NULL`);
-
-  const impressionsByFlightResult = await db
-    .select({
-      flightId: flights.id,
-      flightName: flights.name,
-      impressions: sql<number>`COUNT(*)::int`,
-    })
-    .from(playEvents)
-    .innerJoin(flights, eq(playEvents.flightId, flights.id))
-    .where(flightWhere)
-    .groupBy(flights.id, flights.name);
-
-  const complianceStatusResult = await db
-    .select({
-      region: regions.code,
-      status: creativeApprovals.status,
-    })
-    .from(creatives)
-    .innerJoin(creativeApprovals, eq(creatives.id, creativeApprovals.creativeId))
-    .innerJoin(regions, eq(creativeApprovals.regionId, regions.id))
-    .where(eq(creatives.campaignId, campaignId));
-
-  const complianceStatus = rollupCompliance(complianceStatusResult);
+  const impressionsByDayResult = await db.execute(sql`
+    SELECT
+      DATE(${playEvents.startedAt}) AS date,
+      COUNT(*)::int AS impressions
+    FROM ${playEvents}
+    WHERE ${playEvents.campaignId} = ${campaignId}
+      ${effectiveStartDate ? sql`AND DATE(${playEvents.startedAt}) >= ${effectiveStartDate}` : sql``}
+      ${effectiveEndDate ? sql`AND DATE(${playEvents.startedAt}) <= ${effectiveEndDate}` : sql``}
+    GROUP BY DATE(${playEvents.startedAt})
+    ORDER BY date ASC
+  `);
 
   return {
-    campaign_id: campaignData.id,
-    campaign_name: campaignData.name,
-    total_play_events: totalPlayEvents,
-    impressions_delivered: totalPlayEvents,
-    impressions_by_region: impressionsByRegionResult.map((r) => ({
-      region: r.region,
+    campaignId: campaignData.id,
+    startDate: effectiveStartDate,
+    endDate: effectiveEndDate,
+    totalImpressions,
+    byScreen: impressionsByScreenResult.map((r) => ({
+      screenId: r.screenId,
+      screenName: r.screenName || undefined,
       impressions: r.impressions,
     })),
-    impressions_by_flight: impressionsByFlightResult.map((r) => ({
-      flight_id: r.flightId,
-      flight_name: r.flightName,
-      impressions: r.impressions,
+    byDay: impressionsByDayResult.rows.map((row: any) => ({
+      date: row.date,
+      impressions: row.impressions,
     })),
-    compliance_status: complianceStatus,
-    start_date: campaignData.startDate,
-    end_date: campaignData.endDate,
-    total_budget: campaignData.totalBudget,
-    currency: campaignData.currency,
-    status: campaignData.status,
   };
 }
 
