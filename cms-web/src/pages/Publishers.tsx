@@ -103,6 +103,9 @@ export default function Publishers() {
                 Type
               </th>
               <th className="px-6 py-3 text-left text-xs font-medium text-zinc-500 uppercase tracking-wider">
+                Screens
+              </th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-zinc-500 uppercase tracking-wider">
                 Contact
               </th>
               <th className="px-6 py-3 text-left text-xs font-medium text-zinc-500 uppercase tracking-wider">
@@ -116,7 +119,7 @@ export default function Publishers() {
           <tbody className="bg-white divide-y divide-zinc-200">
             {publishers.length === 0 ? (
               <tr>
-                <td colSpan={5} className="px-6 py-8 text-center text-sm text-zinc-500">
+                <td colSpan={6} className="px-6 py-8 text-center text-sm text-zinc-500">
                   No publishers found.
                 </td>
               </tr>
@@ -141,6 +144,11 @@ export default function Publishers() {
                       )}`}
                     >
                       {formatType(pub.publisherType)}
+                    </span>
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                      {pub.screenCount || 0}
                     </span>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-zinc-600">

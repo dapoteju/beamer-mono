@@ -10,13 +10,13 @@ export interface PublisherProfile {
   email: string | null;
   address: string | null;
   notes: string | null;
+  screenCount: number;
+  vehicleCount: number;
   createdAt: string;
   updatedAt: string;
 }
 
 export interface PublisherProfileDetail extends PublisherProfile {
-  screenCount: number;
-  vehicleCount: number;
 }
 
 export interface CreatePublisherPayload {

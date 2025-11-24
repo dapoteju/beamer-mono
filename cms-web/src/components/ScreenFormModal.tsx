@@ -233,7 +233,7 @@ export function ScreenFormModal({ mode, screenId, initialValues, onClose, onSucc
           {/* Name */}
           <div>
             <label className="block text-sm font-medium text-zinc-700 mb-1">
-              Name <span className="text-red-500">*</span>
+              Name <span className="text-zinc-400 text-xs">(Optional)</span>
             </label>
             <input
               type="text"
@@ -242,7 +242,7 @@ export function ScreenFormModal({ mode, screenId, initialValues, onClose, onSucc
               className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${
                 errors.name ? "border-red-500" : "border-zinc-300"
               }`}
-              placeholder="e.g., Screen Lagos Central"
+              placeholder="e.g., Screen Lagos Central (auto-code will be generated)"
             />
             {errors.name && <p className="text-red-500 text-sm mt-1">{errors.name}</p>}
           </div>
