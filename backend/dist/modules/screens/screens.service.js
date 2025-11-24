@@ -78,6 +78,14 @@ async function listScreensWithPlayerInfo(filters) {
         FROM ${schema_1.heartbeats} h 
         WHERE h.screen_id = ${schema_1.screens.id}
       )`,
+        // Phase 3A: Publisher profile data
+        publisherId: schema_1.screens.publisherId,
+        publisherProfileId: schema_1.publisherProfiles.id,
+        publisherType: schema_1.publisherProfiles.publisherType,
+        publisherFullName: schema_1.publisherProfiles.fullName,
+        publisherPhone: schema_1.publisherProfiles.phoneNumber,
+        publisherEmail: schema_1.publisherProfiles.email,
+        publisherOrganisationId: schema_1.publisherProfiles.organisationId,
         // Phase 1: Extended metadata (nullable fields)
         screenClassification: schema_1.screens.screenClassification,
         vehicleId: schema_1.screens.vehicleId,
@@ -102,7 +110,8 @@ async function listScreensWithPlayerInfo(filters) {
         .from(schema_1.screens)
         .leftJoin(schema_1.organisations, (0, drizzle_orm_1.eq)(schema_1.screens.publisherOrgId, schema_1.organisations.id))
         .leftJoin(schema_1.players, (0, drizzle_orm_1.eq)(schema_1.players.screenId, schema_1.screens.id))
-        .leftJoin(schema_1.vehicles, (0, drizzle_orm_1.eq)(schema_1.screens.vehicleId, schema_1.vehicles.id));
+        .leftJoin(schema_1.vehicles, (0, drizzle_orm_1.eq)(schema_1.screens.vehicleId, schema_1.vehicles.id))
+        .leftJoin(schema_1.publisherProfiles, (0, drizzle_orm_1.eq)(schema_1.screens.publisherId, schema_1.publisherProfiles.id));
     if (conditions.length > 0) {
         return query.where((0, drizzle_orm_1.and)(...conditions));
     }
@@ -113,6 +122,7 @@ async function createScreen(input) {
         .insert(schema_1.screens)
         .values({
         publisherOrgId: input.publisherOrgId,
+        publisherId: input.publisherId || null, // Phase 3A
         name: input.name,
         screenType: input.screenType,
         resolutionWidth: input.resolutionWidth,
@@ -465,6 +475,7 @@ async function createScreenForCMS(input) {
         .insert(schema_1.screens)
         .values({
         publisherOrgId: input.publisherOrgId,
+        publisherId: input.publisherId || null, // Phase 3A
         name: input.name,
         city: input.city,
         regionCode: input.regionCode,
@@ -509,6 +520,8 @@ async function updateScreenData(screenId, input, currentPlayerId) {
             updateData.regionCode = input.regionCode;
         if (input.publisherOrgId !== undefined)
             updateData.publisherOrgId = input.publisherOrgId;
+        if (input.publisherId !== undefined)
+            updateData.publisherId = input.publisherId || null; // Phase 3A
         if (input.status !== undefined)
             updateData.status = input.status;
         // Phase 2: Classification metadata

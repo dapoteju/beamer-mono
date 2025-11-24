@@ -1,6 +1,6 @@
 // src/modules/screens/screens.service.ts
 import { db } from "../../db/client";
-import { screens, organisations, players, heartbeats, playEvents, creatives, campaigns, regions, vehicles } from "../../db/schema";
+import { screens, organisations, players, heartbeats, playEvents, creatives, campaigns, regions, vehicles, publisherProfiles } from "../../db/schema";
 import { eq, desc, and, gte, sql, isNull } from "drizzle-orm";
 
 export async function listScreens(filters?: {
@@ -72,6 +72,14 @@ export async function listScreensWithPlayerInfo(filters?: {
         FROM ${heartbeats} h 
         WHERE h.screen_id = ${screens.id}
       )`,
+      // Phase 3A: Publisher profile data
+      publisherId: screens.publisherId,
+      publisherProfileId: publisherProfiles.id,
+      publisherType: publisherProfiles.publisherType,
+      publisherFullName: publisherProfiles.fullName,
+      publisherPhone: publisherProfiles.phoneNumber,
+      publisherEmail: publisherProfiles.email,
+      publisherOrganisationId: publisherProfiles.organisationId,
       // Phase 1: Extended metadata (nullable fields)
       screenClassification: screens.screenClassification,
       vehicleId: screens.vehicleId,
@@ -96,7 +104,8 @@ export async function listScreensWithPlayerInfo(filters?: {
     .from(screens)
     .leftJoin(organisations, eq(screens.publisherOrgId, organisations.id))
     .leftJoin(players, eq(players.screenId, screens.id))
-    .leftJoin(vehicles, eq(screens.vehicleId, vehicles.id));
+    .leftJoin(vehicles, eq(screens.vehicleId, vehicles.id))
+    .leftJoin(publisherProfiles, eq(screens.publisherId, publisherProfiles.id));
 
   if (conditions.length > 0) {
     return query.where(and(...conditions));
@@ -107,6 +116,7 @@ export async function listScreensWithPlayerInfo(filters?: {
 
 export async function createScreen(input: {
   publisherOrgId: string;
+  publisherId?: string; // Phase 3A
   name: string;
   screenType: string;
   resolutionWidth: number;
@@ -120,6 +130,7 @@ export async function createScreen(input: {
     .insert(screens)
     .values({
       publisherOrgId: input.publisherOrgId,
+      publisherId: input.publisherId || null, // Phase 3A
       name: input.name,
       screenType: input.screenType,
       resolutionWidth: input.resolutionWidth,
@@ -538,6 +549,7 @@ export async function createScreenForCMS(input: {
   city: string;
   regionCode: string;
   publisherOrgId: string;
+  publisherId?: string; // Phase 3A: New publisher profile reference
   status?: 'active' | 'inactive' | 'maintenance';
   playerId?: string;
   // Phase 2: Classification metadata
@@ -559,6 +571,7 @@ export async function createScreenForCMS(input: {
     .insert(screens)
     .values({
       publisherOrgId: input.publisherOrgId,
+      publisherId: input.publisherId || null, // Phase 3A
       name: input.name,
       city: input.city,
       regionCode: input.regionCode,
@@ -599,6 +612,7 @@ export async function updateScreenData(screenId: string, input: {
   city?: string;
   regionCode?: string;
   publisherOrgId?: string;
+  publisherId?: string | null; // Phase 3A
   status?: 'active' | 'inactive' | 'maintenance';
   playerId?: string | null;
   // Phase 2: Classification metadata
@@ -622,6 +636,7 @@ export async function updateScreenData(screenId: string, input: {
     if (input.city !== undefined) updateData.city = input.city;
     if (input.regionCode !== undefined) updateData.regionCode = input.regionCode;
     if (input.publisherOrgId !== undefined) updateData.publisherOrgId = input.publisherOrgId;
+    if (input.publisherId !== undefined) updateData.publisherId = input.publisherId || null; // Phase 3A
     if (input.status !== undefined) updateData.status = input.status;
     
     // Phase 2: Classification metadata

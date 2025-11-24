@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.invoices = exports.bookingFlights = exports.screenGroupMembers = exports.screenGroups = exports.heartbeats = exports.playEvents = exports.players = exports.creativeApprovals = exports.users = exports.regions = exports.creatives = exports.flightCreatives = exports.flights = exports.bookings = exports.campaigns = exports.screens = exports.vehicles = exports.organisations = exports.userRoleEnum = exports.screenStatusEnum = exports.orgTypeEnum = void 0;
+exports.invoices = exports.bookingFlights = exports.screenGroupMembers = exports.screenGroups = exports.heartbeats = exports.playEvents = exports.players = exports.creativeApprovals = exports.users = exports.regions = exports.creatives = exports.flightCreatives = exports.flights = exports.bookings = exports.campaigns = exports.screens = exports.vehicles = exports.publisherProfiles = exports.publisherTypeEnum = exports.organisations = exports.userRoleEnum = exports.screenStatusEnum = exports.orgTypeEnum = void 0;
 // src/db/schema.ts
 const pg_core_1 = require("drizzle-orm/pg-core");
 // --- Enums ---
@@ -27,6 +27,29 @@ exports.organisations = (0, pg_core_1.pgTable)("organisations", {
     billingEmail: (0, pg_core_1.varchar)("billing_email", { length: 255 }).notNull(),
     country: (0, pg_core_1.varchar)("country", { length: 2 }).notNull(), // ISO country code
     createdAt: (0, pg_core_1.timestamp)("created_at", { withTimezone: true })
+        .defaultNow()
+        .notNull(),
+    // Phase 3A: Organisation category for publisher/advertiser separation
+    organisationCategory: (0, exports.orgTypeEnum)("organisation_category").notNull().default("advertiser"),
+});
+// --- Publisher Profiles (Phase 3A) ---
+exports.publisherTypeEnum = (0, pg_core_1.pgEnum)("publisher_type", [
+    "organisation",
+    "individual",
+]);
+exports.publisherProfiles = (0, pg_core_1.pgTable)("publisher_profiles", {
+    id: (0, pg_core_1.uuid)("id").primaryKey().defaultRandom(),
+    organisationId: (0, pg_core_1.uuid)("organisation_id").references(() => exports.organisations.id),
+    publisherType: (0, exports.publisherTypeEnum)("publisher_type").notNull(),
+    fullName: (0, pg_core_1.text)("full_name"),
+    phoneNumber: (0, pg_core_1.text)("phone_number"),
+    email: (0, pg_core_1.text)("email"),
+    address: (0, pg_core_1.text)("address"),
+    notes: (0, pg_core_1.text)("notes"),
+    createdAt: (0, pg_core_1.timestamp)("created_at", { withTimezone: true })
+        .defaultNow()
+        .notNull(),
+    updatedAt: (0, pg_core_1.timestamp)("updated_at", { withTimezone: true })
         .defaultNow()
         .notNull(),
 });
@@ -68,6 +91,8 @@ exports.screens = (0, pg_core_1.pgTable)("screens", {
     createdAt: (0, pg_core_1.timestamp)("created_at", { withTimezone: true })
         .defaultNow()
         .notNull(),
+    // Phase 3A: New publisher profile reference (nullable for migration, will be required later)
+    publisherId: (0, pg_core_1.uuid)("publisher_id").references(() => exports.publisherProfiles.id),
     // Phase 1: Extended metadata (all nullable, non-breaking)
     screenClassification: (0, pg_core_1.text)("screen_classification").default("vehicle"), // vehicle, billboard, indoor
     vehicleId: (0, pg_core_1.text)("vehicle_id").references(() => exports.vehicles.id),

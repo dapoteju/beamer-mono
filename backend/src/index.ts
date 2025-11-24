@@ -16,6 +16,8 @@ import { bookingsRouter } from "./modules/bookings/bookings.routes";
 import { invoicesRouter } from "./modules/invoices/invoices.routes";
 import { playerRouter } from "./modules/player/player.routes";
 import { reportsRouter } from "./modules/reports/reports.routes";
+import { publishersRouter } from "./modules/publishers/publishers.routes";
+import { advertisersRouter } from "./modules/advertisers/advertisers.routes";
 
 import { notFoundHandler, errorHandler } from "./middleware/errorhandler";
 
@@ -37,7 +39,9 @@ app.use("/api/creatives", creativesRouter);  // approval
 app.use("/api/bookings", bookingsRouter);
 app.use("/api/invoices", invoicesRouter);
 app.use("/api/player", playerRouter);
-app.use("/api/reports", reportsRouter); 
+app.use("/api/reports", reportsRouter);
+app.use("/api/publishers", publishersRouter);
+app.use("/api/advertisers", advertisersRouter);
 
 // 404 + error handlers last
 app.use(notFoundHandler);

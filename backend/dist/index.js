@@ -19,6 +19,8 @@ const bookings_routes_1 = require("./modules/bookings/bookings.routes");
 const invoices_routes_1 = require("./modules/invoices/invoices.routes");
 const player_routes_1 = require("./modules/player/player.routes");
 const reports_routes_1 = require("./modules/reports/reports.routes");
+const publishers_routes_1 = require("./modules/publishers/publishers.routes");
+const advertisers_routes_1 = require("./modules/advertisers/advertisers.routes");
 const errorhandler_1 = require("./middleware/errorhandler");
 const app = (0, express_1.default)();
 // Middlewares
@@ -37,6 +39,8 @@ app.use("/api/bookings", bookings_routes_1.bookingsRouter);
 app.use("/api/invoices", invoices_routes_1.invoicesRouter);
 app.use("/api/player", player_routes_1.playerRouter);
 app.use("/api/reports", reports_routes_1.reportsRouter);
+app.use("/api/publishers", publishers_routes_1.publishersRouter);
+app.use("/api/advertisers", advertisers_routes_1.advertisersRouter);
 // 404 + error handlers last
 app.use(errorhandler_1.notFoundHandler);
 app.use(errorhandler_1.errorHandler);

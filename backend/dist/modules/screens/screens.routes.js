@@ -86,6 +86,15 @@ exports.screensRouter.get("/", auth_1.requireAuth, async (req, res, next) => {
             isOnline: screen.lastHeartbeatAt
                 ? now.getTime() - new Date(screen.lastHeartbeatAt).getTime() < 2 * 60 * 1000
                 : false,
+            // Phase 3A: Publisher profile data
+            publisher: screen.publisherProfileId ? {
+                id: screen.publisherProfileId,
+                publisherType: screen.publisherType,
+                fullName: screen.publisherFullName,
+                phoneNumber: screen.publisherPhone,
+                email: screen.publisherEmail,
+                organisationId: screen.publisherOrganisationId,
+            } : null,
             // Phase 2: Classification metadata
             screenClassification: screen.screenClassification,
             vehicle: screen.vehicle,
@@ -114,7 +123,8 @@ exports.screensRouter.post("/", auth_1.requireAuth, async (req, res, next) => {
                 error: "Forbidden. Only internal admin/ops users can create screens."
             });
         }
-        const { name, city, regionCode, publisherOrgId, status, playerId, 
+        const { name, city, regionCode, publisherOrgId, publisherId, // Phase 3A
+        status, playerId, 
         // Phase 2: Classification metadata
         screenClassification, vehicleId, structureType, sizeDescription, illuminationType, address, venueName, venueType, venueAddress, latitude, longitude, } = req.body;
         // Validate required fields
@@ -149,6 +159,7 @@ exports.screensRouter.post("/", auth_1.requireAuth, async (req, res, next) => {
             city,
             regionCode,
             publisherOrgId,
+            publisherId, // Phase 3A
             status,
             playerId,
             // Phase 2: Classification metadata
@@ -287,7 +298,8 @@ exports.screensRouter.patch("/:id", auth_1.requireAuth, async (req, res, next) =
                 error: "Forbidden. You can only edit screens belonging to your organization."
             });
         }
-        const { name, city, regionCode, publisherOrgId, status, playerId, 
+        const { name, city, regionCode, publisherOrgId, publisherId, // Phase 3A
+        status, playerId, 
         // Phase 2: Classification metadata
         screenClassification, vehicleId, structureType, sizeDescription, illuminationType, address, venueName, venueType, venueAddress, latitude, longitude, } = req.body;
         // Build update payload
@@ -302,6 +314,8 @@ exports.screensRouter.patch("/:id", auth_1.requireAuth, async (req, res, next) =
             updatePayload.status = status;
         if (playerId !== undefined)
             updatePayload.playerId = playerId;
+        if (publisherId !== undefined)
+            updatePayload.publisherId = publisherId; // Phase 3A
         // Phase 2: Classification metadata
         if (screenClassification !== undefined)
             updatePayload.screenClassification = screenClassification;

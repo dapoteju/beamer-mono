@@ -116,6 +116,15 @@ screensRouter.get("/", requireAuth, async (req: AuthRequest, res: Response, next
       isOnline: screen.lastHeartbeatAt
         ? now.getTime() - new Date(screen.lastHeartbeatAt).getTime() < 2 * 60 * 1000
         : false,
+      // Phase 3A: Publisher profile data
+      publisher: screen.publisherProfileId ? {
+        id: screen.publisherProfileId,
+        publisherType: screen.publisherType,
+        fullName: screen.publisherFullName,
+        phoneNumber: screen.publisherPhone,
+        email: screen.publisherEmail,
+        organisationId: screen.publisherOrganisationId,
+      } : null,
       // Phase 2: Classification metadata
       screenClassification: screen.screenClassification,
       vehicle: screen.vehicle,
@@ -151,6 +160,7 @@ screensRouter.post("/", requireAuth, async (req: AuthRequest, res: Response, nex
       city, 
       regionCode, 
       publisherOrgId, 
+      publisherId, // Phase 3A
       status, 
       playerId,
       // Phase 2: Classification metadata
@@ -203,6 +213,7 @@ screensRouter.post("/", requireAuth, async (req: AuthRequest, res: Response, nex
       city,
       regionCode,
       publisherOrgId,
+      publisherId, // Phase 3A
       status,
       playerId,
       // Phase 2: Classification metadata
@@ -362,6 +373,7 @@ screensRouter.patch("/:id", requireAuth, async (req: AuthRequest, res: Response,
       city, 
       regionCode, 
       publisherOrgId, 
+      publisherId, // Phase 3A
       status, 
       playerId,
       // Phase 2: Classification metadata
@@ -385,6 +397,7 @@ screensRouter.patch("/:id", requireAuth, async (req: AuthRequest, res: Response,
     if (regionCode !== undefined) updatePayload.regionCode = regionCode;
     if (status !== undefined) updatePayload.status = status;
     if (playerId !== undefined) updatePayload.playerId = playerId;
+    if (publisherId !== undefined) updatePayload.publisherId = publisherId; // Phase 3A
     
     // Phase 2: Classification metadata
     if (screenClassification !== undefined) updatePayload.screenClassification = screenClassification;
