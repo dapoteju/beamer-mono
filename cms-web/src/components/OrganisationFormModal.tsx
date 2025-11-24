@@ -14,6 +14,100 @@ interface OrganisationFormModalProps {
   mode: "create" | "edit";
 }
 
+const COUNTRIES = [
+  { code: "US", name: "United States" },
+  { code: "GB", name: "United Kingdom" },
+  { code: "CA", name: "Canada" },
+  { code: "AU", name: "Australia" },
+  { code: "NZ", name: "New Zealand" },
+  { code: "IE", name: "Ireland" },
+  { code: "ZA", name: "South Africa" },
+  { code: "NG", name: "Nigeria" },
+  { code: "KE", name: "Kenya" },
+  { code: "GH", name: "Ghana" },
+  { code: "TZ", name: "Tanzania" },
+  { code: "UG", name: "Uganda" },
+  { code: "ZW", name: "Zimbabwe" },
+  { code: "RW", name: "Rwanda" },
+  { code: "ET", name: "Ethiopia" },
+  { code: "EG", name: "Egypt" },
+  { code: "MA", name: "Morocco" },
+  { code: "TN", name: "Tunisia" },
+  { code: "DZ", name: "Algeria" },
+  { code: "SN", name: "Senegal" },
+  { code: "CI", name: "Côte d'Ivoire" },
+  { code: "CM", name: "Cameroon" },
+  { code: "BW", name: "Botswana" },
+  { code: "MU", name: "Mauritius" },
+  { code: "NA", name: "Namibia" },
+  { code: "DE", name: "Germany" },
+  { code: "FR", name: "France" },
+  { code: "IT", name: "Italy" },
+  { code: "ES", name: "Spain" },
+  { code: "NL", name: "Netherlands" },
+  { code: "BE", name: "Belgium" },
+  { code: "CH", name: "Switzerland" },
+  { code: "AT", name: "Austria" },
+  { code: "SE", name: "Sweden" },
+  { code: "NO", name: "Norway" },
+  { code: "DK", name: "Denmark" },
+  { code: "FI", name: "Finland" },
+  { code: "PL", name: "Poland" },
+  { code: "PT", name: "Portugal" },
+  { code: "GR", name: "Greece" },
+  { code: "CZ", name: "Czech Republic" },
+  { code: "RO", name: "Romania" },
+  { code: "HU", name: "Hungary" },
+  { code: "BG", name: "Bulgaria" },
+  { code: "SK", name: "Slovakia" },
+  { code: "HR", name: "Croatia" },
+  { code: "SI", name: "Slovenia" },
+  { code: "LT", name: "Lithuania" },
+  { code: "LV", name: "Latvia" },
+  { code: "EE", name: "Estonia" },
+  { code: "IN", name: "India" },
+  { code: "CN", name: "China" },
+  { code: "JP", name: "Japan" },
+  { code: "KR", name: "South Korea" },
+  { code: "SG", name: "Singapore" },
+  { code: "HK", name: "Hong Kong" },
+  { code: "TW", name: "Taiwan" },
+  { code: "MY", name: "Malaysia" },
+  { code: "TH", name: "Thailand" },
+  { code: "ID", name: "Indonesia" },
+  { code: "PH", name: "Philippines" },
+  { code: "VN", name: "Vietnam" },
+  { code: "PK", name: "Pakistan" },
+  { code: "BD", name: "Bangladesh" },
+  { code: "LK", name: "Sri Lanka" },
+  { code: "AE", name: "United Arab Emirates" },
+  { code: "SA", name: "Saudi Arabia" },
+  { code: "IL", name: "Israel" },
+  { code: "TR", name: "Turkey" },
+  { code: "BR", name: "Brazil" },
+  { code: "MX", name: "Mexico" },
+  { code: "AR", name: "Argentina" },
+  { code: "CL", name: "Chile" },
+  { code: "CO", name: "Colombia" },
+  { code: "PE", name: "Peru" },
+  { code: "VE", name: "Venezuela" },
+  { code: "EC", name: "Ecuador" },
+  { code: "BO", name: "Bolivia" },
+  { code: "UY", name: "Uruguay" },
+  { code: "PY", name: "Paraguay" },
+  { code: "CR", name: "Costa Rica" },
+  { code: "PA", name: "Panama" },
+  { code: "GT", name: "Guatemala" },
+  { code: "DO", name: "Dominican Republic" },
+  { code: "CU", name: "Cuba" },
+  { code: "JM", name: "Jamaica" },
+  { code: "TT", name: "Trinidad and Tobago" },
+  { code: "BS", name: "Bahamas" },
+  { code: "BB", name: "Barbados" },
+  { code: "RU", name: "Russia" },
+  { code: "UA", name: "Ukraine" },
+].sort((a, b) => a.name.localeCompare(b.name));
+
 export default function OrganisationFormModal({
   isOpen,
   onClose,
@@ -106,8 +200,14 @@ export default function OrganisationFormModal({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div className="bg-white rounded-lg shadow-xl w-full max-w-md p-6">
+    <div 
+      className="fixed inset-0 bg-zinc-900/20 backdrop-blur-sm flex items-center justify-center z-50 p-4"
+      onClick={onClose}
+    >
+      <div 
+        className="bg-white rounded-lg shadow-2xl w-full max-w-md p-6"
+        onClick={(e) => e.stopPropagation()}
+      >
         <div className="flex items-center justify-between mb-6">
           <h2 className="text-xl font-semibold text-zinc-900">
             {mode === "create" ? "Create Organisation" : "Edit Organisation"}
@@ -168,20 +268,23 @@ export default function OrganisationFormModal({
 
           <div>
             <label htmlFor="country" className="block text-sm font-medium text-zinc-700 mb-1">
-              Country (ISO Code) <span className="text-red-500">*</span>
+              Country <span className="text-red-500">*</span>
             </label>
-            <input
+            <select
               id="country"
-              type="text"
               value={country}
-              onChange={(e) => setCountry(e.target.value.toUpperCase())}
+              onChange={(e) => setCountry(e.target.value)}
               required
-              maxLength={2}
               className="w-full px-3 py-2 border border-zinc-300 rounded-md focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-transparent"
-              placeholder="US"
               disabled={loading}
-            />
-            <p className="text-xs text-zinc-500 mt-1">2-letter ISO country code (e.g., US, GB, NG)</p>
+            >
+              <option value="">Select a country...</option>
+              {COUNTRIES.map((c) => (
+                <option key={c.code} value={c.code}>
+                  {c.name} ({c.code})
+                </option>
+              ))}
+            </select>
           </div>
 
           <div>
