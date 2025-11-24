@@ -67,6 +67,18 @@ export async function deletePublisher(id: string): Promise<void> {
 }
 
 export async function fetchPublisherOrganisations(): Promise<{id: string; name: string}[]> {
-  const response = await apiClient.get<{id: string; name: string}[]>("/publishers/organisations/list");
+  const response = await apiClient.get<{id: string; name: string}[]>("/publishers/dropdown/organisations");
+  return response.data;
+}
+
+export interface PublisherOption {
+  id: string;
+  label: string;
+  publisherType: "organisation" | "individual";
+  organisationId: string | null;
+}
+
+export async function getPublisherOptions(): Promise<PublisherOption[]> {
+  const response = await apiClient.get<PublisherOption[]>("/publishers/dropdown");
   return response.data;
 }

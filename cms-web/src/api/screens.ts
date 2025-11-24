@@ -34,6 +34,19 @@ export interface Screen {
   venueAddress?: string | null;
   latitude?: number | null;
   longitude?: number | null;
+  // Phase 3A: Publisher profile data
+  publisher?: {
+    id: string;
+    publisherType: "organisation" | "individual";
+    fullName?: string | null;
+    phoneNumber?: string | null;
+    email?: string | null;
+    organisation?: {
+      id: string;
+      name: string;
+      country?: string | null;
+    } | null;
+  } | null;
 }
 
 export interface ScreenPlayer {
@@ -71,6 +84,19 @@ export interface ScreenInfo {
   venueAddress?: string | null;
   latitude?: number | null;
   longitude?: number | null;
+  // Phase 3A: Publisher profile data
+  publisher?: {
+    id: string;
+    publisherType: "organisation" | "individual";
+    fullName?: string | null;
+    phoneNumber?: string | null;
+    email?: string | null;
+    organisation?: {
+      id: string;
+      name: string;
+      country?: string | null;
+    } | null;
+  } | null;
 }
 
 export interface ScreenStats {
@@ -205,6 +231,7 @@ export interface CreateScreenPayload {
   city: string;
   regionCode: string;
   publisherOrgId: string;
+  publisherId?: string; // Phase 3A
   status?: 'active' | 'inactive' | 'maintenance';
   playerId?: string;
   // Phase 2: Extended metadata (optional)
@@ -226,6 +253,7 @@ export interface UpdateScreenPayload {
   city?: string;
   regionCode?: string;
   publisherOrgId?: string;
+  publisherId?: string | null; // Phase 3A
   status?: 'active' | 'inactive' | 'maintenance';
   playerId?: string | null;
   // Phase 2: Extended metadata (optional)
