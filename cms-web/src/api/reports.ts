@@ -5,7 +5,15 @@ export interface CampaignReport {
   startDate: string;
   endDate: string;
   totalImpressions: number;
-  byScreen: Array<{ screenId: string; screenName?: string; impressions: number }>;
+  byScreen: Array<{ 
+    screenId: string; 
+    screenName?: string; 
+    screenType?: string;
+    screenClassification?: string;
+    publisherName?: string;
+    publisherType?: string;
+    impressions: number;
+  }>;
   byDay: Array<{ date: string; impressions: number }>;
 }
 

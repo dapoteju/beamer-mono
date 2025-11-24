@@ -9,6 +9,8 @@ import {
   flights,
   creativeApprovals,
   regions,
+  publisherProfiles,
+  organisations,
 } from "../../db/schema";
 import { eq, sql, and, desc, gte, lte } from "drizzle-orm";
 
@@ -17,7 +19,15 @@ export interface CampaignReport {
   startDate: string;
   endDate: string;
   totalImpressions: number;
-  byScreen: Array<{ screenId: string; screenName?: string; impressions: number }>;
+  byScreen: Array<{ 
+    screenId: string; 
+    screenName?: string; 
+    screenType?: string;
+    screenClassification?: string;
+    publisherName?: string;
+    publisherType?: string;
+    impressions: number;
+  }>;
   byDay: Array<{ date: string; impressions: number }>;
 }
 
@@ -167,12 +177,27 @@ export async function getCampaignReport(
     .select({
       screenId: screens.id,
       screenName: screens.name,
+      screenType: screens.screenType,
+      screenClassification: screens.screenClassification,
+      publisherName: sql<string>`COALESCE(${publisherProfiles.fullName}, ${organisations.name}, 'Unknown')`,
+      publisherType: sql<string>`COALESCE(${publisherProfiles.publisherType}, ${organisations.type}, 'Unknown')`,
       impressions: sql<number>`COUNT(*)::int`,
     })
     .from(playEvents)
     .innerJoin(screens, eq(playEvents.screenId, screens.id))
+    .leftJoin(publisherProfiles, eq(screens.publisherId, publisherProfiles.id))
+    .leftJoin(organisations, eq(screens.publisherOrgId, organisations.id))
     .where(playEventsWhere)
-    .groupBy(screens.id, screens.name);
+    .groupBy(
+      screens.id, 
+      screens.name, 
+      screens.screenType, 
+      screens.screenClassification,
+      publisherProfiles.fullName,
+      publisherProfiles.publisherType,
+      organisations.name,
+      organisations.type
+    );
 
   const impressionsByDayResult = await db.execute(sql`
     SELECT
@@ -194,6 +219,10 @@ export async function getCampaignReport(
     byScreen: impressionsByScreenResult.map((r) => ({
       screenId: r.screenId,
       screenName: r.screenName || undefined,
+      screenType: r.screenType || undefined,
+      screenClassification: r.screenClassification || undefined,
+      publisherName: r.publisherName || undefined,
+      publisherType: r.publisherType || undefined,
       impressions: r.impressions,
     })),
     byDay: impressionsByDayResult.rows.map((row: any) => ({

@@ -10,10 +10,14 @@ import {
   Line,
   BarChart,
   Bar,
+  PieChart,
+  Pie,
+  Cell,
   XAxis,
   YAxis,
   CartesianGrid,
   Tooltip,
+  Legend,
   ResponsiveContainer,
 } from "recharts";
 
@@ -109,12 +113,15 @@ export default function CampaignReporting() {
     if (!reportData || reportData.byScreen.length === 0) return;
 
     const rows: (string | number)[][] = [
-      ["Screen Name or ID", "Screen ID", "Impressions"],
+      ["Screen Name or ID", "Screen ID", "Screen Type", "Publisher", "Publisher Type", "Impressions"],
       ...reportData.byScreen
         .sort((a, b) => b.impressions - a.impressions)
         .map((screen) => [
           screen.screenName || screen.screenId,
           screen.screenId,
+          screen.screenClassification || screen.screenType || "N/A",
+          screen.publisherName || "N/A",
+          screen.publisherType || "N/A",
           screen.impressions,
         ]),
     ];
@@ -122,6 +129,29 @@ export default function CampaignReporting() {
     const filename = `campaign-${reportData.campaignId}-by-screen-${reportData.startDate}-${reportData.endDate}.csv`;
     downloadCsv(filename, rows);
   }
+
+  function getScreenTypeDistribution() {
+    if (!reportData || reportData.byScreen.length === 0) return [];
+
+    const distribution = new Map<string, number>();
+    
+    reportData.byScreen.forEach((screen) => {
+      const type = screen.screenClassification || screen.screenType || "Unknown";
+      // Properly title-case and replace underscores with spaces
+      const formattedType = type
+        .split('_')
+        .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+        .join(' ');
+      distribution.set(formattedType, (distribution.get(formattedType) || 0) + screen.impressions);
+    });
+
+    return Array.from(distribution.entries()).map(([name, value]) => ({
+      name,
+      value,
+    }));
+  }
+
+  const COLORS = ["#3b82f6", "#10b981", "#f59e0b", "#ef4444", "#8b5cf6", "#ec4899"];
 
   return (
     <div className="space-y-6">
@@ -402,47 +432,93 @@ export default function CampaignReporting() {
                   </p>
                 ) : (
                   <div>
-                    <div className="mb-6">
-                      <ResponsiveContainer width="100%" height={300}>
-                        <BarChart
-                          data={reportData.byScreen
-                            .sort((a, b) => b.impressions - a.impressions)
-                            .slice(0, 10)
-                            .map((screen) => ({
-                              name: screen.screenName || screen.screenId,
-                              impressions: screen.impressions,
-                            }))}
-                          margin={{ top: 5, right: 20, left: 10, bottom: 5 }}
-                        >
-                          <CartesianGrid strokeDasharray="3 3" stroke="#e4e4e7" />
-                          <XAxis
-                            dataKey="name"
-                            tick={{ fontSize: 12 }}
-                            stroke="#71717a"
-                            angle={-45}
-                            textAnchor="end"
-                            height={80}
-                          />
-                          <YAxis
-                            tick={{ fontSize: 12 }}
-                            stroke="#71717a"
-                            tickFormatter={(value: number) => value.toLocaleString()}
-                          />
-                          <Tooltip
-                            contentStyle={{
-                              backgroundColor: "#ffffff",
-                              border: "1px solid #e4e4e7",
-                              borderRadius: "0.375rem",
-                              fontSize: "0.875rem",
-                            }}
-                            formatter={(value: number) => [
-                              value.toLocaleString(),
-                              "Impressions",
-                            ]}
-                          />
-                          <Bar dataKey="impressions" fill="#3b82f6" radius={[4, 4, 0, 0]} />
-                        </BarChart>
-                      </ResponsiveContainer>
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+                      <div>
+                        <h3 className="text-sm font-semibold text-zinc-700 mb-3">
+                          Top 10 Screens by Impressions
+                        </h3>
+                        <ResponsiveContainer width="100%" height={300}>
+                          <BarChart
+                            data={reportData.byScreen
+                              .sort((a, b) => b.impressions - a.impressions)
+                              .slice(0, 10)
+                              .map((screen) => ({
+                                name: screen.screenName || screen.screenId,
+                                impressions: screen.impressions,
+                              }))}
+                            margin={{ top: 5, right: 20, left: 10, bottom: 5 }}
+                          >
+                            <CartesianGrid strokeDasharray="3 3" stroke="#e4e4e7" />
+                            <XAxis
+                              dataKey="name"
+                              tick={{ fontSize: 12 }}
+                              stroke="#71717a"
+                              angle={-45}
+                              textAnchor="end"
+                              height={80}
+                            />
+                            <YAxis
+                              tick={{ fontSize: 12 }}
+                              stroke="#71717a"
+                              tickFormatter={(value: number) => value.toLocaleString()}
+                            />
+                            <Tooltip
+                              contentStyle={{
+                                backgroundColor: "#ffffff",
+                                border: "1px solid #e4e4e7",
+                                borderRadius: "0.375rem",
+                                fontSize: "0.875rem",
+                              }}
+                              formatter={(value: number) => [
+                                value.toLocaleString(),
+                                "Impressions",
+                              ]}
+                            />
+                            <Bar dataKey="impressions" fill="#3b82f6" radius={[4, 4, 0, 0]} />
+                          </BarChart>
+                        </ResponsiveContainer>
+                      </div>
+                      <div>
+                        <h3 className="text-sm font-semibold text-zinc-700 mb-3">
+                          Impressions by Screen Type
+                        </h3>
+                        <ResponsiveContainer width="100%" height={300}>
+                          <PieChart>
+                            <Pie
+                              data={getScreenTypeDistribution()}
+                              cx="50%"
+                              cy="50%"
+                              labelLine={false}
+                              label={({name, percent}) => `${name}: ${((percent || 0) * 100).toFixed(0)}%`}
+                              outerRadius={80}
+                              fill="#8884d8"
+                              dataKey="value"
+                            >
+                              {getScreenTypeDistribution().map((_entry, index) => (
+                                <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                              ))}
+                            </Pie>
+                            <Tooltip
+                              contentStyle={{
+                                backgroundColor: "#ffffff",
+                                border: "1px solid #e4e4e7",
+                                borderRadius: "0.375rem",
+                                fontSize: "0.875rem",
+                              }}
+                              formatter={(value: number) => [
+                                value.toLocaleString(),
+                                "Impressions",
+                              ]}
+                            />
+                            <Legend
+                              verticalAlign="bottom"
+                              height={36}
+                              iconType="circle"
+                              wrapperStyle={{ fontSize: "0.875rem" }}
+                            />
+                          </PieChart>
+                        </ResponsiveContainer>
+                      </div>
                     </div>
                     <div className="overflow-x-auto">
                       <table className="w-full">
@@ -450,6 +526,12 @@ export default function CampaignReporting() {
                           <tr>
                             <th className="text-left px-4 py-3 text-xs font-medium text-zinc-700 uppercase tracking-wider">
                               Screen Name
+                            </th>
+                            <th className="text-left px-4 py-3 text-xs font-medium text-zinc-700 uppercase tracking-wider">
+                              Screen Type
+                            </th>
+                            <th className="text-left px-4 py-3 text-xs font-medium text-zinc-700 uppercase tracking-wider">
+                              Publisher
                             </th>
                             <th className="text-right px-4 py-3 text-xs font-medium text-zinc-700 uppercase tracking-wider">
                               Impressions
@@ -463,6 +545,27 @@ export default function CampaignReporting() {
                               <tr key={screen.screenId} className="hover:bg-zinc-50">
                                 <td className="px-4 py-3 text-sm text-zinc-900">
                                   {screen.screenName || screen.screenId}
+                                </td>
+                                <td className="px-4 py-3 text-sm">
+                                  <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                                    screen.screenClassification === 'vehicle' ? 'bg-green-100 text-green-800' :
+                                    screen.screenClassification === 'billboard' ? 'bg-blue-100 text-blue-800' :
+                                    screen.screenClassification === 'indoor' ? 'bg-purple-100 text-purple-800' :
+                                    'bg-zinc-100 text-zinc-800'
+                                  }`}>
+                                    {screen.screenClassification ? 
+                                      screen.screenClassification.charAt(0).toUpperCase() + screen.screenClassification.slice(1) : 
+                                      screen.screenType || 'Unknown'
+                                    }
+                                  </span>
+                                </td>
+                                <td className="px-4 py-3 text-sm text-zinc-700">
+                                  {screen.publisherName || 'N/A'}
+                                  {screen.publisherType && (
+                                    <span className="ml-2 text-xs text-zinc-500">
+                                      ({screen.publisherType})
+                                    </span>
+                                  )}
                                 </td>
                                 <td className="px-4 py-3 text-sm text-zinc-900 text-right font-medium">
                                   {screen.impressions.toLocaleString()}
