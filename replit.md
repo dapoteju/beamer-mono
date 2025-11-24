@@ -110,6 +110,16 @@ The project is organized into a monorepo containing distinct applications and li
 - **Permissions**: Campaign dropdown automatically filtered by backend based on JWT (advertiser users only see their org's campaigns, internal users see all active campaigns); server-side enforcement ensures data isolation.
 - **Navigation**: Link to Campaign Reporting added to main Reporting page; route: /reporting/campaigns (protected, requires authentication).
 
+**Comprehensive Seed Script (Development):**
+- **Location**: backend/scripts/seed.ts (run via `npm run seed` in backend directory).
+- **UUID Generation**: Uses deterministicUUID() to generate RFC 4122-compliant UUIDs from human-readable names (e.g., "campaign-adidas-summer-2025" → consistent UUID); ensures version 5 format with proper variant bits.
+- **Idempotency**: Safe to re-run; uses natural key lookups (org names, campaign names) and .onConflictDoNothing() to prevent duplicates.
+- **Performance**: Batch inserts (500 records at a time) for play events; completes ~26k play events in ~1 minute.
+- **Seed Data Created**: 5 organisations (Beamer Internal, Adidas UK, iFitness Lekki, LagosCabs, Capital OOH); 7 users (password: demo123); 2 publisher profiles; 6 vehicles; 3 regions; 18 screens (vehicle/billboard/indoor); 4 screen groups; 4 campaigns; 4 bookings; 5 flights; 4 creatives; 18 players; 84+ heartbeats; 26k+ play events.
+- **Storylines**: Adidas UK (3 campaigns: past/active/future); iFitness Lekki (active local campaign); LagosCabs & Capital OOH (publisher infrastructure with screens/vehicles).
+- **Login Credentials**: admin@beamer.com / demo123 (Internal Admin); marketing@adidas.co.uk / demo123 (Adidas Advertiser); admin@ifitness.ng / demo123 (iFitness Advertiser).
+- **Safety**: Environment guard prevents accidental production seeding unless ALLOW_SEED_DEMO=true is set.
+
 ### System Design Choices
 - **Monorepo Architecture**: Centralized repository for all platform components.
 - **Microservice-like Separation**: Distinct `backend` and `cms-web` applications.

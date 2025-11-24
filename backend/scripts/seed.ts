@@ -21,9 +21,32 @@ import {
 import { eq, and } from "drizzle-orm";
 import bcrypt from "bcrypt";
 import { nanoid } from "nanoid";
-import { randomUUID } from "crypto";
+import { createHash } from "crypto";
 
 const SALT_ROUNDS = 10;
+
+// Generate deterministic UUID v5-style from a name (for human-friendly seed data)
+function deterministicUUID(name: string): string {
+  const hash = createHash('sha256').update(name).digest('hex');
+  
+  // Format as UUID v5: xxxxxxxx-xxxx-5xxx-Yxxx-xxxxxxxxxxxx
+  // where Y is 8, 9, a, or b (variant bits for RFC 4122)
+  
+  // Take first 32 hex chars and format as UUID
+  const uuid = [
+    hash.substring(0, 8),
+    hash.substring(8, 12),
+    hash.substring(12, 16),
+    hash.substring(16, 20),
+    hash.substring(20, 32),
+  ].join('-');
+  
+  // Set version to 5 (replace char at index 14)
+  // Set variant to RFC 4122 (replace char at index 19 with 8, 9, a, or b)
+  const variantChar = ['8', '9', 'a', 'b'][parseInt(hash[16], 16) % 4];
+  
+  return uuid.substring(0, 14) + '5' + uuid.substring(15, 19) + variantChar + uuid.substring(20);
+}
 
 // Safety check: prevent accidental production seeding
 function checkEnvironment() {
@@ -441,7 +464,7 @@ async function seedCampaignsFlightsTargeting(orgIds: any, screenIdMap: Record<st
   let adidasCampaignAId: string;
   if (adidasCampaignA.length === 0) {
     const [created] = await db.insert(campaigns).values({
-      id: randomUUID(),
+      id: deterministicUUID("campaign-adidas-ultraboost-2024"),
       advertiserOrgId: orgIds.adidasOrgId,
       name: "Adidas Ultraboost Launch - Q4 2024",
       objective: "Product launch and brand awareness for new Ultraboost running shoes",
@@ -451,9 +474,9 @@ async function seedCampaignsFlightsTargeting(orgIds: any, screenIdMap: Record<st
       currency: "NGN",
       status: "completed",
       targetingJson: { cities: ["Lagos"], regions: ["NG-LA"], demographics: ["18-35", "fitness-oriented"] },
-    }).returning();
-    adidasCampaignAId = created.id;
-    counts.campaigns++;
+    }).onConflictDoNothing().returning();
+    adidasCampaignAId = created?.id || deterministicUUID("campaign-adidas-ultraboost-2024");
+    if (created) counts.campaigns++;
   } else {
     adidasCampaignAId = adidasCampaignA[0].id;
   }
@@ -466,7 +489,7 @@ async function seedCampaignsFlightsTargeting(orgIds: any, screenIdMap: Record<st
   let adidasCampaignBId: string;
   if (adidasCampaignB.length === 0) {
     const [created] = await db.insert(campaigns).values({
-      id: randomUUID(),
+      id: deterministicUUID("campaign-adidas-summer-2025"),
       advertiserOrgId: orgIds.adidasOrgId,
       name: "Adidas Summer Collection 2025",
       objective: "Drive traffic to retail stores and online sales for summer apparel",
@@ -476,9 +499,9 @@ async function seedCampaignsFlightsTargeting(orgIds: any, screenIdMap: Record<st
       currency: "NGN",
       status: "active",
       targetingJson: { cities: ["Lagos", "Abuja"], regions: ["NG-LA", "NG-FC"], timeWindows: ["06:00-10:00", "17:00-21:00"] },
-    }).returning();
-    adidasCampaignBId = created.id;
-    counts.campaigns++;
+    }).onConflictDoNothing().returning();
+    adidasCampaignBId = created?.id || deterministicUUID("campaign-adidas-summer-2025");
+    if (created) counts.campaigns++;
   } else {
     adidasCampaignBId = adidasCampaignB[0].id;
   }
@@ -491,7 +514,7 @@ async function seedCampaignsFlightsTargeting(orgIds: any, screenIdMap: Record<st
   let adidasCampaignCId: string;
   if (adidasCampaignC.length === 0) {
     const [created] = await db.insert(campaigns).values({
-      id: randomUUID(),
+      id: deterministicUUID("campaign-adidas-worldcup-2025"),
       advertiserOrgId: orgIds.adidasOrgId,
       name: "Adidas World Cup Partnership",
       objective: "Brand association with major sporting event",
@@ -501,9 +524,9 @@ async function seedCampaignsFlightsTargeting(orgIds: any, screenIdMap: Record<st
       currency: "NGN",
       status: "scheduled",
       targetingJson: { cities: ["Lagos", "Abuja"], regions: ["NG-LA", "NG-FC"], demographics: ["sports-fans", "18-45"] },
-    }).returning();
-    adidasCampaignCId = created.id;
-    counts.campaigns++;
+    }).onConflictDoNothing().returning();
+    adidasCampaignCId = created?.id || deterministicUUID("campaign-adidas-worldcup-2025");
+    if (created) counts.campaigns++;
   } else {
     adidasCampaignCId = adidasCampaignC[0].id;
   }
@@ -517,7 +540,7 @@ async function seedCampaignsFlightsTargeting(orgIds: any, screenIdMap: Record<st
   let iFitnessCampaignId: string;
   if (iFitnessCampaign.length === 0) {
     const [created] = await db.insert(campaigns).values({
-      id: randomUUID(),
+      id: deterministicUUID("campaign-ifitness-newyear-2025"),
       advertiserOrgId: orgIds.iFitnessOrgId,
       name: "iFitness New Year Promo",
       objective: "Drive gym membership sign-ups for New Year resolution period",
@@ -527,9 +550,9 @@ async function seedCampaignsFlightsTargeting(orgIds: any, screenIdMap: Record<st
       currency: "NGN",
       status: "active",
       targetingJson: { cities: ["Lagos"], regions: ["NG-LA"], screenGroups: ["Lekki Fitness Loop"], timeWindows: ["06:00-10:00", "17:00-21:00"] },
-    }).returning();
-    iFitnessCampaignId = created.id;
-    counts.campaigns++;
+    }).onConflictDoNothing().returning();
+    iFitnessCampaignId = created?.id || deterministicUUID("campaign-ifitness-newyear-2025");
+    if (created) counts.campaigns++;
   } else {
     iFitnessCampaignId = iFitnessCampaign[0].id;
   }
@@ -940,6 +963,8 @@ async function seedPlayEvents(
     daysRange: { start: number; end: number },
     eventsPerDayPerScreen: { min: number; max: number }
   ) {
+    const batch: any[] = [];
+    
     for (let dayOffset = daysRange.start; dayOffset <= daysRange.end; dayOffset++) {
       for (const screenCode of screenCodes) {
         const screenId = screenIdMap[screenCode];
@@ -952,7 +977,7 @@ async function seedPlayEvents(
           const startedAt = daysFromNow(dayOffset);
           startedAt.setHours(randomBetween(6, 21), randomBetween(0, 59), randomBetween(0, 59));
 
-          await db.insert(playEvents).values({
+          batch.push({
             playerId,
             screenId,
             creativeId,
@@ -968,14 +993,20 @@ async function seedPlayEvents(
         }
       }
     }
+    
+    // Insert in batches of 500
+    for (let i = 0; i < batch.length; i += 500) {
+      const chunk = batch.slice(i, i + 500);
+      await db.insert(playEvents).values(chunk).onConflictDoNothing();
+    }
   }
 
   // Adidas Campaign A (past): 7-14 days of historical play events
   const expresswayScreens = ["SCR-CO-001", "SCR-CO-002", "SCR-CO-003", "SCR-CO-006"];
   await generatePlayEvents(
     campaigns.adidasCampaignAId,
-    flights.adidasFlightA1,
-    creatives.adidasCreativeA1,
+    flights.adidasFlightA1Id,
+    creatives.adidasCreativeA1Id,
     expresswayScreens,
     { start: -21, end: -7 },
     { min: 100, max: 300 }
@@ -985,8 +1016,8 @@ async function seedPlayEvents(
   // Morning flight
   await generatePlayEvents(
     campaigns.adidasCampaignBId,
-    flights.adidasFlightB1,
-    creatives.adidasCreativeB1,
+    flights.adidasFlightB1Id,
+    creatives.adidasCreativeB1Id,
     expresswayScreens,
     { start: -7, end: 0 },
     { min: 150, max: 400 }
@@ -996,8 +1027,8 @@ async function seedPlayEvents(
   const mallScreens = ["SCR-CO-007", "SCR-CO-008", "SCR-CO-009"];
   await generatePlayEvents(
     campaigns.adidasCampaignBId,
-    flights.adidasFlightB2,
-    creatives.adidasCreativeB1,
+    flights.adidasFlightB2Id,
+    creatives.adidasCreativeB1Id,
     mallScreens,
     { start: -7, end: 0 },
     { min: 100, max: 250 }
@@ -1007,8 +1038,8 @@ async function seedPlayEvents(
   const fitnessScreens = ["SCR-LC-003", "SCR-CO-003", "SCR-CO-010"];
   await generatePlayEvents(
     campaigns.iFitnessCampaignId,
-    flights.iFitnessFlight1,
-    creatives.iFitnessCreative1,
+    flights.iFitnessFlight1Id,
+    creatives.iFitnessCreative1Id,
     fitnessScreens,
     { start: -3, end: 0 },
     { min: 20, max: 100 }
