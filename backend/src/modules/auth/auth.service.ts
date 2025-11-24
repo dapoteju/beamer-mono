@@ -21,13 +21,13 @@ export async function registerUser(input: RegisterInput): Promise<AuthResponse> 
     throw new Error("Email already registered");
   }
 
-  const orgExists = await db
+  const [org] = await db
     .select()
     .from(organisations)
     .where(eq(organisations.id, input.orgId))
     .limit(1);
 
-  if (orgExists.length === 0) {
+  if (!org) {
     throw new Error("Organisation not found");
   }
 
@@ -50,6 +50,7 @@ export async function registerUser(input: RegisterInput): Promise<AuthResponse> 
     email: newUser.email,
     orgId: newUser.orgId!,
     role: newUser.role as "admin" | "ops" | "viewer",
+    orgType: org.orgType as "advertiser" | "publisher" | "beamer_internal",
   };
 
   const token = jwt.sign(payload, JWT_SECRET, { expiresIn: JWT_EXPIRES_IN });
@@ -62,6 +63,8 @@ export async function registerUser(input: RegisterInput): Promise<AuthResponse> 
       fullName: newUser.fullName,
       orgId: newUser.orgId!,
       role: newUser.role as "admin" | "ops" | "viewer",
+      orgType: org.orgType as "advertiser" | "publisher" | "beamer_internal",
+      orgName: org.orgName,
       createdAt: newUser.createdAt,
       updatedAt: newUser.updatedAt!,
     },
@@ -89,11 +92,22 @@ export async function loginUser(input: LoginInput): Promise<AuthResponse> {
     throw new Error("Invalid email or password");
   }
 
+  const [org] = await db
+    .select()
+    .from(organisations)
+    .where(eq(organisations.id, user.orgId!))
+    .limit(1);
+
+  if (!org) {
+    throw new Error("User's organisation not found");
+  }
+
   const payload: JWTPayload = {
     userId: user.id,
     email: user.email,
     orgId: user.orgId!,
     role: user.role as "admin" | "ops" | "viewer",
+    orgType: org.orgType as "advertiser" | "publisher" | "beamer_internal",
   };
 
   const token = jwt.sign(payload, JWT_SECRET, { expiresIn: JWT_EXPIRES_IN });
@@ -106,6 +120,8 @@ export async function loginUser(input: LoginInput): Promise<AuthResponse> {
       fullName: user.fullName,
       orgId: user.orgId!,
       role: user.role as "admin" | "ops" | "viewer",
+      orgType: org.orgType as "advertiser" | "publisher" | "beamer_internal",
+      orgName: org.orgName,
       createdAt: user.createdAt,
       updatedAt: user.updatedAt!,
     },
@@ -123,12 +139,24 @@ export async function getUserById(userId: string): Promise<User | null> {
     return null;
   }
 
+  const [org] = await db
+    .select()
+    .from(organisations)
+    .where(eq(organisations.id, user.orgId))
+    .limit(1);
+
+  if (!org) {
+    return null;
+  }
+
   return {
     id: user.id,
     email: user.email,
     fullName: user.fullName,
     orgId: user.orgId,
     role: user.role as "admin" | "ops" | "viewer",
+    orgType: org.orgType as "advertiser" | "publisher" | "beamer_internal",
+    orgName: org.orgName,
     createdAt: user.createdAt,
     updatedAt: user.updatedAt,
   };
