@@ -66,7 +66,7 @@ beamer-mono/
 - `JWT_SECRET`: Secret key for JWT token signing (configured)
 
 **Frontend:**
-- `VITE_API_URL`: Backend API URL (default: http://localhost:3000/api)
+- `VITE_API_URL`: Backend API URL (empty by default, uses Vite proxy)
 
 ### Workflows
 - **Backend API**: Runs `npm run dev` in backend directory
@@ -76,6 +76,7 @@ beamer-mono/
   - Port: 5000 (visible in Replit preview)
   - Hot module replacement enabled
   - Configured with allowedHosts for Replit preview compatibility
+  - Vite proxy forwards /api requests to backend on port 3000
 
 ### Database
 - PostgreSQL database created via Replit
@@ -173,6 +174,13 @@ Users table includes:
 - `cms-web/src/main.tsx` - Added AuthInitializer for proper hydration
 
 ## Recent Changes
+- November 24, 2025: Fixed API Connectivity Issue
+  - Configured Vite proxy to forward /api requests to backend
+  - Updated API client to use relative URLs instead of hardcoded localhost
+  - Frontend can now successfully communicate with backend in Replit environment
+  - Login flow working end-to-end with admin@beamer.com / beamer123
+  - Architect verified and approved the fix
+
 - November 24, 2025: CMS Frontend Authentication Integration
   - Implemented complete authentication flow in CMS frontend
   - Created API client with Axios and auth token management
