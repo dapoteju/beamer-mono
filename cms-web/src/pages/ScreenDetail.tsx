@@ -170,7 +170,13 @@ export default function ScreenDetail() {
           <div>
             <h1 className="text-2xl font-semibold text-zinc-900">{screen.name}</h1>
             <p className="text-sm text-zinc-600 mt-1">
-              {screen.city}, {screen.regionCode} • {screen.publisherOrgName}
+              {screen.city}, {screen.regionCode} • {
+                screen.publisher 
+                  ? screen.publisher.publisherType === "organisation"
+                    ? screen.publisher.organisation?.name || screen.publisherOrgName
+                    : screen.publisher.fullName || screen.publisherOrgName
+                  : screen.publisherOrgName
+              }
             </p>
           </div>
           <div className="flex items-center gap-3">
@@ -352,10 +358,16 @@ export default function ScreenDetail() {
                         <span className="text-zinc-900 font-medium">{screen.vehicle.colour}</span>
                       </div>
                     )}
-                    {screen.vehicle.publisherOrgName && (
+                    {(screen.publisher || screen.vehicle.publisherOrgName) && (
                       <div>
                         <span className="text-zinc-600">Fleet:</span>{" "}
-                        <span className="text-zinc-900 font-medium">{screen.vehicle.publisherOrgName}</span>
+                        <span className="text-zinc-900 font-medium">
+                          {screen.publisher 
+                            ? screen.publisher.publisherType === "organisation"
+                              ? screen.publisher.organisation?.name || screen.vehicle.publisherOrgName
+                              : screen.publisher.fullName || screen.vehicle.publisherOrgName
+                            : screen.vehicle.publisherOrgName}
+                        </span>
                       </div>
                     )}
                   </div>
@@ -625,6 +637,7 @@ export default function ScreenDetail() {
             city: screen.city,
             regionCode: screen.regionCode,
             publisherOrgId: screen.publisherOrgId,
+            publisherId: screen.publisher?.id || null,
             status: screen.status,
             playerId: player?.id || null,
             screenClassification: screen.screenClassification || "vehicle",

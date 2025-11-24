@@ -128,11 +128,15 @@ export function ScreenFormModal({ mode, screenId, initialValues, onClose, onSucc
     if (!validate()) return;
 
     if (mode === "create") {
+      // Find selected publisher to get organisationId for backward compatibility
+      const selectedPublisher = publisherOptions.find(p => p.id === formData.publisherId);
+      
       const payload: CreateScreenPayload = {
         name: formData.name,
         city: formData.city,
         regionCode: formData.regionCode,
-        publisherOrgId: formData.publisherOrgId,
+        // Use organisationId from publisher profile if available, otherwise use form value
+        publisherOrgId: selectedPublisher?.organisationId || formData.publisherOrgId,
         publisherId: formData.publisherId || undefined,
         status: formData.status as any,
         playerId: formData.playerId || undefined,
@@ -167,11 +171,9 @@ export function ScreenFormModal({ mode, screenId, initialValues, onClose, onSucc
       // Only include publisherId if user is internal and it changed
       if (isInternal && formData.publisherId !== initialValues?.publisherId) {
         payload.publisherId = formData.publisherId || null;
-        // Also update publisherOrgId for backward compatibility
+        // Also update publisherOrgId for backward compatibility - send org ID if available, null if individual
         const selectedPublisher = publisherOptions.find(p => p.id === formData.publisherId);
-        if (selectedPublisher?.organisationId) {
-          payload.publisherOrgId = selectedPublisher.organisationId;
-        }
+        payload.publisherOrgId = selectedPublisher?.organisationId || undefined;
       }
 
       // Handle player assignment
@@ -283,6 +285,7 @@ export function ScreenFormModal({ mode, screenId, initialValues, onClose, onSucc
                   setFormData({ 
                     ...formData, 
                     publisherId: e.target.value,
+                    // Set publisherOrgId from publisher profile if available, otherwise explicitly clear it
                     publisherOrgId: selectedPublisher?.organisationId || ""
                   });
                 }}
