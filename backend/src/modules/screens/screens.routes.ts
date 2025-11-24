@@ -17,6 +17,7 @@ import {
   getAvailablePlayers,
   getPublisherOrganisations,
   getRegionsList,
+  getVehiclesList,
 } from "./screens.service";
 import { requireAuth, AuthRequest } from "../../middleware/auth";
 import { db } from "../../db/client";
@@ -266,6 +267,30 @@ screensRouter.get("/dropdown/players", requireAuth, async (req: AuthRequest, res
 
     const players = await getAvailablePlayers();
     res.json(players);
+  } catch (err) {
+    next(err);
+  }
+});
+
+// GET /api/screens/dropdown/vehicles - Get vehicles for dropdown
+screensRouter.get("/dropdown/vehicles", requireAuth, async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    if (!canAccessScreens(req)) {
+      return res.status(403).json({ error: "Forbidden" });
+    }
+
+    // beamer_internal: can see all vehicles
+    // publisher: can see only vehicles for their organisation
+    // advertiser: forbidden
+    const { orgType, orgId } = req.user!;
+    
+    if (orgType === "advertiser") {
+      return res.status(403).json({ error: "Forbidden" });
+    }
+
+    const publisherFilter = orgType === "publisher" ? orgId : undefined;
+    const vehicles = await getVehiclesList(publisherFilter);
+    res.json(vehicles);
   } catch (err) {
     next(err);
   }

@@ -1,0 +1,462 @@
+PHASE 2 PROMPT — CMS Updates for Screen Classification + Vehicles
+
+PROMPT START
+
+Phase 1 of the extended screen metadata is complete and working.
+Now I want you to implement Phase 2: update the CMS (cms-web) so that it:
+
+Uses the new screenClassification and vehicle metadata in the UI
+
+Supports type-aware Create/Edit forms
+
+Shows vehicle/billboard/indoor details on the Screen Detail page
+
+Adds a classification filter to the Screens list
+
+This phase is mostly frontend, with minimal backend additions for dropdowns.
+Do NOT break existing functionality (CRUD, player assignment, permissions).
+
+0. CONTEXT (VERY IMPORTANT)
+
+From Phase 1 and earlier work:
+
+Backend:
+
+screens table now has new fields:
+
+screenClassification (default 'vehicle')
+
+vehicleId
+
+billboard fields: structureType, sizeDescription, illuminationType, address
+
+indoor fields: venueName, venueType, venueAddress
+
+latitude, longitude
+
+vehicles table exists with:
+
+id, publisherOrgId, identifier, licencePlate, make, model, year, colour, notes
+
+Existing endpoints:
+
+GET /api/screens
+
+GET /api/screens/:id
+
+POST /api/screens
+
+PATCH /api/screens/:id
+
+GET /api/screens/dropdown/regions
+
+GET /api/screens/dropdown/publishers
+
+GET /api/screens/dropdown/available-players
+
+Screens CRUD and player assignment already work. Do not break this.
+
+Frontend (cms-web):
+
+Screens list page: src/pages/Screens.tsx
+
+Screen detail page: src/pages/ScreenDetail.tsx
+
+Screen form modal (create/edit): src/components/ScreenFormModal.tsx
+
+Screens API client: src/api/screens.ts
+
+We are now enhancing these, not rewriting them.
+
+1. BACKEND — VEHICLE DROPDOWN ENDPOINT (SMALL ADDITION)
+
+Add a new dropdown endpoint to support selecting existing vehicles when editing/creating a vehicle-classified screen.
+
+1.1 New endpoint
+
+Create:
+
+GET /api/screens/dropdown/vehicles
+
+Behaviour:
+
+Auth: same requireAuth as other screens dropdown endpoints.
+
+Response: array of vehicles with:
+
+{
+  id: string;
+  identifier: string | null;
+  licencePlate: string | null;
+  make: string | null;
+  model: string | null;
+  colour: string | null;
+  publisherOrgId: string;
+  publisherOrgName: string; // name of associated organisation
+}
+
+
+Permissions:
+
+beamer_internal: can see all vehicles
+
+publisher: can see only vehicles where publisherOrgId = their organisation
+
+advertiser: should not see any vehicles (403 or empty array, consistent with existing permissions)
+
+Keep this in the screens module with the other dropdown endpoints for consistency.
+
+Do NOT change existing dropdown endpoints.
+
+2. FRONTEND — API CLIENT UPDATES (cms-web/src/api/screens.ts)
+
+Update or add types and functions to support:
+
+2.1 Screen types
+
+Extend the Screen / ScreenDetail types to include:
+
+screenClassification?: "vehicle" | "billboard" | "indoor" | "other";
+
+vehicle?: {
+  id: string;
+  licencePlate?: string | null;
+  make?: string | null;
+  model?: string | null;
+  colour?: string | null;
+  identifier?: string | null;
+  publisherOrgId?: string;
+  publisherOrgName?: string;
+} | null;
+
+structureType?: string | null;
+sizeDescription?: string | null;
+illuminationType?: string | null;
+address?: string | null;
+
+venueName?: string | null;
+venueType?: string | null;
+venueAddress?: string | null;
+
+latitude?: number | null;
+longitude?: number | null;
+
+
+Do NOT remove any existing properties. Only add optional ones.
+
+2.2 Vehicle dropdown type + function
+
+Add:
+
+export interface VehicleOption {
+  id: string;
+  identifier: string | null;
+  licencePlate: string | null;
+  make: string | null;
+  model: string | null;
+  colour: string | null;
+  publisherOrgId: string;
+  publisherOrgName: string;
+}
+
+
+And a function:
+
+export async function getVehicleOptions(): Promise<VehicleOption[]>;
+
+
+which calls GET /api/screens/dropdown/vehicles with auth token attached.
+
+2.3 Create/Update payload types
+
+Extend the create / update payload types to optionally include:
+
+screenClassification?: "vehicle" | "billboard" | "indoor" | "other";
+vehicleId?: string | null;
+
+structureType?: string | null;
+sizeDescription?: string | null;
+illuminationType?: string | null;
+address?: string | null;
+
+venueName?: string | null;
+venueType?: string | null;
+venueAddress?: string | null;
+
+latitude?: number | null;
+longitude?: number | null;
+
+
+Make these fields optional so existing calls that don’t send them still work.
+
+Update the POST/PATCH calls to include these fields when provided, but do not require them.
+
+3. FRONTEND — SCREEN FORM MODAL (ScreenFormModal.tsx)
+
+Enhance the ScreenFormModal component to:
+
+3.1 Add a “Screen Classification” dropdown
+
+At the top of the form, add:
+
+screenClassification: "vehicle" | "billboard" | "indoor" | "other"
+
+
+UI:
+
+Label: “Screen Type” or “Screen Classification”
+
+Options:
+
+Vehicle
+
+Billboard
+
+Indoor
+
+Other
+
+Default:
+
+For new screens: default to "vehicle".
+
+For existing screens: use the value from screen.screenClassification, falling back to "vehicle" if not set.
+
+3.2 Dynamic sections based on classification
+
+Use the dropdown value to conditionally render sections:
+
+If screenClassification === "vehicle":
+
+Show Vehicle section:
+
+A dropdown to select an existing vehicle:
+
+Options from getVehicleOptions()
+
+Label is a nicely formatted string, e.g.:
+
+"LAG-123-XY • Toyota Corolla • [Publisher Name]"
+
+Bind this to vehicleId.
+
+Allow clearing selection (vehicleId = null) if desired — but don’t break backend logic.
+
+No inline vehicle creation yet — only selection of existing vehicles.
+
+If screenClassification === "billboard":
+
+Show Billboard section:
+
+Structure Type (text input or select)
+
+Size Description
+
+Illumination Type
+
+Address
+
+Bind to:
+
+structureType
+
+sizeDescription
+
+illuminationType
+
+address
+
+If screenClassification === "indoor":
+
+Show Indoor / Venue section:
+
+Venue Name
+
+Venue Type (text for now)
+
+Venue Address
+
+Bind to:
+
+venueName
+
+venueType
+
+venueAddress
+
+If screenClassification === "other":
+
+Show a single optional field, e.g.:
+
+“Notes” → bind to address or sizeDescription (minimal for now).
+
+3.3 Form submission
+
+On submit:
+
+Include screenClassification in the payload.
+
+Include vehicleId and the relevant metadata fields based on classification.
+
+Ensure existing required fields (publisher, region, player assignment) remain intact.
+
+Maintain all current validation and error-handling behaviour.
+
+4. FRONTEND — SCREENS LIST PAGE (Screens.tsx)
+
+Update the list page to make classification visible and filterable.
+
+4.1 New “Type” column
+
+In the screens table, add a column “Type” that displays:
+
+If screenClassification === "vehicle" → “Vehicle”
+
+If "billboard" → “Billboard”
+
+If "indoor" → “Indoor”
+
+Else → “Other” / “Unknown”
+
+Optional: render as small badges.
+
+4.2 Vehicle info column (for quick context)
+
+Optionally, if screenClassification === "vehicle" and screen.vehicle exists:
+
+Add a “Vehicle” column that shows:
+
+vehicle.licencePlate (and maybe hover with make/model)
+
+For non-vehicle screens, this can be “—”.
+
+4.3 Classification filter (dropdown)
+
+At the top of the page (above the table), add a dropdown filter:
+
+Label: “Screen Type”
+
+Options:
+
+All
+
+Vehicle
+
+Billboard
+
+Indoor
+
+Other
+
+Filtering can be implemented client-side using the already-fetched data (no need to change backend query for now):
+
+Default: All
+
+When changed, only show screens whose screenClassification matches the selected type (or all if “All”).
+
+Keep other existing filters (regions, publishers) as-is.
+
+5. FRONTEND — SCREEN DETAIL PAGE (ScreenDetail.tsx)
+
+Enhance the Overview section to show classification and metadata.
+Do not add a new tab — keep everything on Overview.
+
+5.1 Classification badge
+
+At the top of the Overview section, show a small badge, e.g.:
+
+“Vehicle Screen”
+
+“Billboard Screen”
+
+“Indoor Screen”
+
+“Other Screen”
+
+based on screen.screenClassification.
+
+5.2 Vehicle section (if classification is vehicle)
+
+If:
+
+screen.screenClassification === "vehicle" AND
+
+screen.vehicle is not null
+
+Show a card or panel with:
+
+Licence Plate
+
+Make + Model
+
+Colour
+
+Publisher Name (from vehicle.publisherOrgName)
+
+Any identifier if available
+
+5.3 Billboard/Indoor section
+
+If screenClassification === "billboard":
+
+Show structure type, size, illumination, address.
+
+If screenClassification === "indoor":
+
+Show venue name, venue type, venue address.
+
+If fields are empty, handle gracefully (show “—”).
+
+Do NOT remove any existing Overview content (PoP summaries, basic info, etc.) — just add these sections.
+
+6. PERMISSIONS & UX
+
+Do NOT change who can see the Screens tab.
+
+Keep existing permission logic for:
+
+Create Screen button
+
+Edit Screen button
+
+The new classification fields and controls should be visible only where the user is already allowed to create/edit screens (no extra restrictions needed).
+
+7. VALIDATION & TESTING
+
+When done:
+
+Confirm npm run build / TypeScript passes for both backend and frontend.
+
+Confirm:
+
+Screens list still loads
+
+Screen detail loads
+
+Create/Edit still works
+
+Player assignment still works
+
+Confirm the new features:
+
+Screen Type column visible
+
+Screen Type dropdown filter works
+
+Screen Classification dropdown visible in ScreenFormModal
+
+Vehicle dropdown appears for vehicle type and loads data from /api/screens/dropdown/vehicles
+
+Overview shows vehicle / billboard / indoor metadata correctly
+
+Finally, summarise:
+
+Files changed in cms-web and backend
+
+The final shape of types in src/api/screens.ts
+
+Example payload for creating:
+
+A vehicle-classified screen
+
+A billboard-classified screen

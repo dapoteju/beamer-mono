@@ -501,6 +501,37 @@ export async function getRegionsList(): Promise<Array<{ id: string; code: string
     .orderBy(regions.name);
 }
 
+export async function getVehiclesList(publisherOrgId?: string): Promise<Array<{ 
+  id: string; 
+  identifier: string | null;
+  licencePlate: string | null;
+  make: string | null;
+  model: string | null;
+  colour: string | null;
+  publisherOrgId: string;
+  publisherOrgName: string | null;
+}>> {
+  const query = db
+    .select({
+      id: vehicles.id,
+      identifier: vehicles.identifier,
+      licencePlate: vehicles.licencePlate,
+      make: vehicles.make,
+      model: vehicles.model,
+      colour: vehicles.colour,
+      publisherOrgId: vehicles.publisherOrgId,
+      publisherOrgName: organisations.name,
+    })
+    .from(vehicles)
+    .leftJoin(organisations, eq(vehicles.publisherOrgId, organisations.id));
+
+  if (publisherOrgId) {
+    return query.where(eq(vehicles.publisherOrgId, publisherOrgId));
+  }
+
+  return query;
+}
+
 // Updated createScreen function with simpler interface for CMS
 export async function createScreenForCMS(input: {
   name: string;
