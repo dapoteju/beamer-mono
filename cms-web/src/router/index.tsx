@@ -16,6 +16,7 @@ import PublisherDetail from "../pages/PublisherDetail";
 import Advertisers from "../pages/Advertisers";
 import AdvertiserDetail from "../pages/AdvertiserDetail";
 import Reporting from "../pages/Reporting";
+import CampaignReporting from "../pages/CampaignReporting";
 import InventoryMap from "../pages/InventoryMap";
 import Login from "../pages/Login";
 
@@ -152,6 +153,7 @@ export const router = createBrowserRouter([
         ),
       },
       { path: "reporting", element: <Reporting /> },
+      { path: "reporting/campaigns", element: <CampaignReporting /> },
     ],
   },
 ]);

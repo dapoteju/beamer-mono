@@ -208,6 +208,12 @@ export default function CampaignDetail() {
             )}
           </div>
           <div className="flex gap-2">
+            <button
+              onClick={() => navigate(`/reporting/campaigns?campaignId=${id}`)}
+              className="px-4 py-2 bg-zinc-100 text-zinc-700 rounded-md text-sm hover:bg-zinc-200 transition-colors"
+            >
+              View Report
+            </button>
             <select
               value={campaign.status}
               onChange={(e) =>
