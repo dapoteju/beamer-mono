@@ -11,6 +11,7 @@ import { fetchBookings, type Booking } from "../api/bookings";
 import { CampaignFormModal } from "../components/CampaignFormModal";
 import { FlightFormModal } from "../components/FlightFormModal";
 import BookingFormModal from "../components/BookingFormModal";
+import TargetingDetails from "../components/TargetingDetails";
 
 export default function CampaignDetail() {
   const { id } = useParams<{ id: string }>();
@@ -329,14 +330,12 @@ export default function CampaignDetail() {
               <dt className="w-48 text-sm font-medium text-zinc-700">Created At:</dt>
               <dd className="text-sm text-zinc-900">{formatDateTime(campaign.createdAt)}</dd>
             </div>
-            {campaign.targetingJson && (
-              <div>
-                <dt className="text-sm font-medium text-zinc-700 mb-2">Targeting JSON:</dt>
-                <dd className="text-sm text-zinc-900 font-mono bg-zinc-50 p-3 rounded border border-zinc-200 overflow-auto">
-                  <pre>{JSON.stringify(campaign.targetingJson, null, 2)}</pre>
-                </dd>
-              </div>
-            )}
+            <div>
+              <dt className="text-sm font-medium text-zinc-700 mb-2">Targeting:</dt>
+              <dd>
+                <TargetingDetails targetingJson={campaign.targetingJson} />
+              </dd>
+            </div>
           </dl>
         </div>
       )}
