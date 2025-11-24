@@ -11,6 +11,7 @@ import { organisationsRouter } from "./modules/organisations/organisations.route
 import { screensRouter } from "./modules/screens/screens.routes";
 import { regionsRouter } from "./modules/regions/regions.routes";
 import { campaignsRouter } from "./modules/campaigns/campaigns.routes";
+import { flightsRouter } from "./modules/campaigns/flights.routes";
 import { creativesRouter } from "./modules/creatives/creatives.routes";
 import { bookingsRouter } from "./modules/bookings/bookings.routes";
 import { invoicesRouter } from "./modules/invoices/invoices.routes";
@@ -34,6 +35,7 @@ app.use("/api/organisations", organisationsRouter);
 app.use("/api/screens", screensRouter);
 app.use("/api/regions", regionsRouter);
 app.use("/api/campaigns", campaignsRouter);
+app.use("/api/flights", flightsRouter);
 app.use("/api/campaigns", creativesRouter);  // creation
 app.use("/api/creatives", creativesRouter);  // approval
 app.use("/api/bookings", bookingsRouter);
