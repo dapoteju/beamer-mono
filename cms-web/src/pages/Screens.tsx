@@ -212,7 +212,10 @@ export default function Screens() {
             <thead>
               <tr className="bg-zinc-50 border-b border-zinc-200">
                 <th className="px-4 py-3 text-left text-xs font-medium text-zinc-700 uppercase tracking-wider">
-                  Screen Name
+                  Code
+                </th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-zinc-700 uppercase tracking-wider">
+                  Name
                 </th>
                 <th className="px-4 py-3 text-left text-xs font-medium text-zinc-700 uppercase tracking-wider">
                   Type
@@ -240,7 +243,7 @@ export default function Screens() {
             <tbody className="bg-white divide-y divide-zinc-200">
               {filteredScreens.length === 0 ? (
                 <tr>
-                  <td colSpan={8} className="px-4 py-8 text-center text-zinc-500">
+                  <td colSpan={9} className="px-4 py-8 text-center text-zinc-500">
                     No screens found
                   </td>
                 </tr>
@@ -251,8 +254,11 @@ export default function Screens() {
                     onClick={() => handleRowClick(screen.id)}
                     className="hover:bg-zinc-50 cursor-pointer transition-colors"
                   >
-                    <td className="px-4 py-3 text-sm font-medium text-zinc-900">
-                      {screen.name}
+                    <td className="px-4 py-3 text-sm font-semibold text-zinc-900">
+                      {screen.code}
+                    </td>
+                    <td className="px-4 py-3 text-sm text-zinc-600">
+                      {screen.name || "—"}
                     </td>
                     <td className="px-4 py-3 text-sm">
                       <span

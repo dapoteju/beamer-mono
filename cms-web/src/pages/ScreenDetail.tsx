@@ -168,7 +168,12 @@ export default function ScreenDetail() {
         </button>
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-2xl font-semibold text-zinc-900">{screen.name}</h1>
+            <h1 className="text-2xl font-semibold text-zinc-900">
+              {screen.code}
+              {screen.name && (
+                <span className="text-zinc-500 font-normal ml-2">• {screen.name}</span>
+              )}
+            </h1>
             <p className="text-sm text-zinc-600 mt-1">
               {screen.city}, {screen.regionCode} • {
                 screen.publisher 

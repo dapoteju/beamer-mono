@@ -10,7 +10,6 @@ const baseNavItems: NavItem[] = [
   { to: "/dashboard", label: "Dashboard" },
   { to: "/campaigns", label: "Campaigns" },
   { to: "/screens", label: "Screens & Players" },
-  { to: "/organisations", label: "Organisations" },
   { to: "/reporting", label: "Reporting" },
 ];
 
@@ -21,7 +20,6 @@ const navItemsByOrgType: Record<string, NavItem[]> = {
     { to: "/screens", label: "Screens & Players" },
     { to: "/publishers", label: "Publishers" },
     { to: "/advertisers", label: "Advertisers" },
-    { to: "/organisations", label: "Organisations" },
     { to: "/reporting", label: "Reporting" },
   ],
   advertiser: [

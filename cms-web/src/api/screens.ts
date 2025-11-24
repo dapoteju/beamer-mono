@@ -13,7 +13,8 @@ export interface Vehicle {
 
 export interface Screen {
   id: string;
-  name: string;
+  code: string; // Phase 3B: Auto-generated screen code (primary identifier)
+  name?: string | null; // Phase 3B: Name is now optional (display name override)
   city: string;
   region: string;
   publisherOrgId: string;
@@ -60,7 +61,8 @@ export interface ScreenPlayer {
 
 export interface ScreenInfo {
   id: string;
-  name: string;
+  code: string; // Phase 3B: Auto-generated screen code (primary identifier)
+  name?: string | null; // Phase 3B: Name is now optional (display name override)
   city: string;
   regionCode: string;
   status: string;
