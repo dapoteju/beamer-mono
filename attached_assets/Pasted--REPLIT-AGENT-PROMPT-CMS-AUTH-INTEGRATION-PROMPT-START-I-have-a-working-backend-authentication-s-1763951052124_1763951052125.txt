@@ -1,0 +1,129 @@
+✅ REPLIT AGENT PROMPT — CMS AUTH INTEGRATION
+PROMPT START
+
+I have a working backend authentication system under /api/auth/* with the following endpoints:
+
+POST /api/auth/login
+
+GET /api/auth/me
+
+POST /api/auth/register
+
+POST /api/auth/logout
+
+The backend returns:
+{ token: string, user: { id, email, full_name, org_id, role } }
+
+The seeded admin user is:
+
+email: admin@beamerads.com
+
+password: beamer123
+
+My frontend (CMS) is in the folder cms-web and is built with:
+
+Vite + React + TypeScript
+
+Zustand for state management
+
+Axios for API calls
+
+React Router
+
+Tailwind CSS
+
+Environment variable: VITE_API_URL (should be set to http://localhost:3000/api)
+
+I need you to fully integrate real authentication into the CMS.
+
+What to Implement (VERY IMPORTANT):
+1. Add a proper API client
+Create cms-web/src/api/client.ts using Axios with:
+
+baseURL = import.meta.env.VITE_API_URL
+
+A helper: setAuthToken(token) to set/remove global auth header.
+
+2. Add auth API helpers
+Create cms-web/src/api/auth.ts with functions:
+
+loginRequest(email, password) → POST /auth/login
+
+fetchMe() → GET /auth/me
+
+Export TS interfaces for: User, AuthResponse
+
+3. Implement full auth store
+Replace the existing user store with a real Zustand auth store:
+
+user, token, isAuthenticated
+
+setAuth({ user, token })
+
+logout()
+
+initFromStorage() (reads token & user from localStorage)
+
+Call setAuthToken(token) when authenticated
+
+Store token + user in localStorage:
+
+auth_token
+
+auth_user
+
+4. Update the Login page
+Modify cms-web/src/pages/Login.tsx to:
+
+Render a form with email/password fields
+
+Call loginRequest()
+
+On success:
+
+Save user + token via store
+
+Redirect to /dashboard
+
+On failure: show error message
+
+5. Add real route protection
+Update cms-web/src/router/index.tsx to include:
+
+A ProtectedRoute wrapper
+
+It should:
+
+Call initFromStorage() once
+
+If unauthenticated → redirect to /login
+
+Else → render children
+
+6. Update the AppLayout topbar
+Modify cms-web/src/layouts/AppLayout.tsx:
+
+Show the logged-in user’s full_name or email
+
+Show their role
+
+Add a working logout button → calls store.logout() then redirects to /login
+
+7. Final check
+Ensure:
+
+Visiting CMS redirects to /login if not authenticated
+
+Logging in with seeded admin works
+
+You can refresh the page and remain logged in
+
+Logout works and clears localStorage
+
+Sidebar + topbar render correctly with real user data
+
+Do NOT modify backend code — only implement frontend integration in cms-web.
+
+Please generate all the necessary files and modifications.
+
+PROMPT END
