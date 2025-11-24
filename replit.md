@@ -103,6 +103,13 @@ The project is organized into a monorepo containing distinct applications and li
 - **Data Flow**: Campaign detail endpoint returns {campaign, flights, stats: {totalImpressions}}; frontend types match backend response structure; null-safe access to stats.totalImpressions with default to 0; flight mutations use standalone /api/flights/:id endpoints.
 - **Navigation**: Campaigns link visible to internal users and advertisers; routes: /campaigns (list), /campaigns/new (create), /campaigns/:id (detail with tabs).
 
+**Campaign Reporting & Proof-of-Play (Phase 5):**
+- **Backend Reports API**: GET /api/reports/campaigns/:id endpoint with optional startDate/endDate query params; returns campaign summary, impressions by region, and impressions by flight; permission-based access (advertiser users see only their campaigns, internal users see all).
+- **Frontend Reporting UI**: Campaign Reporting page at /reporting/campaigns with campaign selector dropdown, date range picker (start/end dates), and "Load Report" button; displays summary cards (total impressions, date range, number of regions); shows data tables for impressions by region (region name + count) and impressions by flight (flight name + count); "View Report" button added to Campaign Detail page header for quick access.
+- **API Integration**: New cms-web/src/api/reports.ts helper with TypeScript interfaces (CampaignReport, ImpressionsByRegion, ImpressionsByFlight) and getCampaignReport() function; follows standard response pattern (response.data.data).
+- **Permissions**: Campaign dropdown automatically filtered by backend based on JWT (advertiser users only see their org's campaigns, internal users see all active campaigns); server-side enforcement ensures data isolation.
+- **Navigation**: Link to Campaign Reporting added to main Reporting page; route: /reporting/campaigns (protected, requires authentication).
+
 ### System Design Choices
 - **Monorepo Architecture**: Centralized repository for all platform components.
 - **Microservice-like Separation**: Distinct `backend` and `cms-web` applications.
