@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { fetchScreens } from "../api/screens";
 import type { Screen } from "../api/screens";
 import { useAuthStore } from "../store/authStore";
+import { ScreenFormModal } from "../components/ScreenFormModal";
 
 export default function Screens() {
   const navigate = useNavigate();
@@ -13,6 +14,7 @@ export default function Screens() {
 
   const [regionFilter, setRegionFilter] = useState("");
   const [publisherFilter, setPublisherFilter] = useState("");
+  const [showCreateModal, setShowCreateModal] = useState(false);
 
   async function loadScreens() {
     try {
@@ -95,6 +97,8 @@ export default function Screens() {
     );
   }
 
+  const canCreateScreen = user?.orgType === "beamer_internal" && (user?.role === "admin" || user?.role === "ops");
+
   return (
     <div>
       <div className="flex items-center justify-between mb-6">
@@ -106,6 +110,14 @@ export default function Screens() {
             Manage digital screens and monitor player status
           </p>
         </div>
+        {canCreateScreen && (
+          <button
+            onClick={() => setShowCreateModal(true)}
+            className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
+          >
+            Create Screen
+          </button>
+        )}
       </div>
 
       <div className="bg-white border border-zinc-200 rounded-lg shadow-sm">
@@ -238,6 +250,17 @@ export default function Screens() {
           </table>
         </div>
       </div>
+
+      {/* Create Screen Modal */}
+      {showCreateModal && (
+        <ScreenFormModal
+          mode="create"
+          onClose={() => setShowCreateModal(false)}
+          onSuccess={() => {
+            loadScreens();
+          }}
+        />
+      )}
     </div>
   );
 }

@@ -111,3 +111,67 @@ export async function fetchScreenPlayEvents(
   const response = await apiClient.get<PlayEvent[]>(`/screens/${id}/play-events`, { params });
   return response.data;
 }
+
+// Dropdown data types and fetchers
+
+export interface Region {
+  id: string;
+  code: string;
+  name: string;
+}
+
+export interface Publisher {
+  id: string;
+  name: string;
+}
+
+export interface Player {
+  id: string;
+  currentScreenId: string | null;
+  currentScreenName: string | null;
+}
+
+export async function fetchRegions(): Promise<Region[]> {
+  const response = await apiClient.get<Region[]>("/screens/dropdown/regions");
+  return response.data;
+}
+
+export async function fetchPublishers(): Promise<Publisher[]> {
+  const response = await apiClient.get<Publisher[]>("/screens/dropdown/publishers");
+  return response.data;
+}
+
+export async function fetchPlayers(): Promise<Player[]> {
+  const response = await apiClient.get<Player[]>("/screens/dropdown/players");
+  return response.data;
+}
+
+// CRUD operations
+
+export interface CreateScreenPayload {
+  name: string;
+  city: string;
+  regionCode: string;
+  publisherOrgId: string;
+  status?: 'active' | 'inactive' | 'maintenance';
+  playerId?: string;
+}
+
+export interface UpdateScreenPayload {
+  name?: string;
+  city?: string;
+  regionCode?: string;
+  publisherOrgId?: string;
+  status?: 'active' | 'inactive' | 'maintenance';
+  playerId?: string | null;
+}
+
+export async function createScreen(payload: CreateScreenPayload): Promise<ScreenInfo> {
+  const response = await apiClient.post<ScreenInfo>("/screens", payload);
+  return response.data;
+}
+
+export async function updateScreen(id: string, payload: UpdateScreenPayload): Promise<ScreenInfo> {
+  const response = await apiClient.patch<ScreenInfo>(`/screens/${id}`, payload);
+  return response.data;
+}

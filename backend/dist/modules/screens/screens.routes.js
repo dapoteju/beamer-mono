@@ -5,6 +5,9 @@ exports.screensRouter = void 0;
 const express_1 = require("express");
 const screens_service_1 = require("./screens.service");
 const auth_1 = require("../../middleware/auth");
+const client_1 = require("../../db/client");
+const schema_1 = require("../../db/schema");
+const drizzle_orm_1 = require("drizzle-orm");
 exports.screensRouter = (0, express_1.Router)();
 function canAccessScreens(req) {
     if (!req.user)
@@ -23,6 +26,31 @@ function canAccessScreen(req, screenPublisherOrgId) {
         return orgId === screenPublisherOrgId;
     }
     return false;
+}
+function canCreateScreen(req) {
+    if (!req.user)
+        return false;
+    const { orgType, role } = req.user;
+    return orgType === "beamer_internal" && (role === "admin" || role === "ops");
+}
+function canEditScreen(req, screenPublisherOrgId) {
+    if (!req.user)
+        return false;
+    const { orgType, orgId } = req.user;
+    // Internal users can edit all screens
+    if (orgType === "beamer_internal") {
+        return true;
+    }
+    // Publisher users can edit only their own screens
+    if (orgType === "publisher") {
+        return orgId === screenPublisherOrgId;
+    }
+    return false;
+}
+function canChangePublisherOrg(req) {
+    if (!req.user)
+        return false;
+    return req.user.orgType === "beamer_internal";
 }
 // GET /api/screens
 exports.screensRouter.get("/", auth_1.requireAuth, async (req, res, next) => {
@@ -65,31 +93,50 @@ exports.screensRouter.get("/", auth_1.requireAuth, async (req, res, next) => {
         next(err);
     }
 });
-// POST /api/screens
+// POST /api/screens - Create screen (beamer_internal admin/ops only)
 exports.screensRouter.post("/", auth_1.requireAuth, async (req, res, next) => {
     try {
-        const { publisherOrgId, name, screenType, resolutionWidth, resolutionHeight, city, regionCode, lat, lng, } = req.body;
-        if (!publisherOrgId ||
-            !name ||
-            !screenType ||
-            !resolutionWidth ||
-            !resolutionHeight ||
-            !city ||
-            !regionCode ||
-            !lat ||
-            !lng) {
-            return res.status(400).json({ error: "Missing required fields" });
+        // Permission check: Only beamer_internal admin/ops can create screens
+        if (!canCreateScreen(req)) {
+            return res.status(403).json({
+                error: "Forbidden. Only internal admin/ops users can create screens."
+            });
         }
-        const created = await (0, screens_service_1.createScreen)({
-            publisherOrgId,
+        const { name, city, regionCode, publisherOrgId, status, playerId } = req.body;
+        // Validate required fields
+        if (!name || !city || !regionCode || !publisherOrgId) {
+            return res.status(400).json({
+                error: "Missing required fields",
+                required: ["name", "city", "regionCode", "publisherOrgId"]
+            });
+        }
+        // Validate region exists
+        const regionExists = await (0, screens_service_1.validateRegionExists)(regionCode);
+        if (!regionExists) {
+            return res.status(400).json({ error: "Invalid regionCode. Region does not exist." });
+        }
+        // Validate publisherOrgId is a publisher organisation
+        const orgValidation = await (0, screens_service_1.validatePublisherOrg)(publisherOrgId);
+        if (!orgValidation.valid) {
+            return res.status(400).json({
+                error: `Invalid publisherOrgId. ${orgValidation.type ? `Organisation is of type "${orgValidation.type}", must be "publisher".` : "Organisation does not exist."}`
+            });
+        }
+        // If playerId provided, validate it's available
+        if (playerId) {
+            const playerAssignment = await (0, screens_service_1.getPlayerAssignment)(playerId);
+            if (!playerAssignment) {
+                return res.status(400).json({ error: "Player does not exist." });
+            }
+            // Note: Player will be reassigned if already assigned to another screen
+        }
+        const created = await (0, screens_service_1.createScreenForCMS)({
             name,
-            screenType,
-            resolutionWidth,
-            resolutionHeight,
             city,
             regionCode,
-            lat,
-            lng,
+            publisherOrgId,
+            status,
+            playerId,
         });
         res.status(201).json(created);
     }
@@ -134,6 +181,115 @@ exports.screensRouter.get("/players/:id", auth_1.requireAuth, async (req, res, n
             return res.status(404).json({ error: "Player not found" });
         }
         res.json(detail);
+    }
+    catch (err) {
+        next(err);
+    }
+});
+// GET /api/screens/dropdown/regions - Get regions for dropdown
+exports.screensRouter.get("/dropdown/regions", auth_1.requireAuth, async (req, res, next) => {
+    try {
+        if (!canAccessScreens(req)) {
+            return res.status(403).json({ error: "Forbidden" });
+        }
+        const regionsList = await (0, screens_service_1.getRegionsList)();
+        res.json(regionsList);
+    }
+    catch (err) {
+        next(err);
+    }
+});
+// GET /api/screens/dropdown/publishers - Get publisher organisations for dropdown
+exports.screensRouter.get("/dropdown/publishers", auth_1.requireAuth, async (req, res, next) => {
+    try {
+        if (!canCreateScreen(req)) {
+            return res.status(403).json({ error: "Forbidden" });
+        }
+        const publishers = await (0, screens_service_1.getPublisherOrganisations)();
+        res.json(publishers);
+    }
+    catch (err) {
+        next(err);
+    }
+});
+// GET /api/screens/dropdown/players - Get players for dropdown (shows assignment status)
+exports.screensRouter.get("/dropdown/players", auth_1.requireAuth, async (req, res, next) => {
+    try {
+        if (!canAccessScreens(req)) {
+            return res.status(403).json({ error: "Forbidden" });
+        }
+        const players = await (0, screens_service_1.getAvailablePlayers)();
+        res.json(players);
+    }
+    catch (err) {
+        next(err);
+    }
+});
+// PATCH /api/screens/:id - Update screen
+exports.screensRouter.patch("/:id", auth_1.requireAuth, async (req, res, next) => {
+    try {
+        const screenId = req.params.id;
+        // Get current screen to check permissions
+        const currentScreen = await (0, screens_service_1.getScreen)(screenId);
+        if (!currentScreen) {
+            return res.status(404).json({ error: "Screen not found" });
+        }
+        // Permission check: Internal users can edit all, publishers can edit own only
+        if (!canEditScreen(req, currentScreen.publisherOrgId)) {
+            return res.status(403).json({
+                error: "Forbidden. You can only edit screens belonging to your organization."
+            });
+        }
+        const { name, city, regionCode, publisherOrgId, status, playerId } = req.body;
+        // Build update payload
+        const updatePayload = {};
+        if (name !== undefined)
+            updatePayload.name = name;
+        if (city !== undefined)
+            updatePayload.city = city;
+        if (regionCode !== undefined)
+            updatePayload.regionCode = regionCode;
+        if (status !== undefined)
+            updatePayload.status = status;
+        if (playerId !== undefined)
+            updatePayload.playerId = playerId;
+        // Publishers cannot change publisherOrgId
+        if (publisherOrgId !== undefined) {
+            if (!canChangePublisherOrg(req)) {
+                return res.status(403).json({
+                    error: "Forbidden. Only internal users can change screen publisher."
+                });
+            }
+            updatePayload.publisherOrgId = publisherOrgId;
+        }
+        // Validate regionCode if provided
+        if (updatePayload.regionCode && !(await (0, screens_service_1.validateRegionExists)(updatePayload.regionCode))) {
+            return res.status(400).json({ error: "Invalid regionCode. Region does not exist." });
+        }
+        // Validate publisherOrgId if provided
+        if (updatePayload.publisherOrgId) {
+            const orgValidation = await (0, screens_service_1.validatePublisherOrg)(updatePayload.publisherOrgId);
+            if (!orgValidation.valid) {
+                return res.status(400).json({
+                    error: `Invalid publisherOrgId. ${orgValidation.type ? `Organisation is of type "${orgValidation.type}", must be "publisher".` : "Organisation does not exist."}`
+                });
+            }
+        }
+        // Validate playerId if provided and not null/empty
+        if (updatePayload.playerId && updatePayload.playerId !== null && updatePayload.playerId !== '') {
+            const playerAssignment = await (0, screens_service_1.getPlayerAssignment)(updatePayload.playerId);
+            if (!playerAssignment) {
+                return res.status(400).json({ error: "Player does not exist." });
+            }
+        }
+        // Get current player assignment
+        const [currentPlayer] = await client_1.db
+            .select({ id: schema_1.players.id })
+            .from(schema_1.players)
+            .where((0, drizzle_orm_1.eq)(schema_1.players.screenId, screenId))
+            .limit(1);
+        const updated = await (0, screens_service_1.updateScreenData)(screenId, updatePayload, currentPlayer?.id);
+        res.json(updated);
     }
     catch (err) {
         next(err);

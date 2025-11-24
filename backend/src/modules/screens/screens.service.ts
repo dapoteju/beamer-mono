@@ -1,7 +1,7 @@
 // src/modules/screens/screens.service.ts
 import { db } from "../../db/client";
-import { screens, organisations, players, heartbeats, playEvents, creatives, campaigns } from "../../db/schema";
-import { eq, desc, and, gte, sql } from "drizzle-orm";
+import { screens, organisations, players, heartbeats, playEvents, creatives, campaigns, regions } from "../../db/schema";
+import { eq, desc, and, gte, sql, isNull } from "drizzle-orm";
 
 export async function listScreens(filters?: {
   publisherOrgId?: string;
@@ -373,4 +373,212 @@ export async function getPlayerDetail(playerId: string) {
     recentHeartbeats,
     recentPlayEvents,
   };
+}
+
+// Helper functions for CRUD operations
+
+export async function validateRegionExists(regionCode: string): Promise<boolean> {
+  const [region] = await db
+    .select({ code: regions.code })
+    .from(regions)
+    .where(eq(regions.code, regionCode))
+    .limit(1);
+  return !!region;
+}
+
+export async function validatePublisherOrg(orgId: string): Promise<{ valid: boolean; type?: string }> {
+  const [org] = await db
+    .select({ type: organisations.type })
+    .from(organisations)
+    .where(eq(organisations.id, orgId))
+    .limit(1);
+  
+  if (!org) return { valid: false };
+  return { valid: org.type === 'publisher', type: org.type };
+}
+
+export async function getPlayerAssignment(playerId: string): Promise<{ screenId: string } | null> {
+  const [player] = await db
+    .select({ screenId: players.screenId })
+    .from(players)
+    .where(eq(players.id, playerId))
+    .limit(1);
+  return player || null;
+}
+
+export async function unassignPlayerFromScreen(playerId: string): Promise<void> {
+  // Note: Players table has screenId as NOT NULL foreign key
+  // We can't actually set it to null due to schema constraints
+  // In a real scenario, you'd either need to:
+  // 1. Change the schema to allow nullable screenId
+  // 2. Delete the player record
+  // 3. Keep a separate "assignment" table
+  // For now, we'll throw an error if trying to unassign
+  throw new Error("Cannot unassign player: screenId is required in schema. Player must be assigned to a screen.");
+}
+
+export async function updatePlayerScreenAssignment(playerId: string, newScreenId: string): Promise<void> {
+  await db
+    .update(players)
+    .set({ screenId: newScreenId })
+    .where(eq(players.id, playerId));
+}
+
+// Swap two players between screens (atomic transaction)
+export async function swapPlayersAssignment(playerAId: string, playerBId: string): Promise<void> {
+  return await db.transaction(async (tx) => {
+    // Get current screen assignments
+    const [playerA] = await tx.select({ screenId: players.screenId }).from(players).where(eq(players.id, playerAId));
+    const [playerB] = await tx.select({ screenId: players.screenId }).from(players).where(eq(players.id, playerBId));
+    
+    if (!playerA || !playerB) {
+      throw new Error("One or both players not found");
+    }
+
+    // Check if they're already on the same screen (no swap needed)
+    if (playerA.screenId === playerB.screenId) {
+      // Both players already on same screen - this shouldn't happen but handle gracefully
+      return;
+    }
+
+    // Atomic swap - both updates must succeed or both rollback
+    await tx.update(players).set({ screenId: playerB.screenId }).where(eq(players.id, playerAId));
+    await tx.update(players).set({ screenId: playerA.screenId }).where(eq(players.id, playerBId));
+  });
+}
+
+export async function getAvailablePlayers(): Promise<Array<{ id: string; currentScreenId: string | null; currentScreenName: string | null }>> {
+  return db
+    .select({
+      id: players.id,
+      currentScreenId: players.screenId,
+      currentScreenName: screens.name,
+    })
+    .from(players)
+    .leftJoin(screens, eq(players.screenId, screens.id));
+}
+
+export async function getPublisherOrganisations(): Promise<Array<{ id: string; name: string }>> {
+  return db
+    .select({
+      id: organisations.id,
+      name: organisations.name,
+    })
+    .from(organisations)
+    .where(eq(organisations.type, 'publisher'));
+}
+
+export async function getRegionsList(): Promise<Array<{ id: string; code: string; name: string }>> {
+  return db
+    .select({
+      id: regions.id,
+      code: regions.code,
+      name: regions.name,
+    })
+    .from(regions)
+    .orderBy(regions.name);
+}
+
+// Updated createScreen function with simpler interface for CMS
+export async function createScreenForCMS(input: {
+  name: string;
+  city: string;
+  regionCode: string;
+  publisherOrgId: string;
+  status?: 'active' | 'inactive' | 'maintenance';
+  playerId?: string;
+}) {
+  // Create screen with a temporary placeholder initially
+  // We'll update it after player assignment if needed
+  const [created] = await db
+    .insert(screens)
+    .values({
+      publisherOrgId: input.publisherOrgId,
+      name: input.name,
+      city: input.city,
+      regionCode: input.regionCode,
+      status: input.status || 'active',
+      // Default values for hidden fields
+      screenType: 'digital_display',
+      resolutionWidth: 1920,
+      resolutionHeight: 1080,
+      lat: '0.0',
+      lng: '0.0',
+    })
+    .returning();
+
+  // Handle player assignment if provided
+  // This will reassign the player from its current screen to this new screen
+  if (input.playerId && created) {
+    await updatePlayerScreenAssignment(input.playerId, created.id);
+  }
+
+  return created;
+}
+
+// Update screen function (atomic transaction)
+export async function updateScreenData(screenId: string, input: {
+  name?: string;
+  city?: string;
+  regionCode?: string;
+  publisherOrgId?: string;
+  status?: 'active' | 'inactive' | 'maintenance';
+  playerId?: string | null;
+}, currentPlayerId?: string) {
+  // Wrap entire update operation in a single transaction for atomicity
+  return await db.transaction(async (tx) => {
+    const updateData: any = {};
+    
+    if (input.name !== undefined) updateData.name = input.name;
+    if (input.city !== undefined) updateData.city = input.city;
+    if (input.regionCode !== undefined) updateData.regionCode = input.regionCode;
+    if (input.publisherOrgId !== undefined) updateData.publisherOrgId = input.publisherOrgId;
+    if (input.status !== undefined) updateData.status = input.status;
+
+    // Update screen fields if there are any changes
+    let updated;
+    if (Object.keys(updateData).length > 0) {
+      [updated] = await tx
+        .update(screens)
+        .set(updateData)
+        .where(eq(screens.id, screenId))
+        .returning();
+    } else {
+      // If no screen fields to update, just fetch current screen
+      [updated] = await tx.select().from(screens).where(eq(screens.id, screenId));
+    }
+
+    // Handle player assignment changes within the same transaction
+    if (input.playerId !== undefined && input.playerId !== currentPlayerId) {
+      if (input.playerId === null || input.playerId === '') {
+        // User wants to unassign - not supported due to schema constraints
+        // Players table requires screenId, so we cannot set it to null
+        // This is a limitation of the current schema
+        throw new Error("Cannot unassign player: screenId is required. Player must always be assigned to a screen.");
+      } else {
+        // Need to swap players to maintain one-player-per-screen
+        if (currentPlayerId) {
+          // There's already a player on this screen - swap them (within transaction)
+          const [playerA] = await tx.select({ screenId: players.screenId }).from(players).where(eq(players.id, currentPlayerId));
+          const [playerB] = await tx.select({ screenId: players.screenId }).from(players).where(eq(players.id, input.playerId));
+          
+          if (!playerA || !playerB) {
+            throw new Error("One or both players not found");
+          }
+
+          // Check if they're already on the same screen (no swap needed)
+          if (playerA.screenId !== playerB.screenId) {
+            // Atomic swap within the outer transaction
+            await tx.update(players).set({ screenId: playerB.screenId }).where(eq(players.id, currentPlayerId));
+            await tx.update(players).set({ screenId: playerA.screenId }).where(eq(players.id, input.playerId));
+          }
+        } else {
+          // No current player on this screen - just assign the new player (within transaction)
+          await tx.update(players).set({ screenId: screenId }).where(eq(players.id, input.playerId));
+        }
+      }
+    }
+
+    return updated;
+  });
 }

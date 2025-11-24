@@ -1,0 +1,265 @@
+I now have full Screens & Players visibility working in the Beamer CMS (screen list, detail, PoP, heartbeats, players, etc.).
+
+I want you to implement full CRUD for screens, consistent with our organisation permission model and the operations rules below.
+
+1. OPERATIONS RULES FOR SCREEN CRUD
+
+Please implement the following behaviour:
+
+Who can create screens?
+
+beamer_internal users with role: admin or ops → YES
+
+publisher → NO (for now)
+
+advertiser → NO
+
+Who can edit screens?
+
+beamer_internal (any role): can edit all screens
+
+publisher: can edit only their own screens
+
+advertiser: never allowed
+
+Fields allowed in the CMS forms:
+Create Screen
+
+name (string)
+
+city (string)
+
+regionId (string, dropdown from regions)
+
+publisherOrgId (must exclude advertiser organisations)
+
+status (active/inactive)
+
+playerId (optional; only players not already linked to another screen)
+
+Edit Screen
+
+name (string)
+
+city (string)
+
+regionId (string)
+
+status (active/inactive)
+
+publisherOrgId:
+
+internal users: allowed
+
+publisher users: not allowed
+
+playerId:
+
+Must ensure:
+one player can only be linked to one screen at a time
+
+NEVER allow deleting screens for now.
+2. BACKEND IMPLEMENTATION
+Add these endpoints in /api/screens:
+POST /api/screens
+
+Creates a screen with the fields above.
+
+Permission:
+
+Only internal users (admin/ops)
+
+Validate:
+
+region exists
+
+publisherOrgId is of type "publisher"
+
+If playerId provided:
+
+Ensure player is unassigned
+
+Assign it to this screen
+
+Return the created screen.
+
+PATCH /api/screens/:id
+
+Edits existing screens.
+
+Permission:
+
+Internal users (any role): can edit all screens
+
+Publisher users: only screens belonging to their org
+
+Advertisers: forbidden
+
+Allowed updates:
+
+name
+
+city
+
+regionId
+
+status
+
+publisherOrgId (internal only)
+
+playerId (assign/unassign)
+
+Player assignment logic:
+
+If a new playerId is provided:
+
+Check if that player is currently assigned to another screen
+
+If yes → unassign from old screen first
+
+If playerId is null:
+
+Unassign current player
+
+Return the updated screen.
+
+3. FRONTEND IMPLEMENTATION — CMS (cms-web)
+Modify Screens.tsx (screens list page)
+
+Add a “Create Screen” button:
+
+Visible only to internal admin/ops users
+
+Clicking it opens a modal form:
+
+name, city, region dropdown, publisher dropdown, status, optional player dropdown
+
+After creation:
+
+Close modal
+
+Refetch screen list
+
+Add/Edit Screen Modal Component
+
+Create a reusable modal:
+cms-web/src/components/ScreenFormModal.tsx
+
+Props:
+
+mode: "create" | "edit"
+
+initialValues (for edit)
+
+onSubmit
+
+onClose
+
+Form fields:
+
+name
+
+city
+
+regionId (dropdown)
+
+publisherOrgId (dropdown)
+
+internal users only
+
+status
+
+playerId:
+
+null option = “Unassigned”
+
+Only show players not assigned OR the currently assigned one
+
+Validation:
+
+Required fields must be enforced in the UI
+
+Modify ScreenDetail.tsx
+
+Add an “Edit Screen” button:
+
+Visible to:
+
+internal users
+
+publisher users (if screen.publisherOrgId === user.orgId)
+
+Opens the same modal with prefilled values
+
+After submit:
+
+Refresh detail page data
+
+4. API Client
+
+Create/extend file:
+cms-web/src/api/screens.ts
+
+Add:
+
+createScreen(payload)
+
+updateScreen(id, payload)
+
+Export TypeScript types:
+
+CreateScreenPayload
+
+UpdateScreenPayload
+
+Screen
+
+ScreenDetail
+
+Ensure all requests automatically include the JWT token.
+
+5. ROUTE GUARDS
+
+Update the route guard logic so:
+
+/screens and /screens/:id:
+
+Allowed:
+
+beamer_internal (all roles)
+
+publisher (all roles)
+
+Denied:
+
+advertiser → redirect to /dashboard
+
+Keep consistent with existing Organisations guards.
+
+6. When Done, Please Provide:
+
+All backend files changed (paths)
+
+All frontend files changed (paths)
+
+Example payloads for:
+
+createScreen
+
+updateScreen
+
+Logic used for enforcing:
+
+permissions
+
+player assignment/unassignment
+
+Steps to test:
+
+internal admin creating screen
+
+internal admin editing screen
+
+publisher user editing only their own screens
+
+player assignment behaviour

@@ -10,10 +10,13 @@ import type {
   Heartbeat,
   PlayEvent,
 } from "../api/screens";
+import { ScreenFormModal } from "../components/ScreenFormModal";
+import { useAuthStore } from "../store/authStore";
 
 export default function ScreenDetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const { user } = useAuthStore();
 
   const [detail, setDetail] = useState<ScreenDetailType | null>(null);
   const [heartbeats, setHeartbeats] = useState<Heartbeat[]>([]);
@@ -26,6 +29,7 @@ export default function ScreenDetail() {
     "overview"
   );
   const [timeRange, setTimeRange] = useState("24h");
+  const [showEditModal, setShowEditModal] = useState(false);
 
   async function loadScreenDetail() {
     if (!id) return;
@@ -148,6 +152,11 @@ export default function ScreenDetail() {
 
   const { screen, player, stats, recentPlayEvents } = detail;
 
+  // Check if user can edit this screen
+  const canEdit =
+    user?.orgType === "beamer_internal" ||
+    (user?.orgType === "publisher" && user?.orgId === screen.publisherOrgId);
+
   return (
     <div>
       <div className="mb-6">
@@ -164,7 +173,7 @@ export default function ScreenDetail() {
               {screen.city}, {screen.regionCode} • {screen.publisherOrgName}
             </p>
           </div>
-          <div>
+          <div className="flex items-center gap-3">
             <span
               className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${
                 player?.isOnline
@@ -174,6 +183,14 @@ export default function ScreenDetail() {
             >
               {player?.isOnline ? "Online" : "Offline"}
             </span>
+            {canEdit && (
+              <button
+                onClick={() => setShowEditModal(true)}
+                className="px-4 py-2 bg-blue-600 text-white text-sm rounded-md hover:bg-blue-700 transition-colors"
+              >
+                Edit Screen
+              </button>
+            )}
           </div>
         </div>
       </div>
@@ -488,6 +505,26 @@ export default function ScreenDetail() {
           )}
         </div>
       </div>
+
+      {/* Edit Screen Modal */}
+      {showEditModal && (
+        <ScreenFormModal
+          mode="edit"
+          screenId={id}
+          initialValues={{
+            name: screen.name,
+            city: screen.city,
+            regionCode: screen.regionCode,
+            publisherOrgId: screen.publisherOrgId,
+            status: screen.status,
+            playerId: player?.id || null,
+          }}
+          onClose={() => setShowEditModal(false)}
+          onSuccess={() => {
+            loadScreenDetail();
+          }}
+        />
+      )}
     </div>
   );
 }
