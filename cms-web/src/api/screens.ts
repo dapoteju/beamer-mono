@@ -229,7 +229,7 @@ export async function fetchVehicles(): Promise<VehicleOption[]> {
 // CRUD operations
 
 export interface CreateScreenPayload {
-  name: string;
+  name?: string | null;
   city: string;
   regionCode: string;
   publisherOrgId: string;
@@ -251,7 +251,7 @@ export interface CreateScreenPayload {
 }
 
 export interface UpdateScreenPayload {
-  name?: string;
+  name?: string | null;
   city?: string;
   regionCode?: string;
   publisherOrgId?: string;

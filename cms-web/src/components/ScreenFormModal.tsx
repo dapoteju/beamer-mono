@@ -15,7 +15,7 @@ interface ScreenFormModalProps {
   mode: "create" | "edit";
   screenId?: string;
   initialValues?: {
-    name: string;
+    name?: string | null;
     city: string;
     regionCode: string;
     publisherOrgId: string;
@@ -113,7 +113,6 @@ export function ScreenFormModal({ mode, screenId, initialValues, onClose, onSucc
   const validate = () => {
     const newErrors: Record<string, string> = {};
 
-    if (!formData.name.trim()) newErrors.name = "Name is required";
     if (!formData.city.trim()) newErrors.city = "City is required";
     if (!formData.regionCode) newErrors.regionCode = "Region is required";
     // publisherId is optional during transition - only validate for internal users with dropdown
@@ -140,7 +139,7 @@ export function ScreenFormModal({ mode, screenId, initialValues, onClose, onSucc
       }
       
       const payload: CreateScreenPayload = {
-        name: formData.name,
+        name: formData.name.trim() || undefined,
         city: formData.city,
         regionCode: formData.regionCode,
         publisherOrgId: publisherOrgId as any,
@@ -160,7 +159,7 @@ export function ScreenFormModal({ mode, screenId, initialValues, onClose, onSucc
       createMutation.mutate(payload);
     } else {
       const payload: UpdateScreenPayload = {
-        name: formData.name,
+        name: formData.name.trim() || undefined,
         city: formData.city,
         regionCode: formData.regionCode,
         status: formData.status as any,
