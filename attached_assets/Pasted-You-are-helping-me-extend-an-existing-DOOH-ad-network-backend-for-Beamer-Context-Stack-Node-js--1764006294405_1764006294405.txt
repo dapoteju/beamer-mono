@@ -1,0 +1,139 @@
+You are helping me extend an existing DOOH ad network backend for Beamer.
+
+Context
+
+Stack: Node.js + Express + TypeScript + Postgres (Drizzle ORM)
+
+There are already tables and some endpoints for campaigns, flights, bookings and reports, based on a tech spec similar to this: Campaign, Creative, Flight, Booking, PlayEvent, Reporting, etc.
+
+We already have working APIs for:
+
+Players (playlist, heartbeat, proof-of-play)
+
+Screens & publishers (inventory)
+
+Location history and inventory map
+
+I now want to build a proper Campaigns & Bookings UX in the CMS, so we need a clean API surface for the frontend to consume.
+
+Goal of this task
+
+Audit existing backend code and confirm what already exists for:
+
+Campaign
+
+Flight
+
+Booking
+
+Create or fix REST endpoints so that the CMS can do the following:
+
+Campaigns
+
+GET /api/campaigns
+
+List campaigns for the authenticated organisation (advertiser or internal)
+
+Support query params: status, from, to, search
+
+GET /api/campaigns/:id
+
+Return campaign details + associated flights + basic stats if easily available
+
+POST /api/campaigns
+
+Create a campaign with fields:
+
+name, objective?, startDate, endDate, totalBudget, currency, status, targetingJson
+
+PUT /api/campaigns/:id
+
+Update editable fields above
+
+PATCH /api/campaigns/:id/status
+
+Change status: draft | active | paused | completed
+
+Flights
+
+GET /api/campaigns/:campaignId/flights
+
+POST /api/campaigns/:campaignId/flights
+
+Fields:
+
+name
+
+startDatetime
+
+endDatetime
+
+targetType (screen or screen_group)
+
+targetId
+
+status
+
+PUT /api/flights/:id
+
+Optional: PATCH /api/flights/:id/status
+
+Bookings (MVP-level, not full billing)
+
+GET /api/bookings?campaignId=...
+
+GET /api/bookings/:id
+
+POST /api/bookings
+
+Fields:
+
+campaignId
+
+billingModel (fixed | cpm | cpd | share_of_loop)
+
+rate
+
+agreedImpressions?
+
+agreedAmountMinor?
+
+currency
+
+startDate
+
+endDate
+
+status
+
+PUT /api/bookings/:id (basic edits)
+
+Important constraints
+
+Re-use existing DB tables and Drizzle models if they already exist; don’t create duplicate models.
+
+Respect the existing auth / org permissions:
+
+Advertiser org users only see their campaigns & bookings.
+
+Beamer internal can see everything.
+
+Don’t break any existing player or reporting endpoints.
+
+Add basic validation and sensible TypeScript types for request DTOs.
+
+Where possible, reuse existing reporting logic to compute basic stats for GET /api/campaigns/:id (e.g. total impressions) but only if it’s straightforward.
+
+Deliverables
+
+Implement / fix the endpoints listed above.
+
+Add or update TypeScript types/interfaces for:
+
+Campaign API response
+
+Flight API response
+
+Booking API response
+
+Show me the list of files you changed and a short summary of what changed in each (no need to paste full file contents).
