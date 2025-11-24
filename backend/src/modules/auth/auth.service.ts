@@ -50,7 +50,7 @@ export async function registerUser(input: RegisterInput): Promise<AuthResponse> 
     email: newUser.email,
     orgId: newUser.orgId!,
     role: newUser.role as "admin" | "ops" | "viewer",
-    orgType: org.orgType as "advertiser" | "publisher" | "beamer_internal",
+    orgType: org.type as "advertiser" | "publisher" | "beamer_internal",
   };
 
   const token = jwt.sign(payload, JWT_SECRET, { expiresIn: JWT_EXPIRES_IN });
@@ -63,8 +63,8 @@ export async function registerUser(input: RegisterInput): Promise<AuthResponse> 
       fullName: newUser.fullName,
       orgId: newUser.orgId!,
       role: newUser.role as "admin" | "ops" | "viewer",
-      orgType: org.orgType as "advertiser" | "publisher" | "beamer_internal",
-      orgName: org.orgName,
+      orgType: org.type as "advertiser" | "publisher" | "beamer_internal",
+      orgName: org.name,
       createdAt: newUser.createdAt,
       updatedAt: newUser.updatedAt!,
     },
@@ -107,7 +107,7 @@ export async function loginUser(input: LoginInput): Promise<AuthResponse> {
     email: user.email,
     orgId: user.orgId!,
     role: user.role as "admin" | "ops" | "viewer",
-    orgType: org.orgType as "advertiser" | "publisher" | "beamer_internal",
+    orgType: org.type as "advertiser" | "publisher" | "beamer_internal",
   };
 
   const token = jwt.sign(payload, JWT_SECRET, { expiresIn: JWT_EXPIRES_IN });
@@ -120,8 +120,8 @@ export async function loginUser(input: LoginInput): Promise<AuthResponse> {
       fullName: user.fullName,
       orgId: user.orgId!,
       role: user.role as "admin" | "ops" | "viewer",
-      orgType: org.orgType as "advertiser" | "publisher" | "beamer_internal",
-      orgName: org.orgName,
+      orgType: org.type as "advertiser" | "publisher" | "beamer_internal",
+      orgName: org.name,
       createdAt: user.createdAt,
       updatedAt: user.updatedAt!,
     },
@@ -155,8 +155,8 @@ export async function getUserById(userId: string): Promise<User | null> {
     fullName: user.fullName,
     orgId: user.orgId,
     role: user.role as "admin" | "ops" | "viewer",
-    orgType: org.orgType as "advertiser" | "publisher" | "beamer_internal",
-    orgName: org.orgName,
+    orgType: org.type as "advertiser" | "publisher" | "beamer_internal",
+    orgName: org.name,
     createdAt: user.createdAt,
     updatedAt: user.updatedAt,
   };
