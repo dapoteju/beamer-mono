@@ -1,0 +1,234 @@
+You are helping me build out the Campaigns & Flights UI inside the Beamer CMS frontend.
+
+Context
+
+Stack: React + TypeScript + Vite.
+
+The backend now includes fully working endpoints for:
+
+Campaigns
+
+Flights
+
+Bookings
+
+You have already built:
+
+Authentication
+
+Navigation layout
+
+Inventory screens (screen list + map view)
+
+I now need full Campaign Management in the CMS UI.
+
+🎯 Goal of this task
+
+Create a complete CMS UI for:
+
+1. Campaigns List
+2. Campaign Create/Edit
+3. Campaign Detail
+4. Flights List & Create/Edit inside campaign detail
+
+This should connect to the new API endpoints I just finished.
+
+🗂️ 1. Create CMS Routes
+
+Add the following routes:
+
+/campaigns
+/campaigns/new
+/campaigns/:campaignId
+
+
+Examples:
+
+/campaigns → List view
+
+/campaigns/new → Create campaign form
+
+/campaigns/123 → Campaign detail view (includes flights)
+
+Add “Campaigns” to the main navigation.
+
+📄 2. Campaigns List Page
+
+Create a page at /campaigns that:
+
+Displays a table with:
+
+name
+
+status (with colored badge)
+
+startDate
+
+endDate
+
+totalBudget + currency
+
+Controls:
+
+Search bar → filters ?search
+
+Filter dropdown → status: All | Draft | Active | Paused | Completed
+
+“New Campaign” button → /campaigns/new
+
+Data Source:
+GET /api/campaigns?status=&from=&to=&search=
+
+📝 3. New Campaign Form (Create)
+
+At route /campaigns/new, create a form with fields:
+
+name (required)
+
+objective (optional)
+
+startDate
+
+endDate
+
+totalBudget
+
+currency (default “NGN”)
+
+status (draft/active/paused/completed)
+
+targetingJson (simple textarea for now)
+
+On submit:
+
+POST /api/campaigns
+
+
+Redirect to /campaigns/:id.
+
+🔍 4. Campaign Detail Page (/campaigns/:id)
+
+Layout:
+
+Header section
+
+Campaign name
+
+Status badge
+
+Dates & budget summary
+
+“Edit Campaign” button
+
+Tabs or sections:
+
+Overview
+
+Flights
+
+Bookings (placeholder for now)
+
+Data Source:
+GET /api/campaigns/:id
+
+
+The backend returns:
+
+Campaign fields
+
+Flights
+
+totalImpressions (from stats)
+
+🛫 5. Flights Section (inside Campaign Detail)
+
+Inside the Flights tab:
+
+Display flight table:
+
+name
+
+startDatetime
+
+endDatetime
+
+targetType (screen | screen_group)
+
+targetId (raw ID for now)
+
+status
+
+Add:
+
+“Add Flight” button
+
+Edit button for each flight
+
+Flight creation form fields:
+
+name
+
+startDatetime
+
+endDatetime
+
+targetType: "screen" or "screen_group"
+
+targetId (text input is fine for MVP)
+
+status: scheduled | active | paused | completed
+
+API:
+GET /api/campaigns/:campaignId/flights
+POST /api/campaigns/:campaignId/flights
+PUT /api/flights/:id
+PATCH /api/flights/:id/status
+
+
+Make sure flights update correctly and refresh the list.
+
+🔒 6. Permissions
+
+Use the existing auth context:
+
+Advertiser org users only see their campaigns
+
+Internal users see all
+
+If needed, implement org_id filtering by passing query params
+
+🎨 7. Components
+
+Reuse existing UI components:
+
+Table
+
+Button
+
+Modal / Drawer
+
+Form inputs
+
+Badge
+
+Date & datetime pickers
+
+Keep visual style consistent with screens & inventory pages.
+
+📌 Deliverables Replit Should Produce
+
+New frontend routes for Campaigns pages
+
+Campaigns List page
+
+Campaign Create page
+
+Campaign Detail page
+
+Flights management UI (list + create + edit)
+
+Updated navigation
+
+All API calls wired to the backend endpoints
+
+Summary of updated/created files

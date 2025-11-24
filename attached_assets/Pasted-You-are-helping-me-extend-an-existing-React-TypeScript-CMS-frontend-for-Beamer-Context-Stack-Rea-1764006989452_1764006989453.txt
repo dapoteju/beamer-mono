@@ -1,0 +1,190 @@
+You are helping me extend an existing React/TypeScript CMS frontend for Beamer.
+
+Context
+
+Stack: React + TypeScript (using whatever component library is already in the project; reuse it).
+
+There is already:
+
+Authentication
+
+A navigation layout for the CMS
+
+Inventory pages (screens, map, etc.)
+
+Backend now exposes:
+
+GET /api/campaigns
+
+GET /api/campaigns/:id
+
+POST /api/campaigns
+
+PUT /api/campaigns/:id
+
+PATCH /api/campaigns/:id/status
+
+GET /api/campaigns/:campaignId/flights
+
+POST /api/campaigns/:campaignId/flights
+
+PUT /api/flights/:id
+
+GET /api/bookings?campaignId=... (for later wiring)
+
+Goal of this task
+
+Create a Campaigns section in the CMS that allows an internal user to:
+
+See a list of campaigns
+
+Create and edit campaigns
+
+Open a campaign detail view that shows:
+
+Campaign core info
+
+Flights for that campaign
+
+A way to add/edit flights
+
+A small panel placeholder for bookings (we’ll fill it in next prompt)
+
+Detailed requirements
+
+Routing & Navigation
+
+Add a top-level route: /campaigns
+
+Add nested route: /campaigns/:id
+
+Make sure “Campaigns” appears in the main navigation (sidebar or header) consistent with existing styling.
+
+Campaigns List Page (/campaigns)
+
+Table or list of campaigns with:
+
+Name
+
+Status
+
+Start date
+
+End date
+
+Total budget + currency
+
+Basic controls:
+
+“New Campaign” button
+
+Status filter (All / Draft / Active / Paused / Completed)
+
+Fetch data from GET /api/campaigns.
+
+Clicking a row takes you to /campaigns/:id.
+
+Campaign Create/Edit
+
+A form for creating/editing campaigns using:
+
+name (required)
+
+objective (optional text/select)
+
+startDate, endDate (date pickers)
+
+totalBudget, currency
+
+status (draft/active/paused/completed)
+
+For create: use POST /api/campaigns.
+
+For edit: use PUT /api/campaigns/:id.
+
+On success, navigate back to the detail page.
+
+Campaign Detail Page (/campaigns/:id)
+Layout suggestion (but adapt to existing design system):
+
+Top section: campaign summary
+
+Name, status badge, dates, budget
+
+“Edit Campaign” button
+
+Tabbed or section layout:
+
+Overview
+
+Basic metadata, maybe some key metrics if available
+
+Flights
+
+Table of flights for this campaign
+
+Bookings (placeholder for now)
+
+Just show: “Bookings for this campaign will be displayed here”
+
+Flights Section (within Campaign Detail)
+
+Use GET /api/campaigns/:campaignId/flights.
+
+Show table with:
+
+Name
+
+Start datetime
+
+End datetime
+
+Target type (screen vs screen_group)
+
+Target id (resolved to a label if easy)
+
+Status
+
+Provide:
+
+“Add Flight” button → opens a modal or drawer
+
+Edit action per flight (inline or via modal)
+
+Flight Form Fields
+
+name
+
+startDatetime, endDatetime (datetime inputs)
+
+targetType (select: screen, screen_group)
+
+targetId (for MVP: plain text input or a simple select if you can easily reuse existing screens/groups API)
+
+status (scheduled/active/paused/completed)
+
+Wire up:
+
+Create → POST /api/campaigns/:campaignId/flights
+
+Edit → PUT /api/flights/:id
+
+Important constraints
+
+Reuse existing layout, components, and API helper utilities in the project.
+
+Keep styling minimal but consistent with the rest of the CMS.
+
+Handle loading states and basic error states (simple messages are fine).
+
+Don’t break existing routes (inventory, map, etc.).
+
+Deliverables
+
+New Campaigns list page.
+
+New CampaignDetail page with Flights management.
+
+Navigation updated to include Campaigns.
+
+Brief description of which components/files were created or modified.
