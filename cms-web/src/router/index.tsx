@@ -1,5 +1,5 @@
 import { createBrowserRouter, Navigate } from "react-router-dom";
-import { useEffect } from "react";
+import type { ReactElement } from "react";
 import AppLayout from "../layouts/AppLayout";
 import { useAuthStore } from "../store/authStore";
 
@@ -10,12 +10,16 @@ import Organisations from "../pages/Organisations";
 import Reporting from "../pages/Reporting";
 import Login from "../pages/Login";
 
-function ProtectedRoute({ children }: { children: JSX.Element }) {
-  const { isAuthenticated, initFromStorage } = useAuthStore();
+function ProtectedRoute({ children }: { children: ReactElement }) {
+  const { isAuthenticated, hasHydrated } = useAuthStore();
 
-  useEffect(() => {
-    initFromStorage();
-  }, [initFromStorage]);
+  if (!hasHydrated) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-zinc-100">
+        <div className="text-zinc-600">Loading...</div>
+      </div>
+    );
+  }
 
   if (!isAuthenticated) {
     return <Navigate to="/login" replace />;
