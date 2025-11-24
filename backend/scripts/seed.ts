@@ -1106,8 +1106,8 @@ const LAGOS_ROUTES = {
 };
 
 async function seedScreenLocationHistory(
-  screenIdMap: Map<string, string>,
-  playerIdMap: Map<string, string>
+  screenIdMap: Record<string, string>,
+  playerIdMap: Record<string, string>
 ) {
   console.log("\n📍 Seeding screen location history (GPS mobility data)...");
 
@@ -1133,8 +1133,8 @@ async function seedScreenLocationHistory(
   }[] = [];
 
   for (const { screenCode, route } of vehicleScreenRoutes) {
-    const screenId = screenIdMap.get(screenCode);
-    const playerId = playerIdMap.get(screenCode);
+    const screenId = screenIdMap[screenCode];
+    const playerId = playerIdMap[screenCode];
 
     if (!screenId) {
       console.log(`   ⚠️ Screen ${screenCode} not found, skipping`);
