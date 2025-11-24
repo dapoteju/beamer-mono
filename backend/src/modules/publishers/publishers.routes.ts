@@ -8,6 +8,7 @@ import {
   updatePublisherProfile,
   deletePublisherProfile,
   getPublisherOrganisations,
+  getPublisherDropdownOptions,
 } from "./publishers.service";
 
 export const publishersRouter = Router();
@@ -65,6 +66,20 @@ publishersRouter.get("/dropdown/organisations", requireAuth, async (req: AuthReq
 
     const organisations = await getPublisherOrganisations();
     res.json(organisations);
+  } catch (err) {
+    next(err);
+  }
+});
+
+// GET /api/publishers/dropdown - Get all publisher profiles for dropdown (for screens form)
+publishersRouter.get("/dropdown", requireAuth, async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    if (!canAccessPublishers(req)) {
+      return res.status(403).json({ error: "Forbidden" });
+    }
+
+    const options = await getPublisherDropdownOptions();
+    res.json(options);
   } catch (err) {
     next(err);
   }

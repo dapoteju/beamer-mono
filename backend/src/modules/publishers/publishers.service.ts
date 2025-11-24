@@ -265,3 +265,31 @@ export async function getPublisherOrganisations(): Promise<Array<{
     .from(organisations)
     .where(eq(organisations.organisationCategory, "publisher"));
 }
+
+export async function getPublisherDropdownOptions(): Promise<Array<{
+  id: string;
+  label: string;
+  publisherType: "organisation" | "individual";
+  organisationId: string | null;
+}>> {
+  const profiles = await db
+    .select({
+      id: publisherProfiles.id,
+      publisherType: publisherProfiles.publisherType,
+      organisationId: publisherProfiles.organisationId,
+      fullName: publisherProfiles.fullName,
+      organisationName: organisations.name,
+    })
+    .from(publisherProfiles)
+    .leftJoin(organisations, eq(publisherProfiles.organisationId, organisations.id));
+
+  return profiles.map((p) => ({
+    id: p.id,
+    label:
+      p.publisherType === "organisation"
+        ? `${p.organisationName || "Unknown Org"} (Organisation)`
+        : `${p.fullName || "Unknown"} (Individual)`,
+    publisherType: p.publisherType,
+    organisationId: p.organisationId,
+  }));
+}

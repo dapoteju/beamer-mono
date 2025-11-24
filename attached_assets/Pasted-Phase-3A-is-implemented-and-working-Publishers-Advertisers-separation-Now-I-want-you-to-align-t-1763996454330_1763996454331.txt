@@ -1,0 +1,208 @@
+Phase 3A is implemented and working (Publishers & Advertisers separation).
+Now I want you to align the Screens UI fully with the new publisher_profiles model.
+
+The goal:
+
+Screens should use publisher profiles (organisation or individual) everywhere.
+
+The old organisation-based publisher selection should be removed from the UI.
+
+All screen create/edit operations should persist publisherId.
+
+Screens list & detail should show the enriched publisher info.
+
+Please do NOT break existing working behaviour (classification, players, CRUD, permissions).
+
+1. BACKEND ASSUMPTIONS (DON’T CHANGE)
+
+From your last update:
+
+publisher_profiles table exists.
+
+screens has a nullable publisherId FK.
+
+Screens API already:
+
+Persists publisherId on POST/PATCH.
+
+Returns enriched publisher data in GET responses.
+
+Old publisherOrgId still exists for backward compatibility, but should now be treated as deprecated in the UI.
+
+Do not change the backend behaviours in this phase, except for adding any dropdown helper endpoint if needed.
+
+2. FRONTEND: SCREENS API CLIENT (cms-web/src/api/screens.ts)
+
+Update types:
+
+Ensure Screen / ScreenDetail includes:
+
+publisher?: {
+  id: string;
+  publisherType: "organisation" | "individual";
+  fullName?: string | null;
+  phoneNumber?: string | null;
+  email?: string | null;
+  organisation?: {
+    id: string;
+    name: string;
+    country?: string | null;
+  } | null;
+} | null;
+
+
+Make sure this matches what the backend actually returns.
+
+Update create/update payload types to include:
+
+publisherId?: string | null;
+
+
+Ensure POST/PATCH calls send publisherId when present.
+
+If a screen has no publisher selected, allow publisherId to be null.
+
+3. NEW PUBLISHER DROPDOWN API (IF NOT ALREADY EXISTING)
+
+If not already implemented, add:
+
+GET /api/publishers/dropdown
+
+Return:
+
+{
+  id: string;
+  label: string;           // e.g. "John Doe (Individual)" or "FleetCo Ltd (Organisation)"
+  publisherType: "organisation" | "individual";
+  organisationId?: string | null;
+}
+
+
+This should be:
+
+Internal only (beamer_internal users).
+
+Optionally publisher users can only see their own profile.
+
+Then add a frontend helper:
+
+export async function getPublisherOptions(): Promise<PublisherOption[]>;
+
+4. SCREEN FORM MODAL (cms-web/src/components/ScreenFormModal.tsx)
+
+Update the create/edit form:
+
+Replace the old “Publisher Organisation” dropdown
+with a new “Publisher” dropdown using getPublisherOptions().
+
+Display label from the API:
+
+John Doe (Individual)
+
+FleetCo Ltd (Organisation)
+
+Bind selected value to publisherId in form state.
+
+On submit:
+
+Include publisherId in the payload (or null).
+
+Ensure:
+
+Existing classification fields (vehicle/billboard/indoor) still work.
+
+Player dropdown integration remains unchanged.
+
+Permissions logic (who can create/edit screens) remains unchanged.
+
+5. SCREENS LIST PAGE (cms-web/src/pages/Screens.tsx)
+
+Update the table to show publisher based on screen.publisher.
+
+Replace any org-only publisher column with a new “Publisher” column.
+
+Display:
+
+If publisher.publisherType === "individual":
+publisher.fullName (e.g. "John Doe")
+
+If "organisation" and publisher.organisation exists:
+publisher.organisation.name (e.g. "FleetCo Ltd")
+
+If no publisher: —
+
+Optionally, you can append a badge:
+
+“Individual Publisher”
+
+“Organisation Publisher”
+
+Do not remove any other existing columns (Type, Status, etc.).
+
+6. SCREEN DETAIL PAGE (cms-web/src/pages/ScreenDetail.tsx)
+
+In the Overview section:
+
+Add/adjust the “Publisher” section to read from screen.publisher.
+
+Show:
+
+Name:
+
+Individual → fullName
+
+Organisation → organisation.name
+
+Type badge: “Individual Publisher” or “Organisation Publisher”
+
+Email, phone (if available)
+
+Remove any references that assume publisher is only an organisation.
+
+Don’t touch PoP/heartbeats tabs.
+
+7. PERMISSIONS & BEHAVIOUR
+
+Do NOT change who can see Screens or edit them.
+
+Do NOT change who can see Publishers/Advertisers (route guards remain as implemented in Phase 3A).
+
+Just make sure screen creation/editing uses publisherId correctly.
+
+8. VALIDATION & SANITY CHECK
+
+When you’re done:
+
+Confirm npm run build / TypeScript passes (backend + frontend).
+
+Confirm:
+
+Screens list loads and shows the new Publisher column correctly.
+
+Screen detail shows correct publisher info.
+
+Creating a new screen allows selecting a publisher, saves it, and it appears on list & detail.
+
+Editing an existing screen can change publisher.
+
+Screens without publishers still work (publisher section shows —).
+
+Confirm no regressions in:
+
+Screen classification fields.
+
+Player assignment.
+
+Existing Publishers / Advertisers pages.
+
+Finally, summarise:
+
+Files changed.
+
+Final Screen / ScreenDetail types.
+
+Example JSON for a screen with:
+
+Individual publisher
+
+Organisation publisher
