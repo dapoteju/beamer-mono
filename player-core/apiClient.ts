@@ -1,6 +1,6 @@
 import { PlayerConfig, Playlist, PlaybackEvent, HeartbeatEvent } from "./types";
 
-const BASE_URL = "https://eecf164c-d39e-4080-aa4d-7c1a918a73be-00-sdkqh1jj8ea.spock.replit.dev:3000/api/player";
+const BASE_URL = "https://17d379ae-de32-486e-8229-49811a28d432-00-1vcd9a1z4xejy.spock.replit.dev/api/player";//change this to your api url
 
 // Helper: build Authorization header
 function authHeader(auth_token: string) {
