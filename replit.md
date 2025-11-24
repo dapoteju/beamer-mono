@@ -102,7 +102,55 @@ npm run lint         # Run ESLint
 - **Issue Fixed**: Removed git lockfile that was preventing commits
 - Node modules and build artifacts are now properly excluded from git
 
+## Authentication System
+
+### Implementation Details
+- **JWT-based authentication** with 7-day token expiration
+- **Bcrypt password hashing** with 10 salt rounds
+- **Role-based access control**: admin, ops, viewer
+- **Protected registration**: Only admins can create new users
+
+### Database Schema
+Users table includes:
+- `id` (UUID)
+- `email` (unique)
+- `password_hash` (bcrypt)
+- `full_name`
+- `org_id` (references organisations)
+- `role` (enum: admin, ops, viewer)
+- `created_at`, `updated_at`
+
+### API Endpoints
+- `POST /api/auth/login` - Login with email/password
+- `GET /api/auth/me` - Get current user (requires JWT)
+- `POST /api/auth/register` - Create user (admin only)
+- `POST /api/auth/logout` - Logout (stateless)
+
+### Initial Admin User
+- **Email**: admin@beamer.com
+- **Password**: beamer123
+- **Role**: admin
+- **Created via**: `npm run seed:admin`
+
+### Security Features
+- No public registration (prevents unauthorized access)
+- Admin-only user creation (prevents privilege escalation)
+- JWT middleware for route protection
+- Environment-based JWT secret
+
 ## Recent Changes
+- November 24, 2025: Authentication System Implementation
+  - Created comprehensive JWT-based authentication system
+  - Implemented user management with role-based access control (admin, ops, viewer)
+  - Added bcrypt password hashing for security
+  - Created auth endpoints: login, register (admin-only), me, logout
+  - Built JWT middleware for protecting routes
+  - Added seed script for initial admin user (admin@beamer.com / beamer123)
+  - Configured JWT_SECRET environment variable
+  - Exported TypeScript types for CMS integration
+  - Documented complete API in AUTH_SETUP.md
+  - Security: Fixed privilege escalation vulnerability by requiring admin auth for registration
+
 - November 24, 2025: Database Migration from Legacy Database
   - Created migration scripts to transfer data from old Replit database
   - Successfully migrated all data (organisations, regions, screens, campaigns, creatives, bookings, flights, invoices)
