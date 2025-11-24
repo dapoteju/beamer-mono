@@ -128,6 +128,25 @@ Users table includes:
 - `role` (enum: admin, ops, viewer)
 - `created_at`, `updated_at`
 
+### Auth Response Format
+Login and /me endpoints return:
+```json
+{
+  "token": "JWT token (includes userId, email, orgId, role, orgType)",
+  "user": {
+    "id": "user UUID",
+    "email": "user@example.com",
+    "fullName": "User Name",
+    "orgId": "organisation UUID",
+    "role": "admin | ops | viewer",
+    "orgType": "advertiser | publisher | beamer_internal",
+    "orgName": "Organisation Name",
+    "createdAt": "ISO timestamp",
+    "updatedAt": "ISO timestamp"
+  }
+}
+```
+
 ### API Endpoints
 - `POST /api/auth/login` - Login with email/password
 - `GET /api/auth/me` - Get current user (requires JWT)
@@ -174,6 +193,15 @@ Users table includes:
 - `cms-web/src/main.tsx` - Added AuthInitializer for proper hydration
 
 ## Recent Changes
+- November 24, 2025: Extended Auth System with Organization Context
+  - Added orgType and orgName to User response type
+  - Extended JWT payload to include orgType for authorization decisions
+  - Modified auth service to load organisation details via database join
+  - All auth endpoints (login, /me, register) now return complete org context
+  - Updated frontend User interface to match backend changes
+  - Architect verified: no security issues, minimal performance impact
+  - Test results: Both login and /me endpoints successfully return org details
+
 - November 24, 2025: Fixed API Connectivity Issue
   - Configured Vite proxy to forward /api requests to backend
   - Updated API client to use relative URLs instead of hardcoded localhost
