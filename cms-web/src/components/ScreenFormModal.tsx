@@ -141,15 +141,31 @@ export function ScreenFormModal({ mode, screenId, initialValues, onClose, onSucc
   );
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div className="bg-white rounded-lg p-6 w-full max-w-lg max-h-[90vh] overflow-y-auto">
-        <h2 className="text-2xl font-bold mb-4">
-          {mode === "create" ? "Create Screen" : "Edit Screen"}
-        </h2>
+    <div 
+      className="fixed inset-0 bg-zinc-900/20 backdrop-blur-sm flex items-center justify-center z-50 p-4"
+      onClick={onClose}
+    >
+      <div 
+        className="bg-white rounded-lg shadow-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto p-6"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-center justify-between mb-6">
+          <h2 className="text-xl font-semibold text-zinc-900">
+            {mode === "create" ? "Create Screen" : "Edit Screen"}
+          </h2>
+          <button
+            onClick={onClose}
+            className="text-zinc-400 hover:text-zinc-600 text-2xl leading-none"
+            type="button"
+            disabled={isSubmitting}
+          >
+            ×
+          </button>
+        </div>
 
-        <form onSubmit={handleSubmit}>
+        <form onSubmit={handleSubmit} className="space-y-4">
           {/* Name */}
-          <div className="mb-4">
+          <div>
             <label className="block text-sm font-medium text-zinc-700 mb-1">
               Name <span className="text-red-500">*</span>
             </label>
@@ -166,7 +182,7 @@ export function ScreenFormModal({ mode, screenId, initialValues, onClose, onSucc
           </div>
 
           {/* City */}
-          <div className="mb-4">
+          <div>
             <label className="block text-sm font-medium text-zinc-700 mb-1">
               City <span className="text-red-500">*</span>
             </label>
@@ -183,7 +199,7 @@ export function ScreenFormModal({ mode, screenId, initialValues, onClose, onSucc
           </div>
 
           {/* Region */}
-          <div className="mb-4">
+          <div>
             <label className="block text-sm font-medium text-zinc-700 mb-1">
               Region <span className="text-red-500">*</span>
             </label>
@@ -205,7 +221,7 @@ export function ScreenFormModal({ mode, screenId, initialValues, onClose, onSucc
           </div>
 
           {/* Publisher (internal only, or disabled for edit if publisher) */}
-          <div className="mb-4">
+          <div>
             <label className="block text-sm font-medium text-zinc-700 mb-1">
               Publisher <span className="text-red-500">*</span>
             </label>
@@ -236,7 +252,7 @@ export function ScreenFormModal({ mode, screenId, initialValues, onClose, onSucc
           </div>
 
           {/* Status */}
-          <div className="mb-4">
+          <div>
             <label className="block text-sm font-medium text-zinc-700 mb-1">Status</label>
             <select
               value={formData.status}
@@ -250,7 +266,7 @@ export function ScreenFormModal({ mode, screenId, initialValues, onClose, onSucc
           </div>
 
           {/* Player Assignment */}
-          <div className="mb-4">
+          <div>
             <label className="block text-sm font-medium text-zinc-700 mb-1">Player</label>
             <select
               value={formData.playerId}
@@ -272,7 +288,7 @@ export function ScreenFormModal({ mode, screenId, initialValues, onClose, onSucc
 
           {/* Submit error */}
           {errors.submit && (
-            <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-md">
+            <div className="p-3 bg-red-50 border border-red-200 rounded-md">
               <p className="text-red-700 text-sm">{errors.submit}</p>
             </div>
           )}
