@@ -1,0 +1,226 @@
+I now have Organisations management in my Beamer project with:
+
+Backend routes in: backend/src/modules/organisations/organisations.routes.ts
+
+CMS frontend in: cms-web
+
+Full auth and org-type/role guards already implemented
+
+Organisations list + detail pages working
+
+I want you to extend this with full Create + Edit organisation support, end-to-end.
+
+1. BACKEND — Add "Create Organisation" Endpoint
+
+In backend/src/modules/organisations/organisations.routes.ts:
+
+Add a new endpoint:
+
+POST /api/organisations
+
+Behaviour:
+
+Use requireAuth middleware
+
+Permission check:
+
+Only users whose user.orgType === 'beamer_internal' AND
+user.role in (admin, ops) can create organisations
+
+Others → return 403 { error: "Forbidden" }
+
+Accept the following payload:
+{
+  "name": string,
+  "country": string,
+  "billing_email": string,
+  "type": "advertiser" | "publisher"
+}
+
+Validation:
+
+name: required
+
+country: required
+
+billing_email: must be valid email
+
+type: must be ONLY "advertiser" or "publisher"
+❌ Never allow creating a beamer_internal org from the API
+(This should only be created manually or via seeds.)
+
+Create a new organisation with:
+
+a generated text ID (consistent with the rest of system)
+
+timestamps
+
+type / country / billing_email
+
+Return the new organisation.
+
+2. BACKEND — Update Organisation Enhancements
+
+Update the PATCH /api/organisations/:id endpoint to ensure:
+
+Allowed fields to update:
+
+name
+
+country
+
+billing_email
+
+type → only between "advertiser" ↔ "publisher"
+
+Forbidden:
+
+Changing to/from "beamer_internal"
+
+Changing the organisation id
+
+Return the updated organisation.
+
+3. CMS FRONTEND — Add "Create Organisation" UI
+
+In cms-web/src/pages/Organisations.tsx:
+
+Add a "Create Organisation" button:
+
+Visible ONLY to internal users with role admin or ops
+
+Place it above the organisations table (aligned to the right)
+
+Clicking "Create Organisation" opens a modal with form fields:
+
+Name (required)
+
+Type (select: Advertiser, Publisher)
+
+Country (required)
+
+Billing Email (email input)
+
+On submit:
+
+Call POST /api/organisations
+
+Show loading state
+
+On success:
+
+Close modal
+
+Refresh organisations list (refetch or invalidate query)
+
+Navigate to /organisations/:id (optional, nice UX)
+
+On error:
+
+Show inline error message
+
+Permissions:
+
+If user is NOT:
+
+orgType: beamer_internal
+
+role: admin or ops
+
+→ Hide "Create Organisation" button entirely.
+
+4. CMS FRONTEND — Update Organisation UI (Expanded)
+
+In both:
+
+cms-web/src/pages/Organisations.tsx
+
+cms-web/src/pages/OrganisationDetail.tsx
+
+Add/Edit Organisation Form:
+
+Use the same component for edit modal and create modal (if convenient)
+
+For edit:
+
+Pre-fill fields with existing values
+
+Disable selecting “Internal”
+
+For create:
+
+All fields blank
+
+Only allow advertiser/publisher
+
+After updating:
+
+Refresh the detail page
+
+Refresh the list page
+
+Show a toast or inline "Saved successfully" message
+
+5. Shared Components & Types
+
+In cms-web/src/api/organisations.ts:
+
+Add:
+
+createOrganisation(payload: CreateOrganisationPayload)
+
+updateOrganisation(id: string, payload: UpdateOrganisationPayload)
+
+TS interfaces:
+
+export interface CreateOrganisationPayload {
+  name: string;
+  country: string;
+  billing_email: string;
+  type: "advertiser" | "publisher";
+}
+
+export interface UpdateOrganisationPayload {
+  name?: string;
+  country?: string;
+  billing_email?: string;
+  type?: "advertiser" | "publisher";
+}
+
+
+Make sure both functions:
+
+automatically attach Authorization header
+
+return typed responses
+
+6. Guards & Redirects
+Ensure:
+
+Only internal org users (admin/ops) can open:
+
+Create modal
+
+Edit modal
+
+POST or PATCH requests
+
+If a publisher/advertiser tries to navigate to /organisations/new or manually trigger an edit:
+
+Redirect them to /dashboard
+
+Keep all existing org-type guards untouched.
+
+7. Deliverables
+
+When you finish, please tell me:
+
+All backend files changed
+
+All frontend files changed
+
+Example payloads for both create and update
+
+How to test create + update flows through CMS
+
+Any validations or guards added

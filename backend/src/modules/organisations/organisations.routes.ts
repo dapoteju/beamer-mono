@@ -59,10 +59,19 @@ organisationsRouter.post('/', requireAuth, async (req: AuthRequest, res: Respons
       });
     }
 
-    const validTypes = ['advertiser', 'publisher', 'beamer_internal'];
+    // Only allow creating advertiser or publisher orgs (never beamer_internal)
+    const validTypes = ['advertiser', 'publisher'];
     if (!validTypes.includes(type)) {
       return res.status(400).json({
-        error: `Invalid type. Must be one of: ${validTypes.join(', ')}`,
+        error: 'Invalid type. Only "advertiser" and "publisher" organisations can be created via API.',
+      });
+    }
+
+    // Simple email validation
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(billing_email)) {
+      return res.status(400).json({
+        error: 'Invalid billing_email format',
       });
     }
 
@@ -156,6 +165,88 @@ organisationsRouter.get('/:id', requireAuth, async (req: AuthRequest, res: Respo
       campaigns: relatedCampaigns,
       bookings: relatedBookings,
     });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// PATCH /api/organisations/:id - Update an organisation (protected)
+organisationsRouter.patch('/:id', requireAuth, async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    if (!hasOrgManagementPermission(req)) {
+      return res.status(403).json({ 
+        error: 'Access denied. Only internal users with admin or ops roles can update organisations.' 
+      });
+    }
+
+    const { id } = req.params;
+    const { name, type, billing_email, country } = req.body || {};
+
+    // Check if organisation exists
+    const [existingOrg] = await db
+      .select()
+      .from(organisations)
+      .where(eq(organisations.id, id));
+
+    if (!existingOrg) {
+      return res.status(404).json({ error: 'Organisation not found' });
+    }
+
+    // Validate type changes
+    if (type) {
+      // Only allow advertiser <-> publisher changes (never to/from beamer_internal)
+      const validTypes = ['advertiser', 'publisher'];
+      if (!validTypes.includes(type)) {
+        return res.status(400).json({
+          error: 'Invalid type. Can only update to "advertiser" or "publisher".',
+        });
+      }
+
+      // Prevent changing to/from beamer_internal
+      if (existingOrg.type === 'beamer_internal' || type === 'beamer_internal') {
+        return res.status(400).json({
+          error: 'Cannot change organisation type to or from "beamer_internal".',
+        });
+      }
+    }
+
+    // Validate email if provided
+    if (billing_email) {
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(billing_email)) {
+        return res.status(400).json({
+          error: 'Invalid billing_email format',
+        });
+      }
+    }
+
+    // Build update object with only provided fields
+    const updateData: any = {};
+    if (name !== undefined) updateData.name = name;
+    if (type !== undefined) updateData.type = type;
+    if (billing_email !== undefined) updateData.billingEmail = billing_email;
+    if (country !== undefined) updateData.country = country;
+
+    if (Object.keys(updateData).length === 0) {
+      return res.status(400).json({
+        error: 'No fields to update',
+      });
+    }
+
+    const [updatedOrg] = await db
+      .update(organisations)
+      .set(updateData)
+      .where(eq(organisations.id, id))
+      .returning({
+        id: organisations.id,
+        name: organisations.name,
+        type: organisations.type,
+        country: organisations.country,
+        billing_email: organisations.billingEmail,
+        created_at: organisations.createdAt,
+      });
+
+    res.json(updatedOrg);
   } catch (err) {
     next(err);
   }

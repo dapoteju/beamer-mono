@@ -1,34 +1,38 @@
 import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { fetchOrganisationById, type OrganisationDetail } from "../api/organisations";
+import { useAuthStore } from "../store/authStore";
+import OrganisationFormModal from "../components/OrganisationFormModal";
 
 export default function OrganisationDetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const { user } = useAuthStore();
   const [organisation, setOrganisation] = useState<OrganisationDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<"overview" | "screens" | "campaigns">("overview");
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+
+  async function loadOrganisation() {
+    if (!id) return;
+
+    try {
+      setLoading(true);
+      setError(null);
+      const data = await fetchOrganisationById(id);
+      setOrganisation(data);
+    } catch (err: any) {
+      console.error("Failed to fetch organisation:", err);
+      setError(
+        err.response?.data?.error || "Failed to load organisation details. Please try again."
+      );
+    } finally {
+      setLoading(false);
+    }
+  }
 
   useEffect(() => {
-    async function loadOrganisation() {
-      if (!id) return;
-
-      try {
-        setLoading(true);
-        setError(null);
-        const data = await fetchOrganisationById(id);
-        setOrganisation(data);
-      } catch (err: any) {
-        console.error("Failed to fetch organisation:", err);
-        setError(
-          err.response?.data?.error || "Failed to load organisation details. Please try again."
-        );
-      } finally {
-        setLoading(false);
-      }
-    }
-
     loadOrganisation();
   }, [id]);
 
@@ -98,6 +102,12 @@ export default function OrganisationDetail() {
     );
   }
 
+  const canEditOrg = user?.orgType === "beamer_internal" && (user?.role === "admin" || user?.role === "ops");
+
+  function handleEditSuccess() {
+    loadOrganisation();
+  }
+
   return (
     <div>
       <button
@@ -107,20 +117,30 @@ export default function OrganisationDetail() {
         ← Back to Organisations
       </button>
 
-      <div className="mb-6">
-        <div className="flex items-center gap-3 mb-2">
-          <h1 className="text-2xl font-semibold text-zinc-900">{organisation.name}</h1>
-          <span
-            className={`px-2 py-1 text-xs font-medium rounded ${getOrgTypeBadgeColor(
-              organisation.type
-            )}`}
-          >
-            {formatOrgType(organisation.type)}
-          </span>
+      <div className="mb-6 flex items-start justify-between">
+        <div>
+          <div className="flex items-center gap-3 mb-2">
+            <h1 className="text-2xl font-semibold text-zinc-900">{organisation.name}</h1>
+            <span
+              className={`px-2 py-1 text-xs font-medium rounded ${getOrgTypeBadgeColor(
+                organisation.type
+              )}`}
+            >
+              {formatOrgType(organisation.type)}
+            </span>
+          </div>
+          <p className="text-sm text-zinc-600">
+            Organisation ID: {organisation.id}
+          </p>
         </div>
-        <p className="text-sm text-zinc-600">
-          Organisation ID: {organisation.id}
-        </p>
+        {canEditOrg && (
+          <button
+            onClick={() => setIsEditModalOpen(true)}
+            className="px-4 py-2 bg-white border border-zinc-300 text-zinc-700 rounded-md hover:bg-zinc-50 transition-colors text-sm font-medium"
+          >
+            Edit Organisation
+          </button>
+        )}
       </div>
 
       <div className="bg-white rounded-lg border border-zinc-200 overflow-hidden mb-6">
@@ -337,6 +357,14 @@ export default function OrganisationDetail() {
           )}
         </div>
       </div>
+
+      <OrganisationFormModal
+        isOpen={isEditModalOpen}
+        onClose={() => setIsEditModalOpen(false)}
+        onSuccess={handleEditSuccess}
+        organisation={organisation}
+        mode="edit"
+      />
     </div>
   );
 }

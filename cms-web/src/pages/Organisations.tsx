@@ -1,30 +1,34 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { fetchOrganisations, type Organisation } from "../api/organisations";
+import { useAuthStore } from "../store/authStore";
+import OrganisationFormModal from "../components/OrganisationFormModal";
 
 export default function Organisations() {
   const [organisations, setOrganisations] = useState<Organisation[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const navigate = useNavigate();
+  const { user } = useAuthStore();
+
+  async function loadOrganisations() {
+    try {
+      setLoading(true);
+      setError(null);
+      const data = await fetchOrganisations();
+      setOrganisations(data);
+    } catch (err: any) {
+      console.error("Failed to fetch organisations:", err);
+      setError(
+        err.response?.data?.error || "Failed to load organisations. Please try again."
+      );
+    } finally {
+      setLoading(false);
+    }
+  }
 
   useEffect(() => {
-    async function loadOrganisations() {
-      try {
-        setLoading(true);
-        setError(null);
-        const data = await fetchOrganisations();
-        setOrganisations(data);
-      } catch (err: any) {
-        console.error("Failed to fetch organisations:", err);
-        setError(
-          err.response?.data?.error || "Failed to load organisations. Please try again."
-        );
-      } finally {
-        setLoading(false);
-      }
-    }
-
     loadOrganisations();
   }, []);
 
@@ -79,13 +83,29 @@ export default function Organisations() {
     );
   }
 
+  const canCreateOrg = user?.orgType === "beamer_internal" && (user?.role === "admin" || user?.role === "ops");
+
+  function handleCreateSuccess() {
+    loadOrganisations();
+  }
+
   return (
     <div>
-      <div className="mb-6">
-        <h1 className="text-2xl font-semibold text-zinc-900">Organisations</h1>
-        <p className="text-sm text-zinc-600 mt-1">
-          Manage all advertisers, publishers, and internal organisations.
-        </p>
+      <div className="mb-6 flex items-start justify-between">
+        <div>
+          <h1 className="text-2xl font-semibold text-zinc-900">Organisations</h1>
+          <p className="text-sm text-zinc-600 mt-1">
+            Manage all advertisers, publishers, and internal organisations.
+          </p>
+        </div>
+        {canCreateOrg && (
+          <button
+            onClick={() => setIsCreateModalOpen(true)}
+            className="px-4 py-2 bg-cyan-600 text-white rounded-md hover:bg-cyan-700 transition-colors text-sm font-medium"
+          >
+            + Create Organisation
+          </button>
+        )}
       </div>
 
       <div className="bg-white rounded-lg border border-zinc-200 overflow-hidden">
@@ -152,6 +172,13 @@ export default function Organisations() {
           </tbody>
         </table>
       </div>
+
+      <OrganisationFormModal
+        isOpen={isCreateModalOpen}
+        onClose={() => setIsCreateModalOpen(false)}
+        onSuccess={handleCreateSuccess}
+        mode="create"
+      />
     </div>
   );
 }

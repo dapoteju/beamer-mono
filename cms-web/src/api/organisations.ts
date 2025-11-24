@@ -46,6 +46,20 @@ export interface OrganisationDetail extends Organisation {
   bookings: Booking[];
 }
 
+export interface CreateOrganisationPayload {
+  name: string;
+  country: string;
+  billing_email: string;
+  type: "advertiser" | "publisher";
+}
+
+export interface UpdateOrganisationPayload {
+  name?: string;
+  country?: string;
+  billing_email?: string;
+  type?: "advertiser" | "publisher";
+}
+
 export async function fetchOrganisations(): Promise<Organisation[]> {
   const response = await apiClient.get<Organisation[]>("/organisations");
   return response.data;
@@ -53,5 +67,18 @@ export async function fetchOrganisations(): Promise<Organisation[]> {
 
 export async function fetchOrganisationById(id: string): Promise<OrganisationDetail> {
   const response = await apiClient.get<OrganisationDetail>(`/organisations/${id}`);
+  return response.data;
+}
+
+export async function createOrganisation(payload: CreateOrganisationPayload): Promise<Organisation> {
+  const response = await apiClient.post<Organisation>("/organisations", payload);
+  return response.data;
+}
+
+export async function updateOrganisation(
+  id: string,
+  payload: UpdateOrganisationPayload
+): Promise<Organisation> {
+  const response = await apiClient.patch<Organisation>(`/organisations/${id}`, payload);
   return response.data;
 }
