@@ -171,6 +171,11 @@ export async function fetchFlights(campaignId: string): Promise<Flight[]> {
   return response.data.data;
 }
 
+export async function fetchFlightById(flightId: string): Promise<Flight> {
+  const response = await apiClient.get(`/flights/${flightId}`);
+  return response.data.data;
+}
+
 export async function createFlight(campaignId: string, payload: CreateFlightPayload): Promise<Flight> {
   const response = await apiClient.post(`/campaigns/${campaignId}/flights`, payload);
   return response.data.data;

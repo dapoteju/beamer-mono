@@ -7,6 +7,7 @@ import Dashboard from "../pages/Dashboard";
 import Campaigns from "../pages/Campaigns";
 import CampaignNew from "../pages/CampaignNew";
 import CampaignDetail from "../pages/CampaignDetail";
+import FlightDetail from "../pages/FlightDetail";
 import Screens from "../pages/Screens";
 import ScreenDetail from "../pages/ScreenDetail";
 import Organisations from "../pages/Organisations";
@@ -80,6 +81,7 @@ export const router = createBrowserRouter([
       { path: "campaigns", element: <Campaigns /> },
       { path: "campaigns/new", element: <CampaignNew /> },
       { path: "campaigns/:id", element: <CampaignDetail /> },
+      { path: "flights/:id", element: <FlightDetail /> },
       {
         path: "screens",
         element: (

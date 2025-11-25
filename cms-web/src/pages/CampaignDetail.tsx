@@ -429,12 +429,20 @@ export default function CampaignDetail() {
                         {flight.targetId}
                       </td>
                       <td className="px-4 py-3">
-                        <button
-                          onClick={() => handleEditFlight(flight.id)}
-                          className="text-sm text-blue-600 hover:text-blue-700"
-                        >
-                          Edit
-                        </button>
+                        <div className="flex gap-3">
+                          <button
+                            onClick={() => navigate(`/flights/${flight.id}`)}
+                            className="text-sm text-blue-600 hover:text-blue-700"
+                          >
+                            View
+                          </button>
+                          <button
+                            onClick={() => handleEditFlight(flight.id)}
+                            className="text-sm text-zinc-600 hover:text-zinc-700"
+                          >
+                            Edit
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   ))}

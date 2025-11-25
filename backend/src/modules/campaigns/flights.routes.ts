@@ -21,6 +21,29 @@ function canAccessCampaign(req: AuthRequest, campaignAdvertiserOrgId: string): b
   return false;
 }
 
+// GET /api/flights/:id
+router.get("/:id", requireAuth, async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const flight = await flightsService.getFlightById(req.params.id);
+    if (!flight) {
+      return res.status(404).json({ status: "error", message: "Flight not found" });
+    }
+
+    const campaign = await getCampaignById(flight.campaignId);
+    if (!campaign) {
+      return res.status(404).json({ status: "error", message: "Campaign not found" });
+    }
+
+    if (!canAccessCampaign(req, campaign.advertiserOrgId)) {
+      return res.status(403).json({ status: "error", message: "Forbidden" });
+    }
+
+    res.json({ status: "success", data: flight });
+  } catch (err) {
+    next(err);
+  }
+});
+
 // PUT /api/flights/:id
 router.put("/:id", requireAuth, async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
