@@ -28,7 +28,7 @@ The project is organized as a monorepo with distinct applications and libraries:
 - Interactive charts (Line Chart, Bar Chart) using Recharts for campaign reporting.
 
 ### Feature Specifications
-- **Authentication**: JWT-based with 7-day expiration, Bcrypt hashing, and role-based access control (`admin`, `ops`, `viewer`). Protected registration.
+- **Authentication**: JWT-based with 7-day expiration, Bcrypt hashing, and role-based access control (`admin`, `ops`, `viewer`). Protected registration. Includes password reset flow with secure token generation (1-hour expiry) and initial admin setup endpoint for production deployments.
 - **API Modules**: Comprehensive API for health checks, organizations, screens, publishers, advertisers, regions, campaigns, flights, creatives, bookings, invoices, and reports.
 - **Screens & Players Management**: Full CRUD for screens with permission-based access, atomic transactions, player swapping logic, and comprehensive validation. Supports three screen types (Vehicle-mounted, Billboard/Static, Indoor) with extended metadata and dynamic CMS UI.
 - **Publishers & Advertisers Separation**: Database restructuring to differentiate publishers and advertisers. Dedicated CRUD API endpoints and refined UI for managing both, ensuring permission-based access and data integrity.
