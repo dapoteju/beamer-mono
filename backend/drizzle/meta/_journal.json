@@ -15,6 +15,13 @@
       "when": 1763901413400,
       "tag": "0001_flat_harry_osborn",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1764086996296,
+      "tag": "0002_add_heartbeat_metrics_columns",
+      "breakpoints": true
     }
   ]
 }

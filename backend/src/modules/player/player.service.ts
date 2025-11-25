@@ -38,6 +38,7 @@ type PlayEventInput = {
 
 type HeartbeatInput = {
   player_id: string;
+  screen_id?: string;
   timestamp: string; // ISO string
   status: string;
   software_version?: string;
@@ -45,12 +46,15 @@ type HeartbeatInput = {
     lat?: number;
     lng?: number;
     accuracy_m?: number;
+    timestamp?: string;
   };
   metrics?: {
     storage_free_mb?: number;
+    memory_free_mb?: number;
     cpu_usage?: number;
     network_type?: string;
     signal_strength?: number;
+    online?: boolean;
   };
 };
 
@@ -424,20 +428,22 @@ export class PlayerService {
       const lng = input.location?.lng ?? null;
 
       const storage_free_mb = input.metrics?.storage_free_mb ?? null;
+      const memory_free_mb = input.metrics?.memory_free_mb ?? null;
       const cpu_usage = input.metrics?.cpu_usage ?? null;
       const network_type = input.metrics?.network_type ?? null;
       const signal_strength = input.metrics?.signal_strength ?? null;
+      const online = input.metrics?.online ?? null;
 
       await client.query(
         `
         INSERT INTO public.heartbeats
           (player_id, screen_id, "timestamp", status, software_version,
-           storage_free_mb, cpu_usage, network_type, signal_strength,
+           storage_free_mb, memory_free_mb, cpu_usage, network_type, signal_strength, online,
            lat, lng)
         VALUES
           ($1,        $2,        $3,          $4,    $5,
-           $6,             $7,        $8,           $9,
-           $10, $11)
+           $6,             $7,              $8,        $9,           $10,             $11,
+           $12, $13)
         `,
         [
           input.player_id,
@@ -446,9 +452,11 @@ export class PlayerService {
           input.status,
           input.software_version ?? null,
           storage_free_mb,
+          memory_free_mb,
           cpu_usage,
           network_type,
           signal_strength,
+          online,
           lat,
           lng,
         ]

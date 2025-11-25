@@ -1,0 +1,229 @@
+You are working inside the folder: beamer-mono-main/backend
+
+Goal:
+Upgrade the backend player endpoints so they accept and store:
+1. GPS location in heartbeats and playback events.
+2. Basic device metrics in heartbeats.
+3. Enriched playback events (screen_id, status, location).
+4. Backward compatibility with existing player behaviour.
+
+This must integrate with the current Drizzle schema and code structure.
+
+──────────────────────────────────────
+STEP 1 — Update /api/player/heartbeats
+──────────────────────────────────────
+
+Find the heartbeat route:
+POST /api/player/heartbeats
+(in player.routes.ts)
+
+Update it to:
+1. Accept a HeartbeatEvent with fields:
+   {
+     player_id,
+     screen_id,
+     timestamp,
+     status,
+     software_version,
+     location?: { lat, lng, accuracy_m, timestamp },
+     metrics?: { cpu_usage, memory_free_mb, storage_free_mb, network_type, online }
+   }
+2. Validate player_id, screen_id, timestamp are present.
+3. Call a new service method: playerService.recordHeartbeat(hb)
+4. Return { status: "success" }
+
+EXAMPLE:
+
+router.post("/heartbeats", async (req, res) => {
+  try {
+    const hb = req.body;
+
+    if (!hb.player_id || !hb.screen_id || !hb.timestamp) {
+      return res.status(400).json({
+        status: "error",
+        message: "player_id, screen_id, and timestamp required"
+      });
+    }
+
+    await playerService.recordHeartbeat(hb);
+    return res.json({ status: "success" });
+  } catch (err) {
+    console.error("Heartbeat error", err);
+    return res.status(500).json({ status: "error", message: "server error" });
+  }
+});
+
+──────────────────────────────────────
+STEP 2 — Implement recordHeartbeat in player.service.ts
+──────────────────────────────────────
+
+Add/modify the method:
+
+export async function recordHeartbeat(hb: any) {
+  const {
+    player_id,
+    screen_id,
+    timestamp,
+    status,
+    software_version,
+    location,
+    metrics
+  } = hb;
+
+  const lat = location?.lat ?? null;
+  const lng = location?.lng ?? null;
+
+  const storage_free_mb = metrics?.storage_free_mb ?? null;
+  const cpu_usage = metrics?.cpu_usage ?? null;
+  const memory_free_mb = metrics?.memory_free_mb ?? null;
+  const network_type = metrics?.network_type ?? null;
+  const online = metrics?.online ?? null;
+
+  await db.insert(heartbeats).values({
+    player_id,
+    screen_id,
+    timestamp: new Date(timestamp),
+    status,
+    software_version,
+    lat,
+    lng,
+    storage_free_mb,
+    cpu_usage,
+    memory_free_mb,
+    network_type,
+    online
+  });
+
+  // Optional: update screen.last_seen_at = timestamp
+}
+
+Make sure this matches the DB schema. If any fields don’t exist, create a NEW migration (DO NOT edit old ones).
+
+──────────────────────────────────────
+STEP 3 — Update /api/player/events/playbacks
+──────────────────────────────────────
+
+Find the route:
+POST /api/player/events/playbacks
+
+Update it to accept a single enriched PlaybackEvent:
+{
+  creative_id,
+  screen_id,
+  played_at,
+  duration_seconds,
+  status,
+  location?: { lat, lng, accuracy_m, timestamp }
+}
+
+Handler:
+
+router.post("/events/playbacks", async (req, res) => {
+  try {
+    const ev = req.body;
+
+    if (!ev.creative_id || !ev.screen_id || !ev.played_at) {
+      return res.status(400).json({
+        status: "error",
+        message: "creative_id, screen_id, played_at required"
+      });
+    }
+
+    await playerService.recordPlayback(ev);
+    return res.json({ status: "success" });
+  } catch (err) {
+    console.error("Playback event error", err);
+    return res.status(500).json({ status: "error", message: "server error" });
+  }
+});
+
+──────────────────────────────────────
+STEP 4 — Implement recordPlayback in player.service.ts
+──────────────────────────────────────
+
+Add/modify:
+
+export async function recordPlayback(ev: any) {
+  const {
+    creative_id,
+    screen_id,
+    played_at,
+    duration_seconds,
+    status,
+    location
+  } = ev;
+
+  const lat = location?.lat ?? null;
+  const lng = location?.lng ?? null;
+
+  // If player_id not included, infer if possible.
+  // If not possible: set to null.
+  const player_id = ev.player_id ?? null;
+
+  await db.insert(playEvents).values({
+    player_id,
+    screen_id,
+    creative_id,
+    started_at: new Date(played_at),
+    duration_seconds,
+    play_status: status,
+    lat,
+    lng
+  });
+}
+
+Ensure field names match the Drizzle schema.
+
+──────────────────────────────────────
+STEP 5 — Update schema via migration (IF NEEDED)
+──────────────────────────────────────
+
+Open drizzle schema for Heartbeat and PlayEvent.
+
+Ensure the following fields exist:
+
+Heartbeats table must have:
+- player_id
+- screen_id
+- timestamp
+- status
+- software_version
+- lat, lng
+- storage_free_mb
+- cpu_usage
+- memory_free_mb
+- network_type
+- online
+
+PlayEvents table must have:
+- player_id
+- screen_id
+- creative_id
+- started_at
+- duration_seconds
+- play_status
+- lat, lng
+
+If ANY of these fields are missing, create a NEW migration.
+
+──────────────────────────────────────
+STEP 6 — Test
+──────────────────────────────────────
+
+After updating player-core (from the earlier prompt) and this backend:
+
+1. Run backend.
+2. Run player-electron.
+3. It should send:
+   - Heartbeats with GPS + metrics.
+   - Playback events with GPS.
+
+4. Confirm heartbeats & play events populate lat/lng in DB.
+
+──────────────────────────────────────
+
+After completing this prompt, the backend will fully support:
+- GPS-aware exposure reporting
+- Device health monitoring
+- Region-aware compliance + telemetry
+- Future fleet scaling

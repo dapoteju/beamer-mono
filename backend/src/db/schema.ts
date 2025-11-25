@@ -359,9 +359,11 @@ export const heartbeats = pgTable("heartbeats", {
   status: text("status").notNull(),
   softwareVersion: varchar("software_version", { length: 50 }),
   storageFreeMb: integer("storage_free_mb"),
+  memoryFreeMb: integer("memory_free_mb"),
   cpuUsage: numeric("cpu_usage", { precision: 5, scale: 2 }),
   networkType: varchar("network_type", { length: 20 }),
   signalStrength: integer("signal_strength"),
+  online: boolean("online"),
   lat: numeric("lat", { precision: 10, scale: 7 }),
   lng: numeric("lng", { precision: 10, scale: 7 }),
   createdAt: timestamp("created_at", { withTimezone: true })

@@ -64,18 +64,42 @@ router.get(
 );
 
 // POST /api/player/events/playbacks - Record play events (authenticated)
+// Accepts either a single event object or an array of events for backward compatibility
 router.post(
   "/events/playbacks",
   authenticatePlayer,
   async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
     try {
-      const { events } = req.body;
       const playerId = req.player!.player_id;
+      const body = req.body;
 
-      if (!Array.isArray(events) || events.length === 0) {
+      let events: any[];
+
+      // Support both single event and array format
+      if (Array.isArray(body.events)) {
+        events = body.events;
+      } else if (body.creative_id) {
+        // Single event format: { creative_id, screen_id, played_at, duration_seconds, status, location }
+        events = [{
+          creative_id: body.creative_id,
+          campaign_id: body.campaign_id || null,
+          flight_id: body.flight_id || null,
+          started_at: body.played_at || body.started_at,
+          duration_seconds: body.duration_seconds,
+          play_status: body.status || body.play_status || 'success',
+          location: body.location,
+        }];
+      } else {
         return res.status(400).json({
           status: "error",
-          message: "events must be a non-empty array",
+          message: "Request must contain either 'events' array or single event with 'creative_id'",
+        });
+      }
+
+      if (events.length === 0) {
+        return res.status(400).json({
+          status: "error",
+          message: "No events to record",
         });
       }
 
