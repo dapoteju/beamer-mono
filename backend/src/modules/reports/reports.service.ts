@@ -1172,25 +1172,31 @@ export async function getCampaignComplianceReport(
   const heartbeatsByScreen = new Set(heartbeatsByScreenResult.map(r => r.screenId));
 
   // Step 5b: Get heartbeats per screen per day for daily compliance tracking
-  const heartbeatsByScreenByDayResult = await db.execute(sql`
-    SELECT
-      ${heartbeats.screenId} AS screen_id,
-      DATE(${heartbeats.timestamp}) AS date
-    FROM ${heartbeats}
-    WHERE ${heartbeats.screenId} = ANY(${scheduledScreenIdsArray})
-      AND ${heartbeats.timestamp} >= ${effectiveStartDate}::date
-      AND ${heartbeats.timestamp} < (${effectiveEndDate}::date + INTERVAL '1 day')
-    GROUP BY ${heartbeats.screenId}, DATE(${heartbeats.timestamp})
-  `);
+  const heartbeatsByScreenByDayResult = scheduledScreenIdsArray.length > 0 
+    ? await db
+        .select({
+          screenId: heartbeats.screenId,
+          date: sql<string>`DATE(${heartbeats.timestamp})::text`,
+        })
+        .from(heartbeats)
+        .where(
+          and(
+            inArray(heartbeats.screenId, scheduledScreenIdsArray),
+            gte(heartbeats.timestamp, new Date(effectiveStartDate)),
+            lte(heartbeats.timestamp, new Date(effectiveEndDate + 'T23:59:59.999Z'))
+          )
+        )
+        .groupBy(heartbeats.screenId, sql`DATE(${heartbeats.timestamp})`)
+    : [];
 
   // Build a map of date -> Set<screenId> for screens with heartbeats
   const heartbeatsByDay = new Map<string, Set<string>>();
-  for (const row of heartbeatsByScreenByDayResult.rows as any[]) {
+  for (const row of heartbeatsByScreenByDayResult) {
     const dateStr = row.date;
     if (!heartbeatsByDay.has(dateStr)) {
       heartbeatsByDay.set(dateStr, new Set());
     }
-    heartbeatsByDay.get(dateStr)!.add(row.screen_id);
+    heartbeatsByDay.get(dateStr)!.add(row.screenId);
   }
 
   // Step 6: Get screen metadata for all scheduled screens
