@@ -34,6 +34,7 @@ The project is organized as a monorepo with distinct applications and libraries:
 - **Publishers & Advertisers Separation**: Database restructuring to differentiate publishers and advertisers. Dedicated CRUD API endpoints and refined UI for managing both, ensuring permission-based access and data integrity.
 - **Campaigns & Flights Management**: Full CRUD for campaigns and nested flights with permission-based access, filtering, status management, and targeting capabilities (screen/screen_group).
 - **Campaign Reporting**: API endpoint for campaign summaries with raw play event data. Frontend reporting page with campaign selector, date range picker, summary cards, data tables, and interactive charts (line and bar charts) for daily and screen-level impressions. Includes CSV export functionality.
+- **Exposure Reporting**: Geographic visualization of ad impressions showing where ads were displayed. Clusters impressions by location (4 decimal precision) with circle markers sized by impression count. Static screens (billboard/indoor) show single location while vehicle screens show multiple exposure points based on GPS history. API endpoint at `/api/reports/campaigns/:id/exposure`.
 - **Development Tools**: Comprehensive seed script (`backend/scripts/seed.ts`) for deterministic and idempotent generation of extensive demo data, including organizations, users, publishers, screens, campaigns, and play events.
 
 ### System Design Choices
