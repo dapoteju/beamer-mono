@@ -5,8 +5,6 @@ function isNodeEnv() {
 }
 
 function getFsAndPath() {
-  // Lazy require so this file still loads in browser sim
-  // but only actually uses fs/path in Node/Electron
   const fs = require("fs") as typeof import("fs");
   const path = require("path") as typeof import("path");
   return { fs, path };
@@ -24,7 +22,7 @@ function getCacheDir() {
 function getExtensionFromUrl(url: string): string {
   try {
     const parsed = new URL(url);
-    const pathname = parsed.pathname; // <-- CORRECT
+    const pathname = parsed.pathname;
     const lastSegment = pathname.split("/").pop() || "";
     const extMatch = lastSegment.match(/\.(\w+)$/);
     return extMatch ? extMatch[0] : "";
@@ -33,10 +31,23 @@ function getExtensionFromUrl(url: string): string {
   }
 }
 
+export function isAssetValid(localPath: string | undefined | null): boolean {
+  if (!localPath) return false;
+  if (!isNodeEnv()) return true;
 
-async function cacheCreative(creative: Creative): Promise<Creative> {
+  try {
+    const { fs } = getFsAndPath();
+    const stat = fs.statSync(localPath);
+    if (!stat.isFile()) return false;
+    if (stat.size <= 0) return false;
+    return true;
+  } catch (err) {
+    return false;
+  }
+}
+
+async function downloadCreative(creative: Creative): Promise<Creative> {
   if (!isNodeEnv()) {
-    // In browser sim, don't try to cache to disk
     return creative;
   }
 
@@ -47,17 +58,11 @@ async function cacheCreative(creative: Creative): Promise<Creative> {
   const filename = `${creative.creative_id}${ext}`;
   const cachePath = path.join(cacheDir, filename);
 
-  // If file already exists, just return creative with local_file_path set
-  if (fs.existsSync(cachePath)) {
-    return { ...creative, local_file_path: cachePath };
-  }
-
-  // Otherwise, try to download and save
   try {
     const res = await fetch(creative.file_url);
     if (!res.ok) {
       console.error("Failed to download creative:", creative.file_url, res.status);
-      return creative; // fallback to remote URL only
+      return creative;
     }
 
     const arrayBuffer = await res.arrayBuffer();
@@ -66,18 +71,35 @@ async function cacheCreative(creative: Creative): Promise<Creative> {
 
     return { ...creative, local_file_path: cachePath };
   } catch (err) {
-    console.error("Error caching creative:", creative.file_url, err);
+    console.error("Error downloading creative:", creative.file_url, err);
     return creative;
   }
 }
 
+async function cacheCreative(creative: Creative): Promise<Creative> {
+  if (!isNodeEnv()) {
+    return creative;
+  }
+
+  const { fs, path } = getFsAndPath();
+
+  const cacheDir = getCacheDir();
+  const ext = getExtensionFromUrl(creative.file_url) || ".bin";
+  const filename = `${creative.creative_id}${ext}`;
+  const cachePath = path.join(cacheDir, filename);
+
+  if (fs.existsSync(cachePath) && isAssetValid(cachePath)) {
+    return { ...creative, local_file_path: cachePath };
+  }
+
+  return downloadCreative(creative);
+}
+
 export async function cachePlaylistAssets(playlist: Playlist): Promise<Playlist> {
   if (!isNodeEnv()) {
-    // No disk caching in browser sim
     return playlist;
   }
 
-  // Cache each creative sequentially (simple & safe for MVP)
   const cachedCreatives: Creative[] = [];
   for (const creative of playlist.playlist) {
     const cached = await cacheCreative(creative);
@@ -87,5 +109,47 @@ export async function cachePlaylistAssets(playlist: Playlist): Promise<Playlist>
   return {
     ...playlist,
     playlist: cachedCreatives,
+  };
+}
+
+export async function verifyAndRepairAssets(playlist: Playlist): Promise<Playlist> {
+  if (!isNodeEnv()) {
+    return playlist;
+  }
+
+  const creatives = playlist.playlist || [];
+  const repairedCreatives: Creative[] = [];
+
+  for (const creative of creatives) {
+    if (isAssetValid(creative.local_file_path)) {
+      repairedCreatives.push(creative);
+      continue;
+    }
+
+    console.warn(
+      `Asset invalid or missing for creative ${creative.creative_id}, attempting re-download...`
+    );
+
+    try {
+      const repaired = await downloadCreative(creative);
+      if (isAssetValid(repaired.local_file_path)) {
+        console.log(`Successfully repaired asset for creative ${creative.creative_id}`);
+        repairedCreatives.push(repaired);
+      } else {
+        console.error(`Failed to repair asset for creative ${creative.creative_id}`);
+        repairedCreatives.push(creative);
+      }
+    } catch (err) {
+      console.error(
+        `Failed to re-download asset for creative ${creative.creative_id}:`,
+        err
+      );
+      repairedCreatives.push(creative);
+    }
+  }
+
+  return {
+    ...playlist,
+    playlist: repairedCreatives,
   };
 }

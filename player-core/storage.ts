@@ -46,3 +46,37 @@ export function loadBeamerConfig(): RawBeamerConfig {
 
   return config;
 }
+
+function isNodeEnv() {
+  return typeof window === "undefined";
+}
+
+export function loadEventQueue<T = any>(filename: string): T[] {
+  if (!isNodeEnv()) {
+    const raw = localStorage.getItem(filename);
+    if (!raw) return [];
+    try {
+      const data = JSON.parse(raw);
+      return Array.isArray(data) ? data : [];
+    } catch {
+      console.warn(`Corrupted queue file in localStorage: ${filename}, resetting to empty`);
+      return [];
+    }
+  }
+  try {
+    const data = loadJSON(filename);
+    if (!data || !Array.isArray(data)) return [];
+    return data as T[];
+  } catch (err) {
+    console.warn(`Corrupted queue file: ${filename}, resetting to empty`, err);
+    return [];
+  }
+}
+
+export function saveEventQueue<T = any>(filename: string, events: T[]): void {
+  if (!isNodeEnv()) {
+    localStorage.setItem(filename, JSON.stringify(events));
+    return;
+  }
+  saveJSON(filename, events);
+}

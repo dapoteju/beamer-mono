@@ -2,8 +2,9 @@ import { loadJSON, saveJSON, loadBeamerConfig } from "./storage";
 import { registerPlayer, setApiBaseUrl } from "./apiClient";
 import { updatePlaylist } from "./playlistService";
 import { startPlaybackLoop } from "./playerEngine";
-import { flushPlaybacks, sendHeartbeatEvent } from "./telemetryService";
+import { queueHeartbeat, flushHeartbeats, flushPlaybacks } from "./telemetryService";
 import { startGpsPolling } from "./gpsService";
+import { verifyAndRepairAssets } from "./assetCache";
 
 async function initPlayer(onPlay: any) {
   const beamerConfig = loadBeamerConfig();
@@ -31,11 +32,15 @@ async function initPlayer(onPlay: any) {
 
   startGpsPolling(30_000);
 
-  const playlist = await updatePlaylist(config.auth_token);
+  let playlist = await updatePlaylist(config.auth_token);
   console.log("Loaded playlist:", playlist);
 
+  playlist = await verifyAndRepairAssets(playlist);
+  console.log("Verified and repaired assets");
+
   setInterval(() => {
-    sendHeartbeatEvent(config.auth_token, config);
+    queueHeartbeat(config);
+    flushHeartbeats(config.auth_token);
     flushPlaybacks(config.auth_token);
   }, 60_000);
 

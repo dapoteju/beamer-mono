@@ -1,0 +1,458 @@
+You are working in: beamer-mono-main/player-core
+
+Goal:
+Upgrade the player-core so that it is resilient to:
+- Process restarts
+- Network failures
+- Missing/corrupted local assets
+
+Specifically, implement:
+
+1) Persistent on-disk queues for:
+   - Playback events
+   - Heartbeat events (optional but preferred)
+
+2) Retry + flush logic that:
+   - Sends queued events when network is available
+   - Does NOT lose events on restart
+   - Keeps failed events until they are successfully sent
+
+3) Basic asset integrity:
+   - Ensure local file for a creative exists and is non-empty before playback
+   - Re-download missing/bad assets
+   - If re-download fails, fall back to the fallback creative instead of crashing
+
+Do NOT touch the backend in this prompt. Only change code inside player-core.
+
+────────────────────────
+STEP 1 – Extend storage utilities
+────────────────────────
+
+Open: beamer-mono-main/player-core/storage.ts
+
+We already have JSON helpers like loadJSON/saveJSON.
+
+1. Add generic helpers for persistent queues:
+
+   ```ts
+   export function loadEventQueue<T = any>(filename: string): T[] {
+     const data = loadJSON(filename);
+     if (!data || !Array.isArray(data)) return [];
+     return data as T[];
+   }
+
+   export function saveEventQueue<T = any>(filename: string, events: T[]): void {
+     saveJSON(filename, events);
+   }
+These will be used by telemetryService to store:
+
+"pending-playbacks.json"
+
+"pending-heartbeats.json"
+
+────────────────────────────
+STEP 2 – Make playback queue persistent
+────────────────────────────
+
+Open: beamer-mono-main/player-core/telemetryService.ts
+
+You already have in-memory queues and functions like:
+
+queuePlayback(...)
+
+flushPlaybacks(...)
+
+We want to change this so the queue is persisted to disk.
+
+Import the new storage helpers:
+
+ts
+Copy code
+import { loadEventQueue, saveEventQueue } from "./storage";
+Remove any plain let playbackQueue: PlaybackEvent[] = []; pattern and instead:
+
+ts
+Copy code
+const PLAYBACK_QUEUE_FILE = "pending-playbacks.json";
+
+function loadPlaybackQueue(): PlaybackEvent[] {
+  return loadEventQueue<PlaybackEvent>(PLAYBACK_QUEUE_FILE);
+}
+
+function savePlaybackQueue(events: PlaybackEvent[]): void {
+  saveEventQueue<PlaybackEvent>(PLAYBACK_QUEUE_FILE, events);
+}
+Update queuePlayback:
+
+Instead of pushing to an in-memory array only, make it:
+
+ts
+Copy code
+export function queuePlayback(event: PlaybackEvent) {
+  try {
+    const queue = loadPlaybackQueue();
+    queue.push(event);
+    savePlaybackQueue(queue);
+  } catch (err) {
+    console.error("Failed to queue playback event:", err);
+  }
+}
+Update flushPlaybacks:
+
+Currently, it probably flushes the in-memory queue and calls sendPlaybackEvent for each, then clears the queue on success.
+
+Change it to:
+
+ts
+Copy code
+export async function flushPlaybacks(auth_token: string) {
+  let queue = loadPlaybackQueue();
+  if (!queue.length) return;
+
+  const remaining: PlaybackEvent[] = [];
+
+  for (const ev of queue) {
+    try {
+      await sendPlaybackEvent(auth_token, ev);
+      // if success: do not re-add
+    } catch (err) {
+      console.error("Failed to send playback event, will retry later:", err);
+      remaining.push(ev);
+    }
+  }
+
+  savePlaybackQueue(remaining);
+}
+This ensures:
+
+Events are loaded from disk each flush.
+
+Only successfully sent events are removed.
+
+Failed events remain on disk for the next retry.
+
+We do not need complex exponential backoff for v1; the existing flush interval (e.g. every 60s) is the implicit backoff.
+
+────────────────────────────
+STEP 3 – Optional: make heartbeat queue persistent
+────────────────────────────
+
+If heartbeats occasionally fail, it can be useful to keep a short queue on disk, but we don't want infinite growth.
+
+Still in telemetryService.ts:
+
+Add similar helpers:
+
+ts
+Copy code
+const HEARTBEAT_QUEUE_FILE = "pending-heartbeats.json";
+
+function loadHeartbeatQueue(): HeartbeatEvent[] {
+  return loadEventQueue<HeartbeatEvent>(HEARTBEAT_QUEUE_FILE);
+}
+
+function saveHeartbeatQueue(events: HeartbeatEvent[]): void {
+  saveEventQueue<HeartbeatEvent>(HEARTBEAT_QUEUE_FILE, events);
+}
+Modify sendHeartbeatEvent:
+
+Right now it probably sends a single heartbeat immediately:
+
+ts
+Copy code
+export async function sendHeartbeatEvent(auth_token: string, config: PlayerConfig) {
+  const location = getLastLocation() || undefined;
+  const metrics = getDeviceMetrics();
+
+  const hb: HeartbeatEvent = {
+    player_id: config.player_id,
+    screen_id: config.screen_id,
+    timestamp: new Date().toISOString(),
+    status: "ok",
+    software_version: config.software_version || "1.0.0",
+    location,
+    metrics,
+  };
+
+  try {
+    await sendHeartbeat(auth_token, hb);
+  } catch (e) {
+    console.error("Heartbeat failed", e);
+  }
+}
+Change this to:
+
+Queue the heartbeat to a local file.
+
+Flush heartbeats in a similar fashion to playbacks.
+
+Example:
+
+ts
+Copy code
+export function queueHeartbeat(config: PlayerConfig) {
+  const location = getLastLocation() || undefined;
+  const metrics = getDeviceMetrics();
+
+  const hb: HeartbeatEvent = {
+    player_id: config.player_id,
+    screen_id: config.screen_id,
+    timestamp: new Date().toISOString(),
+    status: "ok",
+    software_version: config.software_version || "1.0.0",
+    location,
+    metrics,
+  };
+
+  try {
+    const queue = loadHeartbeatQueue();
+    queue.push(hb);
+    saveHeartbeatQueue(queue);
+  } catch (err) {
+    console.error("Failed to queue heartbeat:", err);
+  }
+}
+
+export async function flushHeartbeats(auth_token: string) {
+  let queue = loadHeartbeatQueue();
+  if (!queue.length) return;
+
+  const remaining: HeartbeatEvent[] = [];
+
+  for (const hb of queue) {
+    try {
+      await sendHeartbeat(auth_token, hb);
+    } catch (e) {
+      console.error("Failed to send heartbeat, will retry later:", e);
+      remaining.push(hb);
+    }
+  }
+
+  saveHeartbeatQueue(remaining);
+}
+Update index.ts to call queueHeartbeat and flushHeartbeats instead of sending live-only:
+
+Open: beamer-mono-main/player-core/index.ts
+
+Replace the heartbeat section:
+
+ts
+Copy code
+// Old:
+setInterval(() => {
+  sendHeartbeatEvent(config.auth_token, config);
+  flushPlaybacks(config.auth_token);
+}, 60_000);
+With:
+
+ts
+Copy code
+setInterval(() => {
+  queueHeartbeat(config);
+  flushHeartbeats(config.auth_token);
+  flushPlaybacks(config.auth_token);
+}, 60_000);
+Now both playbacks and heartbeats are durable.
+
+────────────────────────────
+STEP 4 – Asset integrity: verify cached assets before playback
+────────────────────────────
+
+We now want to:
+
+Ensure that each creative's local_file_path exists and is non-empty.
+
+Attempt re-download if missing/bad.
+
+If we cannot fix it, skip that creative and rely on the fallback.
+
+Open: beamer-mono-main/player-core/assetCache.ts (or similar file that handles caching).
+
+It should already be responsible for:
+
+Downloading asset files
+
+Storing local_file_path in the playlist creatives
+
+Import Node fs module at the top:
+
+ts
+Copy code
+import fs from "fs";
+import path from "path";
+Add a helper:
+
+ts
+Copy code
+export function isAssetValid(localPath: string | undefined | null): boolean {
+  if (!localPath) return false;
+
+  try {
+    const stat = fs.statSync(localPath);
+    if (!stat.isFile()) return false;
+    if (stat.size <= 0) return false;
+    return true;
+  } catch (err) {
+    return false;
+  }
+}
+In the function that caches assets (e.g. cachePlaylistAssets(playlist)), after downloading each file and setting creative.local_file_path, you do NOT need to compute a hash for now, but you can ensure basic validity:
+
+After download: if isAssetValid returns false, log an error.
+
+Export a function that, given a playlist, verifies all creative assets and tries to fix missing ones:
+
+ts
+Copy code
+import { Playlist } from "./types";
+
+export async function verifyAndRepairAssets(playlist: Playlist): Promise<Playlist> {
+  // Pseudocode, assume playlist.playlist is the array of creatives
+  const creatives = playlist.playlist || [];
+
+  for (const creative of creatives) {
+    if (isAssetValid(creative.local_file_path)) {
+      continue; // Looks good
+    }
+
+    // Try re-download
+    try {
+      console.warn(
+        `Asset invalid or missing for creative ${creative.creative_id}, attempting re-download...`
+      );
+      // Call your existing caching/downloading logic for just this creative.
+      // If your cache function works on entire playlist only, you can either:
+      //  - refactor to support per-creative, or
+      //  - simply log and let the next cache run fix it.
+      //
+      // For now, if it's too complex to re-download here, just skip.
+    } catch (err) {
+      console.error(
+        `Failed to re-download asset for creative ${creative.creative_id}:`,
+        err
+      );
+    }
+  }
+
+  return playlist;
+}
+If it's hard in your current structure to re-download individual creatives, it's fine to:
+
+log the invalid asset
+
+and rely on the next cachePlaylistAssets call to do a full repair.
+
+────────────────────────────
+STEP 5 – Use verifyAndRepairAssets before playback
+────────────────────────────
+
+Open: beamer-mono-main/player-core/index.ts
+
+In initPlayer, after you load the playlist and before you start the playback loop:
+
+Import verifyAndRepairAssets:
+
+ts
+Copy code
+import { verifyAndRepairAssets } from "./assetCache";
+After fetching and caching the playlist, add:
+
+ts
+Copy code
+let playlist = await updatePlaylist(config.auth_token);
+console.log("Loaded playlist:", playlist);
+
+playlist = await verifyAndRepairAssets(playlist);
+Then pass this playlist into startPlaybackLoop.
+
+────────────────────────────
+STEP 6 – Safe fallback behaviour in playerEngine
+────────────────────────────
+
+Open: beamer-mono-main/player-core/playerEngine.ts
+
+We need to ensure that if a creative has no valid local asset, the player does NOT crash or attempt to play garbage.
+
+Import isAssetValid:
+
+ts
+Copy code
+import { isAssetValid } from "./assetCache";
+In the playback loop, before calling onPlay(creative):
+
+Check if the creative has a valid local_file_path (for Electron/Node).
+
+If not valid, continue to the next creative (or log a warning).
+
+Example:
+
+ts
+Copy code
+for (;;) {
+  for (const creative of playlist.playlist) {
+    try {
+      if (!isAssetValid(creative.local_file_path)) {
+        console.warn(
+          `Skipping creative ${creative.creative_id} due to invalid or missing asset`
+        );
+        continue;
+      }
+
+      // Normal playback
+      const location = getLastLocation() || undefined;
+
+      queuePlayback({
+        creative_id: creative.creative_id,
+        screen_id: playlist.screen_id,
+        played_at: new Date().toISOString(),
+        duration_seconds: creative.duration_seconds,
+        status: "success",
+        location,
+      });
+
+      await onPlay(creative);
+      await sleep(creative.duration_seconds * 1000);
+    } catch (err) {
+      console.error(
+        `Error during playback of creative ${creative.creative_id}:`,
+        err
+      );
+      // Optionally queue a "error" status event instead of "success"
+    }
+  }
+}
+Ensure there is a fallback creative in the playlist (as your existing logic likely already does). If the entire playlist ends up with no valid creatives, your onPlay handler should present a fallback asset or error screen.
+
+────────────────────────────
+STEP 7 – Sanity check
+────────────────────────────
+
+After these changes:
+
+Run TypeScript build for player-core and fix any type issues.
+
+Run the player (electron or Node simulator).
+
+Simulate:
+
+Kill network → events queue up on disk.
+
+Restore network → flushPlaybacks and flushHeartbeats should drain queues.
+
+Kill the process (Ctrl+C) then restart → queued events should still be on disk and eventually sent.
+
+Manually delete one cached asset file and restart → verify:
+
+isAssetValid detects missing file.
+
+Player either re-downloads or logs and skips, without crashing.
+
+Playback continues with remaining creatives / fallback.
+
+We should now have:
+
+A resilient player that does not lose proof-of-play when offline or after restarts.
+
+Basic asset integrity checks with safe handling of missing/corrupt files.
+
+A much more production-ready Beamer Player.
