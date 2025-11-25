@@ -1,8 +1,7 @@
 import { PlayerConfig, Playlist, PlaybackEvent, HeartbeatEvent } from "./types";
 
-const BASE_URL = "https://17d379ae-de32-486e-8229-49811a28d432-00-1vcd9a1z4xejy.spock.replit.dev/api/player";//change this to your api url
+const BASE_URL = "https://17d379ae-de32-486e-8229-49811a28d432-00-1vcd9a1z4xejy.spock.replit.dev/api/player";
 
-// Helper: build Authorization header
 function authHeader(auth_token: string) {
   return {
     Authorization: `Bearer ${auth_token}`,
@@ -15,7 +14,6 @@ export async function registerPlayer(): Promise<PlayerConfig> {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
       serial_number: "SIMULATED-PLAYER",
-      // Use your REAL screen id here (the UUID you pasted before)
       screen_id: "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee",
     }),
   });
@@ -29,14 +27,13 @@ export async function registerPlayer(): Promise<PlayerConfig> {
 
   const data = json.data;
 
-  // IMPORTANT:
-  // Your API expects token as "<player_id>:<auth_token>"
   const combinedToken = `${data.player_id}:${data.auth_token}`;
 
   const config: PlayerConfig = {
     player_id: data.player_id,
     auth_token: combinedToken,
     screen_id: data.screen_id,
+    software_version: "1.0.0",
   };
 
   return config;
@@ -58,7 +55,6 @@ export async function fetchPlaylist(
     });
 
     if (res.status === 304) {
-      // No changes since last config_hash
       return null;
     }
 
@@ -72,7 +68,6 @@ export async function fetchPlaylist(
     return json.data as Playlist;
   } catch (err) {
     console.error("Playlist fetch failed (probably offline):", err);
-    // 🔴 IMPORTANT: returning null lets updatePlaylist() fall back to local playlist
     return null;
   }
 }
@@ -98,7 +93,6 @@ export async function sendPlaybackEvent(auth_token: string, event: PlaybackEvent
     try {
       json = JSON.parse(text);
     } catch {
-      // non-JSON response
     }
 
     if (!res.ok || (json && json.status !== "success")) {
@@ -133,7 +127,6 @@ export async function sendHeartbeat(
     try {
       json = JSON.parse(text);
     } catch {
-      // ignore
     }
 
     if (!res.ok || (json && json.status !== "success")) {
@@ -143,4 +136,3 @@ export async function sendHeartbeat(
     console.error("Heartbeat network error:", err);
   }
 }
-

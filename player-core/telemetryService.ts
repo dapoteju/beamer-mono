@@ -1,5 +1,7 @@
-import { PlaybackEvent, HeartbeatEvent } from "./types";
+import { PlaybackEvent, HeartbeatEvent, PlayerConfig } from "./types";
 import { sendPlaybackEvent, sendHeartbeat } from "./apiClient";
+import { getLastLocation } from "./gpsService";
+import { getDeviceMetrics } from "./deviceMetricsService";
 
 let playbackQueue: PlaybackEvent[] = [];
 
@@ -21,11 +23,21 @@ export async function flushPlaybacks(auth_token: string) {
   }
 }
 
-export async function sendHeartbeatEvent(auth_token: string, player_id: string) {
+export async function sendHeartbeatEvent(
+  auth_token: string,
+  config: PlayerConfig
+) {
+  const location = getLastLocation() || undefined;
+  const metrics = getDeviceMetrics();
+
   const hb: HeartbeatEvent = {
-    player_id,
+    player_id: config.player_id,
+    screen_id: config.screen_id,
+    timestamp: new Date().toISOString(),
     status: "ok",
-    timestamp: new Date().toISOString()
+    software_version: config.software_version || "1.0.0",
+    location,
+    metrics,
   };
 
   try {

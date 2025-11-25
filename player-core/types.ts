@@ -1,36 +1,56 @@
+export interface Location {
+  lat: number;
+  lng: number;
+  accuracy_m?: number;
+  timestamp?: string;
+}
+
+export interface DeviceMetrics {
+  cpu_usage: number;
+  memory_free_mb: number;
+  storage_free_mb: number;
+  network_type: string;
+  online: boolean;
+}
+
 export interface Creative {
   creative_id: string;
   type: "image" | "video";
   file_url: string;
   duration_seconds: number;
-  // Optional path to a locally cached file (set by the player, not the API)
   local_file_path?: string;
 }
 
-
-// This matches what your API actually returns
 export interface Playlist {
   screen_id: string;
   region: string;
   city: string;
   config_hash: string;
-  playlist: Creative[]; // <- IMPORTANT: array is called `playlist` in the API
+  playlist: Creative[];
 }
 
 export interface PlayerConfig {
   player_id: string;
   auth_token: string;
   screen_id: string;
+  software_version?: string;
 }
 
 export interface PlaybackEvent {
   creative_id: string;
-  played_at: string;  // ISO timestamp
+  screen_id: string;
+  played_at: string;
   duration_seconds: number;
+  status: "success" | "error" | "skipped";
+  location?: Location;
 }
 
 export interface HeartbeatEvent {
   player_id: string;
-  status: string;
+  screen_id: string;
   timestamp: string;
+  status: string;
+  software_version: string;
+  location?: Location;
+  metrics?: DeviceMetrics;
 }
