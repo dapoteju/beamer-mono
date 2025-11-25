@@ -1,0 +1,183 @@
+You are working on the Beamer CMS web app. I want you to build a proper INTERNAL DASHBOARD at `/dashboard` with the following behaviour and layout.
+
+Context
+- Tech stack: React + TypeScript (same as existing CMS frontend).
+- Backend: Node/Express + Postgres (already running in Replit).
+- Auth: Use the existing auth context / hooks. Assume this dashboard is only for `org.type = "beamer_internal"` for now.
+- There are already pages and APIs for:
+  - Campaigns
+  - Screens (including online/offline info via heartbeats / lastSeenAt)
+  - Compliance / Creative approvals
+  - Reports (campaign & booking reports)
+  - Inventory Map (Leaflet map showing screen markers with online/offline state)
+  - Exposure / location-history endpoints for screens
+
+Goal
+Implement a **Network Operations Dashboard** that answers, at a glance:
+1. Is the network healthy?
+2. What needs my attention right now?
+3. Where are my screens, roughly, on a mini map?
+
+The dashboard should have 5 main sections:
+1) Top KPI Strip
+2) “Needs Attention” – Pending Approvals
+3) “Needs Attention” – Offline Screens
+4) Mini Network Map card
+5) Quick Links
+
+Make sure the design matches the existing CMS styling (reuse card, table, badge components). Add loading and error states for each widget.
+
+--------------------------------
+1) TOP KPI STRIP
+--------------------------------
+At the top of `/dashboard`, create a row of 4 cards:
+
+Cards:
+1. **Active Campaigns**
+   - Data: Call the existing campaigns endpoint (e.g. `GET /api/campaigns?status=active`) and show the count.
+2. **Active Screens**
+   - Data: Call the existing screens endpoint (e.g. `GET /api/screens?status=active`) and show the count.
+3. **Online Screens**
+   - Logic:
+     - A screen is “online” if it has a recent heartbeat / lastSeenAt within the last 10 minutes.
+     - Either:
+       - Reuse an existing field like `lastSeenAt` on the Screen, OR
+       - Fetch latest heartbeats from the heartbeat endpoint and compute online/offline on the backend or in a helper function.
+   - Data: Show count of online vs total (e.g. “34 / 40”).
+4. **Pending Approvals**
+   - Data: Call the endpoint already used by the Compliance page (e.g. `GET /api/creatives/approvals?status=pending` or the global pending approvals endpoint) and show the total number of pending approvals.
+
+Implementation details:
+- Each card should:
+  - Show a label (e.g. “Active Campaigns”).
+  - Show the number in a large font.
+  - Show a subtle sub-label if helpful (e.g. “campaigns currently live”).
+- Show skeleton/loading states while the data is loading.
+- Show a small error message if the request fails, without breaking the whole page.
+
+--------------------------------
+2) NEEDS ATTENTION – PENDING APPROVALS
+--------------------------------
+Below the KPI strip (left side of the page on desktop), create a card titled **“Pending Compliance Approvals”** with a table.
+
+Data:
+- Use the same backend API that powers the Compliance dashboard (global pending approvals).
+- Only show rows where `status = "pending"`.
+- Order by oldest first (oldest updatedAt/createdAt at the top).
+- Limit to the first ~10 records in this dashboard widget.
+
+Columns:
+- Creative Name
+- Campaign Name
+- Region Code
+- Status (badge, always “Pending” here)
+- Last Updated (formatted nicely, e.g. `22 Nov 2025, 14:05`)
+- “Review” button:
+  - On click, open the existing Creative / Compliance modal for that creative, OR navigate to the Compliance page with that creative pre-selected.
+  - Use whatever pattern is already used in the app for reviewing approvals.
+
+Behaviour:
+- Loading state while fetching.
+- Empty state message if there are no pending approvals (e.g. “No pending approvals 🎉”).
+
+--------------------------------
+3) NEEDS ATTENTION – OFFLINE SCREENS
+--------------------------------
+Under (or next to) the pending approvals section, create another card titled **“Offline Screens”**.
+
+Definition:
+- A screen is considered **offline** if:
+  - `lastSeenAt` is older than 10 minutes, OR
+  - The latest heartbeat status is `error` or `warning` (if such a field exists).
+- Use whichever data is already available (lastSeenAt + heartbeats, or a derived status).
+
+Data:
+- Fetch screens & their status using existing endpoints.
+- You can either:
+  - Add a new backend helper endpoint that returns “offline screens only” with all the needed fields, OR
+  - Fetch all screens and filter on the frontend using lastSeenAt and/or heartbeat info if that data is easily accessible.
+
+Columns:
+- Screen Name
+- City / Region (or location fields you already store on `Screen`)
+- Publisher Org Name
+- Last Seen At (formatted datetime)
+- Status badge (“Offline” or “Warning”, with different colours if both exist)
+- “View Screen” link that navigates to the `/screens/:id` page or existing screen detail view.
+
+Behaviour:
+- Only show the first ~10 offline screens in this widget.
+- Provide a “View all screens” link/button at the bottom that sends the user to the Screens list page, pre-filtered by offline if possible.
+- Loading / error / empty state handled gracefully.
+
+--------------------------------
+4) MINI NETWORK MAP CARD
+--------------------------------
+We want a **small map widget**, not a full-page map, on the dashboard.
+
+Requirements:
+- Title: **“Network Map”**
+- Map library: reuse the same Leaflet (or similar) setup already used on the `/inventory/map` or location-history page.
+- Size:
+  - This should be a card that fits into one column on desktop (e.g. half or one-third width, not a full-width hero section).
+  - Enough height to see clusters of screens but not dominate the page.
+
+Data:
+- Show all active screens with their coordinates.
+- Markers:
+  - Green marker / icon for online screens.
+  - Red marker / icon for offline screens.
+- Use the same logic for online/offline as the “Offline Screens” widget (lastSeenAt / heartbeat).
+
+Interaction:
+- Basic pan and zoom only.
+- No heavy popups or tooltips required for MVP (but a simple popup with screen name if easy is fine).
+- Include a **“Open Full Map”** button/link in the card that navigates to the existing full inventory map page (e.g. `/inventory/map`).
+
+Performance:
+- If necessary, reuse or import the existing map component used for the full Inventory Map, but with a “compact” variant prop (smaller size, less UI chrome, etc.).
+
+--------------------------------
+5) QUICK LINKS SECTION
+--------------------------------
+Add a **“Quick Links”** row (could be on the right side or at the bottom of the dashboard).
+
+Buttons / cards:
+- “View Campaigns” → `/campaigns`
+- “View Screens” → `/screens`
+- “Open Compliance Queue” → `/compliance`
+- “Open Reports” → `/reports`
+- “Open Inventory Map” → `/inventory/map`
+
+Each quick link can be a simple clickable card or button using existing UI components.
+
+--------------------------------
+ROUTING & ACCESS
+--------------------------------
+- Ensure `/dashboard` uses this new `Dashboard` component.
+- Make `/dashboard` the default landing page after login for internal users (beamer_internal).
+- If role-based routing exists:
+  - For now, just support the internal dashboard.
+  - If the user is NOT beamer_internal, either:
+    - Redirect them to a basic page (e.g. campaigns list), OR
+    - Show a placeholder like “Dashboard for advertisers/publishers coming soon”.
+
+--------------------------------
+GENERAL IMPLEMENTATION NOTES
+--------------------------------
+- Reuse existing shared UI components: cards, tables, badges, layout containers.
+- Each widget should fetch its own data or use a single “dashboard summary” endpoint if one already exists or is easy to add.
+- Handle loading and error states for each section separately so a failed request in one widget doesn’t break the entire page.
+- Keep the code well-structured:
+  - `Dashboard.tsx` (main container) + subcomponents like `DashboardKpiStrip`, `PendingApprovalsWidget`, `OfflineScreensWidget`, `NetworkMiniMapCard`, `DashboardQuickLinks`.
+- Add any necessary new backend endpoints in a minimal way if they don’t exist:
+  - For example: `/api/dashboard/internal-summary` or `/api/screens/offline` etc.
+
+Deliverables:
+- A working `/dashboard` route that shows:
+  - KPI strip
+  - Pending Approvals table
+  - Offline Screens table
+  - Mini network map card
+  - Quick links section
+- All wired up to real backend data with loading and error states, using the existing styles and components of the CMS.
