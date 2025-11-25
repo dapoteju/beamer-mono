@@ -16,6 +16,7 @@ export function CampaignCreativesTab({ campaignId }: CampaignCreativesTabProps) 
   const [showAddModal, setShowAddModal] = useState(false);
   const [editingCreative, setEditingCreative] = useState<Creative | null>(null);
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
+  const [previewCreative, setPreviewCreative] = useState<Creative | null>(null);
 
   const {
     data: creatives = [],
@@ -61,30 +62,36 @@ export function CampaignCreativesTab({ campaignId }: CampaignCreativesTabProps) 
   };
 
   const renderPreview = (creative: Creative) => {
-    if (creative.mime_type.startsWith("image/")) {
-      return (
-        <img
-          src={creative.file_url}
-          alt={creative.name}
-          className="w-16 h-12 object-cover rounded"
-        />
-      );
-    } else if (creative.mime_type.startsWith("video/")) {
-      return (
-        <video
-          src={creative.file_url}
-          className="w-16 h-12 object-cover rounded"
-          muted
-          playsInline
-        />
-      );
-    }
-    return (
+    const content = creative.mime_type.startsWith("image/") ? (
+      <img
+        src={creative.file_url}
+        alt={creative.name}
+        className="w-16 h-12 object-cover rounded"
+      />
+    ) : creative.mime_type.startsWith("video/") ? (
+      <video
+        src={creative.file_url}
+        className="w-16 h-12 object-cover rounded"
+        muted
+        playsInline
+      />
+    ) : (
       <div className="w-16 h-12 bg-zinc-200 rounded flex items-center justify-center">
         <svg className="w-6 h-6 text-zinc-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
         </svg>
       </div>
+    );
+
+    return (
+      <button
+        type="button"
+        onClick={() => setPreviewCreative(creative)}
+        className="cursor-pointer hover:opacity-80 transition-opacity"
+        title="Click to preview"
+      >
+        {content}
+      </button>
     );
   };
 
@@ -276,6 +283,53 @@ export function CampaignCreativesTab({ campaignId }: CampaignCreativesTabProps) 
               >
                 {deleteMutation.isPending ? "Deleting..." : "Delete"}
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {previewCreative && (
+        <div
+          className="fixed inset-0 bg-black/80 flex items-center justify-center z-50"
+          onClick={() => setPreviewCreative(null)}
+        >
+          <div
+            className="relative max-w-4xl max-h-[90vh] w-full mx-4"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <button
+              onClick={() => setPreviewCreative(null)}
+              className="absolute -top-10 right-0 text-white hover:text-zinc-300 transition-colors"
+            >
+              <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+            <div className="bg-zinc-900 rounded-lg overflow-hidden">
+              <div className="p-4 border-b border-zinc-700">
+                <h3 className="text-white font-medium">{previewCreative.name}</h3>
+                <p className="text-zinc-400 text-sm">
+                  {previewCreative.width} x {previewCreative.height} | {previewCreative.duration_seconds}s
+                </p>
+              </div>
+              <div className="flex items-center justify-center p-4 bg-zinc-800">
+                {previewCreative.mime_type.startsWith("image/") ? (
+                  <img
+                    src={previewCreative.file_url}
+                    alt={previewCreative.name}
+                    className="max-w-full max-h-[70vh] object-contain rounded"
+                  />
+                ) : previewCreative.mime_type.startsWith("video/") ? (
+                  <video
+                    src={previewCreative.file_url}
+                    className="max-w-full max-h-[70vh] rounded"
+                    controls
+                    autoPlay
+                  />
+                ) : (
+                  <div className="text-zinc-400 py-12">Preview not available</div>
+                )}
+              </div>
             </div>
           </div>
         </div>

@@ -298,21 +298,51 @@ export function CreativeFormModal({
           )}
 
           {mode === "edit" && (
-            <div>
-              <label className="block text-sm font-medium text-zinc-700 mb-1">
-                Status
-              </label>
-              <select
-                value={formData.status}
-                onChange={(e) => setFormData({ ...formData, status: e.target.value as CreativeStatus })}
-                className="w-full px-3 py-2 border border-zinc-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                disabled={isSubmitting}
-              >
-                <option value="pending_review">Pending Review</option>
-                <option value="approved">Approved</option>
-                <option value="rejected">Rejected</option>
-              </select>
-            </div>
+            <>
+              {filePreview && creative && (
+                <div className="border border-zinc-200 rounded-md overflow-hidden">
+                  <div className="bg-zinc-100 px-3 py-2 border-b border-zinc-200">
+                    <p className="text-xs text-zinc-600">
+                      {creative.width} x {creative.height} | {creative.duration_seconds}s
+                    </p>
+                  </div>
+                  <div className="p-2 bg-zinc-50 flex items-center justify-center">
+                    {creative.mime_type.startsWith("image/") ? (
+                      <img
+                        src={filePreview}
+                        alt="Preview"
+                        className="max-h-48 mx-auto rounded"
+                      />
+                    ) : creative.mime_type.startsWith("video/") ? (
+                      <video
+                        src={filePreview}
+                        className="max-h-48 mx-auto rounded"
+                        controls
+                        muted
+                      />
+                    ) : (
+                      <div className="py-8 text-zinc-400 text-sm">Preview not available</div>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              <div>
+                <label className="block text-sm font-medium text-zinc-700 mb-1">
+                  Status
+                </label>
+                <select
+                  value={formData.status}
+                  onChange={(e) => setFormData({ ...formData, status: e.target.value as CreativeStatus })}
+                  className="w-full px-3 py-2 border border-zinc-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  disabled={isSubmitting}
+                >
+                  <option value="pending_review">Pending Review</option>
+                  <option value="approved">Approved</option>
+                  <option value="rejected">Rejected</option>
+                </select>
+              </div>
+            </>
           )}
 
           <div>
