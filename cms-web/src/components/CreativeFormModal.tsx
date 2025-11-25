@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, type FormEvent } from "react";
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import {
   uploadFile,
   createCreative,
@@ -9,6 +9,7 @@ import {
   type UpdateCreativePayload,
   type CreativeStatus,
 } from "../api/creatives";
+import { fetchRegions, type Region } from "../api/screens";
 
 interface CreativeFormModalProps {
   mode: "create" | "edit";
@@ -30,31 +31,37 @@ export function CreativeFormModal({
   const [formData, setFormData] = useState({
     name: "",
     duration_seconds: "",
-    regions_required: "",
     status: "pending_review" as CreativeStatus,
   });
+  const [selectedRegions, setSelectedRegions] = useState<string[]>([]);
+  const [regionDropdownOpen, setRegionDropdownOpen] = useState(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [filePreview, setFilePreview] = useState<string | null>(null);
   const [mediaDimensions, setMediaDimensions] = useState<{ width: number; height: number }>({ width: 0, height: 0 });
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [uploading, setUploading] = useState(false);
 
+  const { data: regions = [] } = useQuery<Region[]>({
+    queryKey: ["regions"],
+    queryFn: fetchRegions,
+  });
+
   useEffect(() => {
     if (mode === "edit" && creative) {
       setFormData({
         name: creative.name,
         duration_seconds: creative.duration_seconds.toString(),
-        regions_required: creative.regions_required?.join(", ") || "",
         status: creative.status,
       });
+      setSelectedRegions(creative.regions_required || []);
       setFilePreview(creative.file_url);
     } else {
       setFormData({
         name: "",
         duration_seconds: "",
-        regions_required: "",
         status: "pending_review",
       });
+      setSelectedRegions([]);
       setSelectedFile(null);
       setFilePreview(null);
     }
@@ -75,10 +82,7 @@ export function CreativeFormModal({
         duration_seconds: parseInt(formData.duration_seconds) || 0,
         width: mediaDimensions.width,
         height: mediaDimensions.height,
-        regions_required: formData.regions_required
-          .split(",")
-          .map((r) => r.trim().toUpperCase())
-          .filter((r) => r.length > 0),
+        regions_required: selectedRegions,
       };
 
       return createCreative(campaignId, payload);
@@ -141,10 +145,7 @@ export function CreativeFormModal({
       const payload: UpdateCreativePayload = {
         name: formData.name.trim(),
         status: formData.status,
-        regions_required: formData.regions_required
-          .split(",")
-          .map((r) => r.trim().toUpperCase())
-          .filter((r) => r.length > 0),
+        regions_required: selectedRegions,
       };
       updateMutation.mutate(payload);
     }
@@ -349,16 +350,84 @@ export function CreativeFormModal({
             <label className="block text-sm font-medium text-zinc-700 mb-1">
               Regions Required
             </label>
-            <input
-              type="text"
-              value={formData.regions_required}
-              onChange={(e) => setFormData({ ...formData, regions_required: e.target.value })}
-              className="w-full px-3 py-2 border border-zinc-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-              placeholder="e.g., NG, KE, GH"
-              disabled={isSubmitting}
-            />
+            <div className="relative">
+              <button
+                type="button"
+                onClick={() => setRegionDropdownOpen(!regionDropdownOpen)}
+                className="w-full px-3 py-2 border border-zinc-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white text-left flex items-center justify-between"
+                disabled={isSubmitting}
+              >
+                <span className={selectedRegions.length === 0 ? "text-zinc-400" : "text-zinc-900"}>
+                  {selectedRegions.length === 0
+                    ? "Select regions..."
+                    : `${selectedRegions.length} region${selectedRegions.length === 1 ? "" : "s"} selected`}
+                </span>
+                <svg
+                  className={`w-4 h-4 text-zinc-500 transition-transform ${regionDropdownOpen ? "rotate-180" : ""}`}
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                </svg>
+              </button>
+              {regionDropdownOpen && (
+                <div className="absolute z-10 mt-1 w-full bg-white border border-zinc-300 rounded-md shadow-lg max-h-48 overflow-y-auto">
+                  {regions.length === 0 ? (
+                    <div className="px-3 py-2 text-sm text-zinc-500">No regions available</div>
+                  ) : (
+                    regions.map((region) => (
+                      <label
+                        key={region.id}
+                        className="flex items-center px-3 py-2 hover:bg-zinc-50 cursor-pointer"
+                      >
+                        <input
+                          type="checkbox"
+                          checked={selectedRegions.includes(region.code)}
+                          onChange={(e) => {
+                            if (e.target.checked) {
+                              setSelectedRegions([...selectedRegions, region.code]);
+                            } else {
+                              setSelectedRegions(selectedRegions.filter((r) => r !== region.code));
+                            }
+                          }}
+                          className="mr-2 h-4 w-4 text-blue-600 rounded border-zinc-300 focus:ring-blue-500"
+                        />
+                        <span className="text-sm text-zinc-900">
+                          {region.name} ({region.code})
+                        </span>
+                      </label>
+                    ))
+                  )}
+                </div>
+              )}
+            </div>
+            {selectedRegions.length > 0 && (
+              <div className="mt-2 flex flex-wrap gap-1">
+                {selectedRegions.map((code) => {
+                  const region = regions.find((r) => r.code === code);
+                  return (
+                    <span
+                      key={code}
+                      className="inline-flex items-center gap-1 px-2 py-0.5 bg-blue-100 text-blue-800 text-xs rounded-full"
+                    >
+                      {region ? region.name : code}
+                      <button
+                        type="button"
+                        onClick={() => setSelectedRegions(selectedRegions.filter((r) => r !== code))}
+                        className="hover:text-blue-600"
+                      >
+                        <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                      </button>
+                    </span>
+                  );
+                })}
+              </div>
+            )}
             <p className="mt-1 text-xs text-zinc-500">
-              Comma-separated region codes
+              Select the regions where this creative needs approval
             </p>
           </div>
 
