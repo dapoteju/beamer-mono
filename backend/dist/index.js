@@ -7,6 +7,7 @@ require("dotenv/config");
 const express_1 = __importDefault(require("express"));
 const cors_1 = __importDefault(require("cors"));
 const path_1 = __importDefault(require("path"));
+const fs_1 = __importDefault(require("fs"));
 const body_parser_1 = require("body-parser");
 const health_routes_1 = require("./modules/health/health.routes");
 const auth_routes_1 = require("./modules/auth/auth.routes");
@@ -53,17 +54,38 @@ app.use("/api/advertisers", advertisers_routes_1.advertisersRouter);
 const isProduction = process.env.NODE_ENV === "production";
 if (isProduction) {
     const frontendDistPath = path_1.default.join(__dirname, "../../cms-web/dist");
-    app.use(express_1.default.static(frontendDistPath, {
-        setHeaders: (res) => {
-            res.set("Cache-Control", "no-cache");
-        },
-    }));
-    app.get("*", (req, res, next) => {
-        if (req.path.startsWith("/api/") || req.path.startsWith("/uploads/")) {
-            return next();
-        }
-        res.sendFile(path_1.default.join(frontendDistPath, "index.html"));
-    });
+    const indexPath = path_1.default.join(frontendDistPath, "index.html");
+    console.log(`[Production] Frontend dist path: ${frontendDistPath}`);
+    console.log(`[Production] Index path: ${indexPath}`);
+    console.log(`[Production] Dist exists: ${fs_1.default.existsSync(frontendDistPath)}`);
+    console.log(`[Production] Index exists: ${fs_1.default.existsSync(indexPath)}`);
+    if (fs_1.default.existsSync(frontendDistPath)) {
+        app.use(express_1.default.static(frontendDistPath, {
+            setHeaders: (res) => {
+                res.set("Cache-Control", "no-cache");
+            },
+        }));
+        app.get("/{*path}", (req, res, next) => {
+            if (req.path.startsWith("/api/") || req.path.startsWith("/uploads/")) {
+                return next();
+            }
+            if (fs_1.default.existsSync(indexPath)) {
+                res.sendFile(indexPath);
+            }
+            else {
+                res.status(500).send("Frontend build not found");
+            }
+        });
+    }
+    else {
+        console.error(`[Production] ERROR: Frontend dist folder not found at ${frontendDistPath}`);
+        app.get("/{*path}", (req, res, next) => {
+            if (req.path.startsWith("/api/") || req.path.startsWith("/uploads/")) {
+                return next();
+            }
+            res.status(500).send("Frontend build not found. Please rebuild the application.");
+        });
+    }
 }
 app.use(errorhandler_1.notFoundHandler);
 app.use(errorhandler_1.errorHandler);

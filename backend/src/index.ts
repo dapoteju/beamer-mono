@@ -3,6 +3,7 @@ import "dotenv/config";
 import express from "express";
 import cors from "cors";
 import path from "path";
+import fs from "fs";
 import { json } from "body-parser";
 
 import { healthRouter } from "./modules/health/health.routes";
@@ -56,19 +57,39 @@ app.use("/api/advertisers", advertisersRouter);
 const isProduction = process.env.NODE_ENV === "production";
 if (isProduction) {
   const frontendDistPath = path.join(__dirname, "../../cms-web/dist");
+  const indexPath = path.join(frontendDistPath, "index.html");
   
-  app.use(express.static(frontendDistPath, {
-    setHeaders: (res) => {
-      res.set("Cache-Control", "no-cache");
-    },
-  }));
+  console.log(`[Production] Frontend dist path: ${frontendDistPath}`);
+  console.log(`[Production] Index path: ${indexPath}`);
+  console.log(`[Production] Dist exists: ${fs.existsSync(frontendDistPath)}`);
+  console.log(`[Production] Index exists: ${fs.existsSync(indexPath)}`);
+  
+  if (fs.existsSync(frontendDistPath)) {
+    app.use(express.static(frontendDistPath, {
+      setHeaders: (res) => {
+        res.set("Cache-Control", "no-cache");
+      },
+    }));
 
-  app.get("*", (req, res, next) => {
-    if (req.path.startsWith("/api/") || req.path.startsWith("/uploads/")) {
-      return next();
-    }
-    res.sendFile(path.join(frontendDistPath, "index.html"));
-  });
+    app.get("/{*path}", (req, res, next) => {
+      if (req.path.startsWith("/api/") || req.path.startsWith("/uploads/")) {
+        return next();
+      }
+      if (fs.existsSync(indexPath)) {
+        res.sendFile(indexPath);
+      } else {
+        res.status(500).send("Frontend build not found");
+      }
+    });
+  } else {
+    console.error(`[Production] ERROR: Frontend dist folder not found at ${frontendDistPath}`);
+    app.get("/{*path}", (req, res, next) => {
+      if (req.path.startsWith("/api/") || req.path.startsWith("/uploads/")) {
+        return next();
+      }
+      res.status(500).send("Frontend build not found. Please rebuild the application.");
+    });
+  }
 }
 
 app.use(notFoundHandler);
