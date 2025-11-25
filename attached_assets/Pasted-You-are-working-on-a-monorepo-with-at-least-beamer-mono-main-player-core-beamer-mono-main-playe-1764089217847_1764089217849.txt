@@ -1,0 +1,427 @@
+You are working on a monorepo with at least:
+- beamer-mono-main/player-core
+- beamer-mono-main/player-electron
+
+Goal:
+1. Introduce a config file `beamer.config.json` that ops can edit per device.
+2. Make the player-core use that config instead of hard-coded values (screen_id, API base URL, etc.).
+3. Add a `PLAYER_SETUP.md` with clear setup instructions for the ops team.
+4. Keep everything working with the existing registration and telemetry logic we already upgraded (GPS + metrics).
+
+We want a clean, repeatable install → configure → run flow.
+
+─────────────────────────
+STEP 1 – Define beamer.config.json contract
+─────────────────────────
+
+We want the player to look for a JSON config file in the current working directory:
+
+File name: beamer.config.json
+
+Shape:
+
+```jsonc
+{
+  "api_base_url": "https://beamer-api.replit.app/api",
+  "serial_number": "HW-000123",
+  "screen_id": "scr_xxx",
+  "provisioning_code": "ABC123"
+}
+Notes:
+
+api_base_url – base URL for the backend API (should end with /api).
+
+serial_number – hardware serial printed on the device (or any unique ID for now).
+
+screen_id – the Screen ID from the CMS.
+
+provisioning_code – short human-entered code generated in the CMS (for future security). For now it can be optional but supported.
+
+We want player-core to:
+
+Fail fast if beamer.config.json is missing or invalid.
+
+Use api_base_url to set the API client base URL.
+
+Use serial_number, screen_id, and provisioning_code when registering the player.
+
+─────────────────────────
+STEP 2 – Add a config loader in player-core
+─────────────────────────
+
+Work inside: beamer-mono-main/player-core
+
+Open the storage utility (likely src/storage.ts or similar).
+
+There are already helpers like loadJSON("player.json") and saveJSON(...).
+
+Add a new function to load the Beamer config file:
+
+ts
+Copy code
+export interface RawBeamerConfig {
+  api_base_url: string;
+  serial_number: string;
+  screen_id: string;
+  provisioning_code?: string;
+}
+
+export function loadBeamerConfig(): RawBeamerConfig {
+  const config = loadJSON("beamer.config.json") as RawBeamerConfig | null;
+
+  if (!config) {
+    throw new Error(
+      "Missing beamer.config.json. Please create it in the working directory."
+    );
+  }
+
+  if (!config.api_base_url || !config.serial_number || !config.screen_id) {
+    throw new Error(
+      "Invalid beamer.config.json. Must include api_base_url, serial_number, and screen_id."
+    );
+  }
+
+  return config;
+}
+Adjust imports/exports as needed so other modules can import loadBeamerConfig and RawBeamerConfig.
+
+─────────────────────────
+STEP 3 – Make apiClient.ts use dynamic base URL
+─────────────────────────
+
+Open: beamer-mono-main/player-core/apiClient.ts
+
+Currently, there is likely a hard-coded BASE_URL, e.g.:
+
+ts
+Copy code
+const BASE_URL = "https://....";
+Change this so that:
+
+BASE_URL is a mutable variable.
+
+We expose a setter function to initialize it from the config.
+
+Example:
+
+ts
+Copy code
+let BASE_URL = "https://beamer-api.replit.app/api"; // default fallback
+
+export function setApiBaseUrl(url: string) {
+  BASE_URL = url.replace(/\/+$/, ""); // strip trailing slashes
+}
+Ensure all API calls build URLs like:
+
+ts
+Copy code
+const url = `${BASE_URL}/player/register`;
+(or whatever your existing paths are), relying on the dynamic BASE_URL.
+
+Do NOT hard-code env-specific URLs anymore. The API base URL should come from beamer.config.json via setApiBaseUrl.
+
+─────────────────────────
+STEP 4 – Use config in initPlayer (player-core)
+─────────────────────────
+
+Open: beamer-mono-main/player-core/index.ts
+
+We already have an initPlayer(onPlay) that:
+
+Loads player.json if exists, else calls registerPlayer().
+
+Starts GPS polling.
+
+Fetches playlist.
+
+Starts heartbeats and playback.
+
+We now need to:
+
+Import loadBeamerConfig and RawBeamerConfig (or the type you defined) from storage.
+
+Import setApiBaseUrl from apiClient.
+
+Inside initPlayer:
+
+Before anything else, load the Beamer config and initialize the API base URL.
+
+Example:
+
+ts
+Copy code
+import { loadBeamerConfig } from "./storage";
+import { setApiBaseUrl } from "./apiClient";
+
+async function initPlayer(onPlay: any) {
+  // 🔹 Load device config (must exist)
+  const beamerConfig = loadBeamerConfig();
+  setApiBaseUrl(beamerConfig.api_base_url);
+
+  let config = loadJSON("player.json");
+
+  if (!config) {
+    console.log("Registering player...");
+    config = await registerPlayer(beamerConfig);
+    if (!config.software_version) {
+      config.software_version = "1.0.0";
+    }
+    saveJSON("player.json", config);
+  }
+
+  if (!config.software_version) {
+    config.software_version = "1.0.0";
+    saveJSON("player.json", config);
+  }
+
+  console.log("Player config:", config);
+
+  startGpsPolling(30_000);
+
+  const playlist = await updatePlaylist(config.auth_token);
+  console.log("Loaded playlist:", playlist);
+
+  setInterval(() => {
+    sendHeartbeatEvent(config.auth_token, config);
+    flushPlaybacks(config.auth_token);
+  }, 60_000);
+
+  startPlaybackLoop(playlist, onPlay);
+}
+Note: registerPlayer should now accept the Beamer config (see next step).
+
+─────────────────────────
+STEP 5 – Pass config into registerPlayer
+─────────────────────────
+
+Still in player-core:
+
+Find registerPlayer() in apiClient.ts. It currently constructs a body with some hard-coded serial_number/screen_id.
+
+Change it so that:
+
+It accepts a parameter of type RawBeamerConfig (or similar):
+
+ts
+Copy code
+import { RawBeamerConfig } from "./storage"; // or correct path
+
+export async function registerPlayer(
+  beamerConfig: RawBeamerConfig
+): Promise<PlayerConfig> {
+  const { serial_number, screen_id, provisioning_code } = beamerConfig;
+
+  const body: any = {
+    serial_number,
+    screen_id,
+  };
+
+  if (provisioning_code) {
+    body.provisioning_code = provisioning_code;
+  }
+
+  // POST to `${BASE_URL}/player/register` or your existing path
+  // using the body above...
+}
+Remove any hard-coded screen_id or serial_number from registerPlayer. Everything should now come from beamerConfig.
+
+The response handling should still construct:
+
+ts
+Copy code
+const config: PlayerConfig = {
+  player_id: data.player_id,
+  auth_token: combinedTokenOrOpaqueToken,
+  screen_id: data.screen_id,
+  software_version: "1.0.0",
+};
+Make sure PlayerConfig matches the type we defined earlier (with software_version).
+
+Update the call site in initPlayer (index.ts) – we already showed the pattern:
+
+ts
+Copy code
+config = await registerPlayer(beamerConfig);
+─────────────────────────
+STEP 6 – Make sure player-electron uses the right working directory
+─────────────────────────
+
+Work in: beamer-mono-main/player-electron
+
+Goal:
+
+When ops run npm start from player-electron, the current working directory should be where beamer.config.json lives and where player.json / playlist.json will be stored.
+
+Confirm that player-electron’s main process (likely main.js or main.ts) does:
+
+process.cwd() in the player-electron folder when launching.
+
+Or, if it changes working directory, make sure it still looks in the player-electron folder for beamer.config.json.
+
+If needed, enforce working directory in package.json scripts:
+
+In beamer-mono-main/player-electron/package.json:
+
+json
+Copy code
+"scripts": {
+  "start": "electron ."
+}
+This is usually fine; just ensure beamer.config.json is expected to live in the player-electron folder on the deployed device.
+
+─────────────────────────
+STEP 7 – Add PLAYER_SETUP.md for Ops
+─────────────────────────
+
+Create a new file at: beamer-mono-main/PLAYER_SETUP.md
+
+Write a clear setup guide for ops. Use this structure:
+
+Overview
+
+What the Beamer Player is.
+
+What this document covers.
+
+Prerequisites
+
+Supported OS (e.g. Ubuntu 22.04 or Windows 10 – adjust based on your target).
+
+Installed software:
+
+Node.js LTS
+
+Git
+
+(Optional) pm2 or systemd access for auto-start.
+
+Install the Beamer Player
+
+Example steps:
+
+bash
+Copy code
+# 1. Clone the repo
+git clone <REPO_URL>
+cd beamer-mono-main/player-electron
+
+# 2. Install dependencies
+npm install
+
+# 3. Build (if needed)
+npm run build  # optional, depending on your setup
+Create beamer.config.json
+
+In the player-electron folder, create a file called beamer.config.json:
+
+json
+Copy code
+{
+  "api_base_url": "https://beamer-api.replit.app/api",
+  "serial_number": "HW-000123",
+  "screen_id": "scr_xxx",
+  "provisioning_code": "ABC123"
+}
+Explain each field briefly:
+
+api_base_url: URL of the Beamer backend API.
+
+serial_number: Provided by hardware/inventory team.
+
+screen_id: Copy from Beamer CMS (Screen detail page).
+
+provisioning_code: Optional one-time code from CMS (if used).
+
+Run the Player
+
+bash
+Copy code
+cd beamer-mono-main/player-electron
+npm start
+Describe what happens:
+
+On first run: player registers with backend and creates player.json.
+
+Then: player fetches playlist, downloads assets, starts playback.
+
+Every 60 seconds: sends heartbeat with GPS + device metrics.
+
+Each creative play: sends a playback event with GPS.
+
+Auto-start on boot (systemd example for Linux)
+
+Provide a sample unit file:
+
+ini
+Copy code
+[Unit]
+Description=Beamer Player
+After=network.target
+
+[Service]
+Type=simple
+WorkingDirectory=/opt/beamer/player-electron
+ExecStart=/usr/bin/npm start
+Restart=always
+RestartSec=5
+Environment=NODE_ENV=production
+
+[Install]
+WantedBy=multi-user.target
+And brief commands:
+
+bash
+Copy code
+sudo cp beamer-player.service /etc/systemd/system/
+sudo systemctl daemon-reload
+sudo systemctl enable beamer-player
+sudo systemctl start beamer-player
+Troubleshooting
+
+Add a few key items:
+
+Missing beamer.config.json → player will throw a clear error.
+
+Wrong api_base_url → heartbeats / playbacks fail (check logs).
+
+Wrong screen_id → CMS shows no data for the expected screen.
+
+Logs: where to find them (e.g. stdout, journald for systemd).
+
+─────────────────────────
+STEP 8 – Run and sanity check
+─────────────────────────
+
+After these changes:
+
+From repo root:
+
+bash
+Copy code
+cd beamer-mono-main/player-electron
+Create a test beamer.config.json using your staging API and a known screen_id.
+
+Run:
+
+bash
+Copy code
+npm start
+Confirm via logs:
+
+It loads beamer.config.json.
+
+It calls register using that config (no hard-coded IDs).
+
+It fetches playlist and starts playback.
+
+It sends heartbeats and playbacks with GPS + metrics.
+
+If TypeScript or imports break, fix them before finishing.
+
+End result:
+
+Player config & provisioning are now ops-friendly.
+
+API base URL, serial number, and screen_id are all driven by beamer.config.json.
+
+There is a clear PLAYER_SETUP.md for deployment.

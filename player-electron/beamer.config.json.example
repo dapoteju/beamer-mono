@@ -1,0 +1,6 @@
+{
+  "api_base_url": "https://your-beamer-backend.replit.app/api",
+  "serial_number": "HW-000001",
+  "screen_id": "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx",
+  "provisioning_code": "ABC123"
+}

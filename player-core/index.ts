@@ -1,16 +1,21 @@
-import { loadJSON, saveJSON } from "./storage";
-import { registerPlayer } from "./apiClient";
+import { loadJSON, saveJSON, loadBeamerConfig } from "./storage";
+import { registerPlayer, setApiBaseUrl } from "./apiClient";
 import { updatePlaylist } from "./playlistService";
 import { startPlaybackLoop } from "./playerEngine";
 import { flushPlaybacks, sendHeartbeatEvent } from "./telemetryService";
 import { startGpsPolling } from "./gpsService";
 
 async function initPlayer(onPlay: any) {
+  const beamerConfig = loadBeamerConfig();
+  console.log("Loaded beamer.config.json:", beamerConfig);
+
+  setApiBaseUrl(beamerConfig.api_base_url);
+
   let config = loadJSON("player.json");
 
   if (!config) {
     console.log("Registering player...");
-    config = await registerPlayer();
+    config = await registerPlayer(beamerConfig);
     if (!config.software_version) {
       config.software_version = "1.0.0";
     }

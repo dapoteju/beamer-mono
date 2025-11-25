@@ -1,6 +1,11 @@
 import { PlayerConfig, Playlist, PlaybackEvent, HeartbeatEvent } from "./types";
+import { RawBeamerConfig } from "./storage";
 
-const BASE_URL = "https://17d379ae-de32-486e-8229-49811a28d432-00-1vcd9a1z4xejy.spock.replit.dev/api/player";
+let BASE_URL = "https://beamer-api.replit.app/api/player";
+
+export function setApiBaseUrl(url: string) {
+  BASE_URL = url.replace(/\/+$/, "") + "/player";
+}
 
 function authHeader(auth_token: string) {
   return {
@@ -8,14 +13,22 @@ function authHeader(auth_token: string) {
   };
 }
 
-export async function registerPlayer(): Promise<PlayerConfig> {
+export async function registerPlayer(beamerConfig: RawBeamerConfig): Promise<PlayerConfig> {
+  const { serial_number, screen_id, provisioning_code } = beamerConfig;
+
+  const body: Record<string, string> = {
+    serial_number,
+    screen_id,
+  };
+
+  if (provisioning_code) {
+    body.provisioning_code = provisioning_code;
+  }
+
   const res = await fetch(`${BASE_URL}/register`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      serial_number: "SIMULATED-PLAYER",
-      screen_id: "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee",
-    }),
+    body: JSON.stringify(body),
   });
 
   const json = await res.json();
