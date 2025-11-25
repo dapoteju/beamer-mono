@@ -1,0 +1,167 @@
+The backend already supports:
+
+Campaigns
+
+Flights
+
+Creatives
+
+Creative upload + CRUD
+
+I now need you to implement the missing link:
+Assign creatives to a flight with weights, so the decision engine can build playlists.
+
+This requires backend + frontend updates.
+
+🔧 BACKEND WORK (API)
+
+Check for flight_creatives table / model
+
+If it already exists, use it.
+
+If not, create it (Drizzle/Postgres):
+
+id: string PK
+flight_id: string FK → flights.id
+creative_id: string FK → creatives.id
+weight: integer (default 100)
+created_at: timestamp
+
+
+Create /api/flights/:flightId/creatives endpoints
+
+GET /api/flights/:flightId/creatives
+Returns a list of creatives assigned to this flight with their weights.
+
+POST /api/flights/:flightId/creatives
+Body:
+
+{
+  "items": [
+    { "creative_id": "cr1", "weight": 70 },
+    { "creative_id": "cr2", "weight": 30 }
+  ]
+}
+
+
+Behavior:
+
+Validate that the flight exists.
+
+Validate creatives belong to the same campaign as the flight.
+
+Remove existing mappings for this flight (simplest flow).
+
+Insert the new mappings.
+
+Return the updated list.
+
+PATCH /api/flights/:flightId/creatives/:id
+Update just the weight.
+
+DELETE /api/flights/:flightId/creatives/:id
+Remove a creative from the flight.
+
+Permissions
+Use the same advertiser/org-level rules used in creatives.routes.
+
+Decision engine integration
+Make sure that wherever the playlist builder runs, it now uses these mappings.
+
+🎨 FRONTEND WORK (CMS)
+
+Add a new “Creatives” tab inside the Flight Detail page.
+
+1. Find Flight Detail page
+
+Usually something like:
+cms-web/src/pages/FlightDetail.tsx
+or inside Campaign → Flights → Flight.
+
+2. Create a new component:
+
+cms-web/src/components/FlightCreativesTab.tsx
+
+This tab should:
+
+Fetch all creatives assigned to this flight (GET /api/flights/:flightId/creatives)
+
+Display them in a table:
+
+preview (image/video)
+
+name
+
+weight (editable input)
+
+delete/remove icon
+
+3. “Add Creatives” button
+
+Add a primary button at the top of the tab:
+
+“Add Creatives from Campaign”
+
+When clicked:
+
+Open a modal FlightAddCreativesModal.tsx
+
+Inside the modal:
+
+Fetch all creatives for the parent campaign using GET /api/campaigns/:campaignId/creatives
+
+Display them in a list with checkboxes
+
+For each selected creative, allow entering a weight (number field, default 100)
+
+On submit:
+
+Call POST /api/flights/:flightId/creatives with the selected list.
+
+Close modal
+
+Refresh list
+
+4. Updating weights inline
+
+In the main table, each row should have a weight input.
+
+Changing the weight automatically triggers:
+
+PATCH /api/flights/:flightId/creatives/:id
+
+5. Deleting a creative from a flight
+
+Add a remove/trash icon
+
+Confirm removal
+
+Call DELETE /api/flights/:flightId/creatives/:id
+
+Refresh the table
+
+6. UI consistency
+
+Reuse:
+
+same button styles
+
+same modal pattern
+
+same table styling as CampaignCreativesTab
+
+📦 DELIVERABLES
+
+When finished, tell me:
+
+Files created
+
+Files modified
+
+Final endpoint URLs
+
+How to navigate to the Flight → Creatives tab
+
+Also confirm the playlist endpoint now returns creatives based on FlightCreative mappings.
+
+Make sure everything compiles.
