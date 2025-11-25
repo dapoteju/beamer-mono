@@ -12,6 +12,7 @@ import { CampaignFormModal } from "../components/CampaignFormModal";
 import { FlightFormModal } from "../components/FlightFormModal";
 import BookingFormModal from "../components/BookingFormModal";
 import TargetingDetails from "../components/TargetingDetails";
+import { CampaignCreativesTab } from "../components/CampaignCreativesTab";
 
 export default function CampaignDetail() {
   const { id } = useParams<{ id: string }>();
@@ -21,7 +22,7 @@ export default function CampaignDetail() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const [activeTab, setActiveTab] = useState<"overview" | "flights" | "bookings">("overview");
+  const [activeTab, setActiveTab] = useState<"overview" | "flights" | "bookings" | "creatives">("overview");
   const [showEditModal, setShowEditModal] = useState(false);
   const [showFlightModal, setShowFlightModal] = useState(false);
   const [editingFlightId, setEditingFlightId] = useState<string | null>(null);
@@ -301,6 +302,16 @@ export default function CampaignDetail() {
           >
             Bookings
           </button>
+          <button
+            onClick={() => setActiveTab("creatives")}
+            className={`pb-3 text-sm font-medium border-b-2 transition-colors ${
+              activeTab === "creatives"
+                ? "border-blue-600 text-blue-600"
+                : "border-transparent text-zinc-600 hover:text-zinc-900"
+            }`}
+          >
+            Creatives
+          </button>
         </nav>
       </div>
 
@@ -522,6 +533,10 @@ export default function CampaignDetail() {
             </div>
           )}
         </div>
+      )}
+
+      {activeTab === "creatives" && (
+        <CampaignCreativesTab campaignId={campaign.id} />
       )}
 
       {showEditModal && (

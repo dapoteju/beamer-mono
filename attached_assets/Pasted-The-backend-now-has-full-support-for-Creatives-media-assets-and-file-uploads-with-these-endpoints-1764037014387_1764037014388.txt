@@ -1,0 +1,192 @@
+The backend now has full support for Creatives (media assets) and file uploads, with these endpoints:
+
+POST /api/uploads – upload file, returns file_url, mime_type, etc.
+
+GET /api/campaigns/:campaignId/creatives – list creatives for a campaign
+
+POST /api/campaigns/:campaignId/creatives – create a creative
+
+PATCH /api/creatives/:id – update a creative
+
+DELETE /api/creatives/:id – delete a creative
+
+I need you to add a proper CMS UI to manage Creatives under a Campaign.
+
+🔍 1. Find the Campaign Detail Page
+
+Locate the existing Campaign detail view in the frontend (React/TypeScript).
+
+This is the page where I can see a single campaign’s info and reporting.
+
+It might be something like CampaignDetail.tsx, CampaignPage, or a route like /campaigns/:id.
+
+Once you find it, add a new tab/section called “Creatives” in the campaign detail view, alongside the other sections/tabs (e.g., Summary, Reporting, Flights, etc., if they exist).
+
+🧾 2. Creatives List UI
+
+Inside the Creatives tab for a given campaign:
+
+Call GET /api/campaigns/:campaignId/creatives when the tab loads.
+
+campaignId should come from the current route / campaign context.
+
+Render the result in a table or card list. For each creative, show:
+
+name
+
+a small preview:
+
+if mime_type starts with image/, use <img src={file_url} />
+
+if mime_type starts with video/, use a small <video src={file_url} /> (muted, no controls or minimal controls)
+
+duration_seconds
+
+width x height
+
+status (e.g. pending_review, approved, rejected) as a colored badge
+
+regions_required (comma-separated list of region codes)
+
+Handle loading and error states:
+
+Show a loading spinner/skeleton while fetching.
+
+Show a simple error message if the API call fails.
+
+If there are no creatives, show an “empty state” message like:
+
+“No creatives added yet for this campaign.”
+
+Define and reuse a Creative TypeScript type based on the backend shape:
+
+export interface Creative {
+  id: string;
+  campaign_id: string;
+  name: string;
+  file_url: string;
+  mime_type: string;
+  duration_seconds: number;
+  width: number;
+  height: number;
+  status: 'pending_review' | 'approved' | 'rejected' | string;
+  regions_required?: string[]; // or unknown;
+  created_at: string;
+}
+
+⬆️ 3. “Add Creative” Flow (Upload + Create)
+
+In the Creatives tab, add a primary button at the top:
+
+“Add Creative”
+
+When clicked:
+
+Open a modal / drawer with a form:
+
+name (text input, required)
+
+file (file input, required)
+
+duration_seconds (number input, required)
+
+optional regions_required (e.g. a comma-separated text input or tags)
+
+When a file is selected and the user submits:
+
+First, upload the file to POST /api/uploads using FormData:
+
+field name should be file to match the backend.
+
+Use the response to get:
+
+file_url
+
+mime_type
+
+Then call:
+
+POST /api/campaigns/:campaignId/creatives with JSON body:
+
+{
+  "name": "<from form>",
+  "file_url": "<file_url from upload>",
+  "mime_type": "<mime_type from upload>",
+  "duration_seconds": <from form>,
+  "width": <optional: can be null or 0 for now>,
+  "height": <optional: can be null or 0 for now>,
+  "regions_required": ["NG", "KE"] // or derived from form if provided
+}
+
+
+When this succeeds:
+
+Close the modal
+
+Refresh the creatives list
+
+Show a success toast/notification if such a pattern exists.
+
+While uploading / creating:
+
+Disable the submit button
+
+Show a loading indicator in the button if possible.
+
+Note: If it’s easy to detect width/height on the frontend (for images/videos), do it; otherwise, just send placeholder values and keep the code clean and simple for now.
+
+✏️ 4. Edit & Delete Creatives
+
+In the creatives list, add actions for each row:
+
+Edit
+
+On click, open a modal or inline editing UI where the user can change:
+
+name
+
+status (pending_review, approved, rejected)
+
+regions_required (if present)
+
+Call PATCH /api/creatives/:id with only the changed fields.
+
+On success, update the list (or refetch) and close the modal.
+
+Delete
+
+Add a small “Delete” or trash icon button.
+
+Show a confirmation dialog: “Are you sure you want to delete this creative?”
+
+On confirm, call DELETE /api/creatives/:id.
+
+On success, remove it from the list or refetch.
+
+Handle errors gracefully with inline messages or toasts.
+
+🧩 5. Integration & Code Organisation
+
+Put the Creatives UI into a separate component if the campaign detail page is already large, e.g.:
+
+CampaignCreativesTab.tsx or similar.
+
+Reuse existing shared UI primitives: buttons, modals, tables, badges, toasts, etc.
+
+Reuse the existing API client/utilities (if there’s a central apiClient or fetchJson helper, use that instead of raw fetch everywhere).
+
+✅ Deliverables
+
+When you’re done, tell me:
+
+The file path(s) of:
+
+The updated Campaign detail page
+
+The new Creatives tab component (if created as a separate file)
+
+How to navigate in the CMS UI to reach the Creatives tab for a campaign.
+
+Any assumptions or TODOs you left as comments in the code.
+
+Make sure the code compiles and the Creatives tab actually loads creatives from the backend and lets me add/edit/delete them end-to-end.
