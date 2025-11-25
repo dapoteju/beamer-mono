@@ -39,6 +39,7 @@ The project is organized as a monorepo with distinct applications and libraries:
 - **Exposure Reporting**: Geographic visualization of ad impressions showing where ads were displayed. Clusters impressions by location (4 decimal precision) with circle markers sized by impression count. Static screens (billboard/indoor) show single location while vehicle screens show multiple exposure points based on GPS history. API endpoint at `/api/reports/campaigns/:id/exposure`.
 - **Compliance Reporting**: Third tab in Campaign Reporting that shows scheduled screens (via flights) and their daily activity status based on heartbeat data. Displays daily metrics for scheduled, active, and offline screens with stacked bar chart visualization. Per-screen status indicators (OK, NO_DELIVERY, OFFLINE) based on heartbeat and impression data. API endpoint at `/api/reports/campaigns/:id/compliance`.
 - **Development Tools**: Comprehensive seed script (`backend/scripts/seed.ts`) for deterministic and idempotent generation of extensive demo data, including organizations, users, publishers, screens, campaigns, and play events.
+- **Regions**: Country-level regulatory jurisdictions for creative approval tracking. Supported regions: Nigeria (NG, ARCON), Kenya (KE, KFCB), Ghana (GH, GACA), South Africa (ZA, AR). Migration script available at `backend/scripts/migrate-regions-to-country-level.ts` for converting from state-level to country-level regions.
 
 ### System Design Choices
 - **Monorepo Architecture**: Centralized repository for all platform components.
