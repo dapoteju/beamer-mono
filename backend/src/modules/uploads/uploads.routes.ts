@@ -67,10 +67,8 @@ router.post(
         });
       }
 
-      const protocol = req.headers["x-forwarded-proto"] || req.protocol;
-      const host = req.headers["x-forwarded-host"] || req.get("host");
-      const baseUrl = `${protocol}://${host}`;
-      const fileUrl = `${baseUrl}/uploads/${req.file.filename}`;
+      // Use relative URL so it works through any proxy
+      const fileUrl = `/uploads/${req.file.filename}`;
 
       res.status(201).json({
         status: "success",
