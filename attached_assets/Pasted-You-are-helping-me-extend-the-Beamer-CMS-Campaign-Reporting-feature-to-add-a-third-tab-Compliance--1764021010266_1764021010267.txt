@@ -1,0 +1,491 @@
+You are helping me extend the Beamer CMS Campaign Reporting feature to add a third tab: Compliance.
+
+We already have:
+
+/reporting/campaigns page with tabs:
+
+Delivery Report – impressions, by day, by screen, charts, CSV.
+
+Exposure – impression-weighted map (static + mobile).
+
+Backend endpoints:
+
+GET /api/reports/campaigns/:campaignId?startDate&endDate (Delivery)
+
+GET /api/reports/campaigns/:campaignId/exposure?startDate&endDate (Exposure)
+
+Data model:
+
+campaigns, flights, bookings linking campaigns → screens.
+
+play_events (or equivalent) holding proof-of-play (screenId, campaignId, playedAt, etc.).
+
+heartbeats (or equivalent) for screen uptime (screenId, recordedAt, maybe status).
+
+screens with metadata (screenType, classification, location, publisherId).
+
+React + TypeScript + React Query + Recharts + Leaflet.
+
+Auth + org scoping enforced via JWT (advertiser vs internal).
+
+Now we want to add a Compliance Report to answer:
+
+“For this campaign and date range, did the screens that were scheduled actually deliver?”
+
+This is an MVP compliance view: we’re not modelling booked impressions yet.
+We’ll focus on delivery vs zero-delivery vs offline and days with flights but no impressions.
+
+1. Backend – New Campaign Compliance Endpoint
+
+Add a new endpoint:
+
+GET /api/reports/campaigns/:campaignId/compliance?startDate=YYYY-MM-DD&endDate=YYYY-MM-DD
+
+Response Shape
+
+Create a TypeScript interface like:
+
+export type ComplianceScreenStatus =
+  | "OK"            // has impressions + heartbeats
+  | "NO_DELIVERY"   // has heartbeats but 0 impressions
+  | "OFFLINE";      // no heartbeats and 0 impressions
+
+export interface CampaignComplianceReport {
+  campaignId: string;
+  startDate: string; // ISO date
+  endDate: string;   // ISO date
+
+  summary: {
+    totalScreensScheduled: number;       // screens targeted by flights in this range
+    screensWithImpressions: number;      // delivered > 0 impressions
+    screensWithZeroImpressions: number;  // delivered == 0 impressions
+    screensWithoutHeartbeats: number;    // no heartbeats in range
+    totalImpressions: number;            // sum of impressions for this campaign in range
+    activeDays: number;                  // days where at least one flight is active
+    daysWithImpressions: number;         // days with >=1 impression for this campaign
+  };
+
+  byDay: {
+    date: string;            // ISO date
+    impressions: number;     // impressions that day
+    hasActiveFlight: boolean;// TRUE if at least one flight was active that day
+  }[];
+
+  byScreen: {
+    screenId: string;
+    screenName?: string | null;
+    screenType?: string | null;
+    publisherName?: string | null;
+    publisherType?: string | null;
+    impressions: number;          // total impressions for this screen in range
+    hasHeartbeats: boolean;       // any heartbeat in range?
+    firstImpressionAt?: string | null;
+    lastImpressionAt?: string | null;
+    status: ComplianceScreenStatus;
+  }[];
+}
+
+
+Add this to the backend reports module (e.g. backend/src/api/reports.ts or equivalent).
+
+Backend Logic (MVP, honest + simple)
+
+Parse campaignId + dates
+
+Use same parsing + “smart default” logic as Delivery.
+
+Validate startDate <= endDate.
+
+Find all screens scheduled for this campaign
+
+Use existing relationships:
+
+campaign → flights → bookings → screens (or however bookings are modelled).
+
+Compute the set of screenIds scheduled for at least one flight overlapping the date range.
+
+This becomes totalScreensScheduled.
+
+Compute impressions per screen & per day
+
+From play_events (or equivalent):
+
+Filter by campaignId.
+
+Filter playedAt between startDate and endDate (inclusive).
+
+Group:
+
+byScreen:
+
+impressions = count of events per screenId.
+
+firstImpressionAt, lastImpressionAt.
+
+byDay:
+
+Bucket by date (YYYY-MM-DD) and count impressions per date.
+
+totalImpressions = sum of all impressions in range.
+
+Compute activeDays + hasActiveFlight per day
+
+For each date in [startDate, endDate]:
+
+Determine if at least one flight for this campaign is active on that date
+(flight date range intersects that day).
+
+Build byDay[]:
+
+date
+
+impressions (0 if none)
+
+hasActiveFlight (true/false)
+
+activeDays = number of days with hasActiveFlight === true.
+
+daysWithImpressions = number of days with impressions > 0.
+
+Heartbeat / uptime info per screen
+
+From heartbeats (or equivalent):
+
+Filter by screenId IN scheduledScreens and recordedAt in range.
+
+For each scheduled screen, compute:
+
+hasHeartbeats = true if any heartbeat in range, else false.
+
+(We’re not modelling per-hour uptime yet; MVP is binary “any heartbeat vs none”.)
+
+Build byScreen[] and status
+
+Start from the set of scheduled screens.
+
+LEFT JOIN:
+
+impressions per screen
+
+heartbeat flag
+
+screen metadata (name, type)
+
+publisher metadata (name/type) using the same join logic as other reports.
+
+For each scheduled screen:
+
+impressions defaults to 0 if absent.
+
+hasHeartbeats defaults to false if no record.
+
+Compute status:
+
+if (impressions > 0 && hasHeartbeats) status = "OK";
+else if (impressions === 0 && hasHeartbeats) status = "NO_DELIVERY";
+else if (impressions === 0 && !hasHeartbeats) status = "OFFLINE";
+else status = "NO_DELIVERY"; // fallback
+
+
+Compute summary counts
+
+screensWithImpressions = count with impressions > 0.
+
+screensWithZeroImpressions = count with impressions === 0.
+
+screensWithoutHeartbeats = count with hasHeartbeats === false.
+
+Permissions
+
+Apply the same org / JWT scoping logic as existing reports:
+
+Advertiser users → only allowed to fetch compliance for campaigns they own.
+
+Internal users → can fetch for any campaign.
+
+Return CampaignComplianceReport from the endpoint.
+
+2. Frontend – New Compliance Tab
+
+Update the Campaign Reporting page so it has three tabs:
+
+Delivery Report
+
+Exposure
+
+Compliance
+
+Use the existing tab system; add a third tab state, e.g. 'delivery' | 'exposure' | 'compliance'.
+
+A. API Helper
+
+In cms-web/src/api/reports.ts, add:
+
+export type ComplianceScreenStatus =
+  | "OK"
+  | "NO_DELIVERY"
+  | "OFFLINE";
+
+export interface CampaignComplianceReport {
+  campaignId: string;
+  startDate: string;
+  endDate: string;
+  summary: {
+    totalScreensScheduled: number;
+    screensWithImpressions: number;
+    screensWithZeroImpressions: number;
+    screensWithoutHeartbeats: number;
+    totalImpressions: number;
+    activeDays: number;
+    daysWithImpressions: number;
+  };
+  byDay: {
+    date: string;
+    impressions: number;
+    hasActiveFlight: boolean;
+  }[];
+  byScreen: {
+    screenId: string;
+    screenName?: string | null;
+    screenType?: string | null;
+    publisherName?: string | null;
+    publisherType?: string | null;
+    impressions: number;
+    hasHeartbeats: boolean;
+    firstImpressionAt?: string | null;
+    lastImpressionAt?: string | null;
+    status: ComplianceScreenStatus;
+  }[];
+}
+
+export async function getCampaignComplianceReport(params: {
+  campaignId: string;
+  startDate: string;
+  endDate: string;
+}): Promise<CampaignComplianceReport> {
+  const { campaignId, startDate, endDate } = params;
+  const query = new URLSearchParams({ startDate, endDate }).toString();
+  const res = await fetch(
+    `/api/reports/campaigns/${campaignId}/compliance?${query}`,
+    { method: "GET", credentials: "include" }
+  );
+  if (!res.ok) {
+    throw new Error("Failed to fetch campaign compliance report");
+  }
+  return res.json();
+}
+
+
+Use React Query (useQuery) in the Compliance tab to fetch this when:
+
+A campaign is selected
+
+Date range is set
+
+User has clicked Load Report.
+
+3. Frontend – Compliance Tab UI
+
+Create a new component, e.g.:
+
+cms-web/src/pages/reporting/CampaignComplianceTab.tsx
+
+It should accept props:
+
+campaignId
+
+startDate
+
+endDate
+
+A flag that indicates the user has already hit Load Report (so it doesn’t auto-fire on page mount with empty filters).
+
+Use React Query + getCampaignComplianceReport.
+
+A. Loading / Error / Empty
+
+Loading: show “Loading compliance report…” spinner.
+
+Error: show alert:
+
+“We couldn’t load the compliance report. Please try again. If the problem persists, contact support.”
+
+Empty / edge: if summary.totalScreensScheduled === 0:
+
+“No screens were scheduled for this campaign during the selected date range.”
+
+B. Summary Cards
+
+Show 4–5 cards at the top:
+
+Screens Scheduled
+summary.totalScreensScheduled
+
+Screens With Delivery
+summary.screensWithImpressions
+
+Screens With Zero Delivery
+summary.screensWithZeroImpressions
+
+Screens Without Heartbeats
+summary.screensWithoutHeartbeats
+
+Total Impressions (optional)
+summary.totalImpressions
+
+Use the same stat-card style as Delivery/Exposure.
+
+C. Compliance Chart (By Day)
+
+Use Recharts (already integrated) to add a simple chart:
+
+X-axis: date
+
+Y-axis: impressions
+
+Show:
+
+Bars or line for impressions per day.
+
+Visually mark days where:
+
+hasActiveFlight === true AND impressions === 0.
+
+Implementation idea:
+
+Use a bar chart where:
+
+If hasActiveFlight && impressions > 0 → normal bar.
+
+If hasActiveFlight && impressions === 0 → bar in a warning color or small tick.
+
+Tooltips show:
+
+Date
+
+Impressions
+
+Whether a flight was active.
+
+This helps quickly see “flight days with zero delivery”.
+
+D. Screen Compliance Table
+
+Below the chart, render a table with:
+
+Columns:
+
+Screen – screenName || screenId
+
+Screen Type – same badge styling as Delivery
+
+Publisher – publisherName (with publisherType in parentheses if desired)
+
+Impressions
+
+Heartbeats – “Yes/No”
+
+Status – colored pill based on status:
+
+OK – green badge (“OK”)
+
+NO_DELIVERY – amber badge (“No delivery”)
+
+OFFLINE – red badge (“Offline”)
+
+Optional: First Seen / Last Seen – short datetime from firstImpressionAt / lastImpressionAt.
+
+Sort default:
+
+status severity (OFFLINE at top, then NO_DELIVERY, then OK),
+and within that by impressions descending.
+
+E. CSV Export (Optional but Recommended)
+
+Add an “Export Compliance (CSV)” button to export byScreen:
+
+Headers:
+
+Screen Name
+
+Screen ID
+
+Screen Type
+
+Publisher
+
+Publisher Type
+
+Impressions
+
+Has Heartbeats
+
+Status
+
+First Impression At
+
+Last Impression At
+
+Use the existing csv.ts utility.
+
+Disable the button when summary.totalScreensScheduled === 0.
+
+4. Integrate Tab Into Campaign Reporting Page
+
+In the main Campaign Reporting page:
+
+Extend tab state to include 'compliance'.
+
+When the Compliance tab is selected, render <CampaignComplianceTab ...> and pass:
+
+campaignId
+
+startDate
+
+endDate
+
+A flag that indicates filters are valid and the user clicked Load Report.
+
+Make sure:
+
+Filters (campaign/date) are shared across all three tabs.
+
+Clicking Load Report doesn’t auto-fetch compliance until the tab is visited (to avoid unnecessary network calls), or use React Query’s enabled option with tab check.
+
+5. Permissions
+
+Do not change existing auth logic.
+
+Ensure the new compliance endpoint uses the same scoping as Delivery/Exposure.
+
+Advertiser users must not see data for campaigns they don’t own.
+
+6. Deliverables Summary
+
+When finished, please output a summary covering:
+
+Backend:
+
+Endpoint path & file(s) changed.
+
+How scheduled screens were determined.
+
+How impressions / heartbeats / statuses were computed.
+
+Frontend:
+
+Files created/updated (CampaignComplianceTab, reports.ts, reporting page).
+
+How tabs are wired.
+
+How loading/error/empty states behave.
+
+Testing steps:
+
+Example seeded campaigns to test:
+
+One with healthy delivery.
+
+One with some screens with zero delivery.
+
+One with screens offline (no heartbeats).
