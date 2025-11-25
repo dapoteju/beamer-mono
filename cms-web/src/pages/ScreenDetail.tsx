@@ -37,6 +37,15 @@ export default function ScreenDetail() {
   );
   const [timeRange, setTimeRange] = useState("24h");
   const [showEditModal, setShowEditModal] = useState(false);
+  const [copiedId, setCopiedId] = useState(false);
+
+  const copyScreenId = async () => {
+    if (detail?.screen.id) {
+      await navigator.clipboard.writeText(detail.screen.id);
+      setCopiedId(true);
+      setTimeout(() => setCopiedId(false), 2000);
+    }
+  };
 
   async function loadScreenDetail() {
     if (!id) return;
@@ -192,11 +201,9 @@ export default function ScreenDetail() {
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-2xl font-semibold text-zinc-900">
-              {screen.code}
-              {screen.name && (
-                <span className="text-zinc-500 font-normal ml-2">• {screen.name}</span>
-              )}
+              {screen.name || screen.code}
             </h1>
+            <p className="text-xs text-zinc-500 font-mono mt-0.5">{screen.code}</p>
             <p className="text-sm text-zinc-600 mt-1">
               {screen.city}, {screen.regionCode} • {
                 screen.publisher 
@@ -233,6 +240,17 @@ export default function ScreenDetail() {
         <div className="bg-white border border-zinc-200 rounded-lg p-4">
           <h3 className="text-sm font-medium text-zinc-700 mb-3">Screen Info</h3>
           <div className="space-y-2 text-sm">
+            <div>
+              <span className="text-zinc-500">Screen ID:</span>{" "}
+              <span className="text-zinc-900 font-mono text-xs">{screen.id}</span>
+              <button
+                onClick={copyScreenId}
+                className="ml-2 text-blue-600 hover:text-blue-700 text-xs"
+                title="Copy Screen ID"
+              >
+                {copiedId ? "Copied!" : "Copy"}
+              </button>
+            </div>
             <div>
               <span className="text-zinc-500">Classification:</span>{" "}
               <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
