@@ -573,6 +573,28 @@ export interface CampaignMobilityReport {
   }>;
 }
 
+export interface CampaignExposureReport {
+  campaignId: string;
+  startDate: string;
+  endDate: string;
+  totalImpressions: number;
+  totalExposureLocations: number;
+  points: Array<{
+    lat: number;
+    lng: number;
+    impressions: number;
+  }>;
+  byScreen: Array<{
+    screenId: string;
+    screenName?: string | null;
+    screenType?: string | null;
+    publisherName?: string | null;
+    publisherType?: string | null;
+    impressions: number;
+    exposureLocations: number;
+  }>;
+}
+
 export async function getCampaignMobilityReport(
   campaignId: string,
   startDate?: string,
@@ -710,5 +732,220 @@ export async function getCampaignMobilityReport(
     startDate: effectiveStartDate,
     endDate: effectiveEndDate,
     screens: screensWithMobility,
+  };
+}
+
+export async function getCampaignExposureReport(
+  campaignId: string,
+  startDate?: string,
+  endDate?: string
+): Promise<CampaignExposureReport | null> {
+  const campaign = await db
+    .select()
+    .from(campaigns)
+    .where(eq(campaigns.id, campaignId))
+    .limit(1);
+
+  if (campaign.length === 0) {
+    return null;
+  }
+
+  const campaignData = campaign[0];
+
+  const today = new Date().toISOString().split('T')[0];
+  const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+
+  let effectiveStartDate = startDate || campaignData.startDate || thirtyDaysAgo;
+  let effectiveEndDate = endDate || campaignData.endDate || today;
+
+  const startDateObj = new Date(effectiveStartDate);
+  const endDateObj = new Date(effectiveEndDate);
+  
+  if (isNaN(startDateObj.getTime()) || isNaN(endDateObj.getTime())) {
+    throw new Error("Invalid date format provided");
+  }
+
+  if (startDateObj > endDateObj) {
+    throw new Error("Start date must be before or equal to end date");
+  }
+
+  const dateConditions = [
+    eq(playEvents.campaignId, campaignId),
+    gte(sql`DATE(${playEvents.startedAt})`, effectiveStartDate),
+    lte(sql`DATE(${playEvents.startedAt})`, effectiveEndDate),
+  ];
+
+  const playEventsResult = await db
+    .select({
+      id: playEvents.id,
+      screenId: playEvents.screenId,
+      startedAt: playEvents.startedAt,
+    })
+    .from(playEvents)
+    .where(and(...dateConditions));
+
+  if (playEventsResult.length === 0) {
+    return {
+      campaignId: campaignData.id,
+      startDate: effectiveStartDate,
+      endDate: effectiveEndDate,
+      totalImpressions: 0,
+      totalExposureLocations: 0,
+      points: [],
+      byScreen: [],
+    };
+  }
+
+  const screenIds = [...new Set(playEventsResult.map(p => p.screenId))];
+
+  const screensResult = await db
+    .select({
+      id: screens.id,
+      name: screens.name,
+      screenType: screens.screenType,
+      screenClassification: screens.screenClassification,
+      lat: screens.lat,
+      lng: screens.lng,
+      publisherName: sql<string>`COALESCE(${publisherProfiles.fullName}, ${organisations.name}, 'Unknown')`,
+      publisherType: sql<string>`COALESCE(${publisherProfiles.publisherType}::text, ${organisations.type}::text, 'Unknown')`,
+    })
+    .from(screens)
+    .leftJoin(publisherProfiles, eq(screens.publisherId, publisherProfiles.id))
+    .leftJoin(organisations, eq(screens.publisherOrgId, organisations.id))
+    .where(inArray(screens.id, screenIds));
+
+  const screenMap = new Map(screensResult.map(s => [s.id, s]));
+
+  const mobileScreenIds = screensResult
+    .filter(s => s.screenClassification === 'vehicle')
+    .map(s => s.id);
+
+  let locationHistoryMap = new Map<string, Array<{ lat: number; lng: number; recordedAt: Date }>>();
+  
+  if (mobileScreenIds.length > 0) {
+    const locationHistory = await db
+      .select({
+        screenId: screenLocationHistory.screenId,
+        latitude: screenLocationHistory.latitude,
+        longitude: screenLocationHistory.longitude,
+        recordedAt: screenLocationHistory.recordedAt,
+      })
+      .from(screenLocationHistory)
+      .where(
+        and(
+          inArray(screenLocationHistory.screenId, mobileScreenIds),
+          gte(screenLocationHistory.recordedAt, new Date(effectiveStartDate)),
+          lte(screenLocationHistory.recordedAt, new Date(effectiveEndDate + 'T23:59:59.999Z'))
+        )
+      )
+      .orderBy(asc(screenLocationHistory.recordedAt));
+
+    for (const loc of locationHistory) {
+      if (!locationHistoryMap.has(loc.screenId)) {
+        locationHistoryMap.set(loc.screenId, []);
+      }
+      locationHistoryMap.get(loc.screenId)!.push({
+        lat: parseFloat(loc.latitude),
+        lng: parseFloat(loc.longitude),
+        recordedAt: loc.recordedAt,
+      });
+    }
+  }
+
+  const exposurePointsMap = new Map<string, number>();
+  const screenExposureMap = new Map<string, { impressions: number; locations: Set<string> }>();
+
+  for (const screenId of screenIds) {
+    screenExposureMap.set(screenId, { impressions: 0, locations: new Set() });
+  }
+
+  const roundCoord = (val: number, decimals: number = 4): number => {
+    const factor = Math.pow(10, decimals);
+    return Math.round(val * factor) / factor;
+  };
+
+  for (const event of playEventsResult) {
+    const screen = screenMap.get(event.screenId);
+    if (!screen) continue;
+
+    const screenExposure = screenExposureMap.get(event.screenId)!;
+    screenExposure.impressions++;
+
+    let lat: number | null = null;
+    let lng: number | null = null;
+
+    if (screen.screenClassification === 'vehicle') {
+      const screenLocations = locationHistoryMap.get(event.screenId);
+      if (screenLocations && screenLocations.length > 0 && event.startedAt) {
+        const eventTime = event.startedAt.getTime();
+        let closestLocation = screenLocations[0];
+        let closestDiff = Math.abs(screenLocations[0].recordedAt.getTime() - eventTime);
+
+        for (const loc of screenLocations) {
+          const diff = Math.abs(loc.recordedAt.getTime() - eventTime);
+          if (diff < closestDiff) {
+            closestDiff = diff;
+            closestLocation = loc;
+          }
+          if (diff < 60000) break;
+        }
+
+        if (closestDiff <= 3600000) {
+          lat = closestLocation.lat;
+          lng = closestLocation.lng;
+        }
+      }
+    } else {
+      if (screen.lat && screen.lng) {
+        lat = parseFloat(screen.lat);
+        lng = parseFloat(screen.lng);
+      }
+    }
+
+    if (lat !== null && lng !== null && !isNaN(lat) && !isNaN(lng)) {
+      const roundedLat = roundCoord(lat);
+      const roundedLng = roundCoord(lng);
+      const key = `${roundedLat},${roundedLng}`;
+      
+      exposurePointsMap.set(key, (exposurePointsMap.get(key) || 0) + 1);
+      screenExposure.locations.add(key);
+    }
+  }
+
+  const points = Array.from(exposurePointsMap.entries()).map(([key, impressions]) => {
+    const [lat, lng] = key.split(',').map(Number);
+    return { lat, lng, impressions };
+  });
+
+  points.sort((a, b) => b.impressions - a.impressions);
+
+  const byScreen = screenIds.map(screenId => {
+    const screen = screenMap.get(screenId);
+    const exposure = screenExposureMap.get(screenId)!;
+    
+    return {
+      screenId,
+      screenName: screen?.name || null,
+      screenType: screen?.screenClassification || screen?.screenType || null,
+      publisherName: screen?.publisherName || null,
+      publisherType: screen?.publisherType || null,
+      impressions: exposure.impressions,
+      exposureLocations: exposure.locations.size,
+    };
+  });
+
+  byScreen.sort((a, b) => b.impressions - a.impressions);
+
+  const totalImpressions = playEventsResult.length;
+  const totalExposureLocations = points.length;
+
+  return {
+    campaignId: campaignData.id,
+    startDate: effectiveStartDate,
+    endDate: effectiveEndDate,
+    totalImpressions,
+    totalExposureLocations,
+    points,
+    byScreen,
   };
 }

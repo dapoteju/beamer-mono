@@ -5,7 +5,7 @@ import { fetchCampaigns } from "../api/campaigns";
 import { getCampaignReport, type CampaignReport } from "../api/reports";
 import { useAuthStore } from "../store/authStore";
 import { downloadCsv } from "../utils/csv";
-import CampaignMobilityTab from "./reporting/CampaignMobilityTab";
+import CampaignExposureTab from "./reporting/CampaignExposureTab";
 import {
   LineChart,
   Line,
@@ -22,7 +22,7 @@ import {
   ResponsiveContainer,
 } from "recharts";
 
-type ReportTab = "delivery" | "mobility";
+type ReportTab = "delivery" | "exposure";
 
 export default function CampaignReporting() {
   const { user } = useAuthStore();
@@ -271,20 +271,20 @@ export default function CampaignReporting() {
             Delivery Report
           </button>
           <button
-            onClick={() => setActiveTab("mobility")}
+            onClick={() => setActiveTab("exposure")}
             className={`whitespace-nowrap border-b-2 py-4 px-1 text-sm font-medium ${
-              activeTab === "mobility"
+              activeTab === "exposure"
                 ? "border-blue-600 text-blue-600"
                 : "border-transparent text-zinc-500 hover:text-zinc-700 hover:border-zinc-300"
             }`}
           >
-            Mobility
+            Exposure
           </button>
         </nav>
       </div>
 
-      {activeTab === "mobility" ? (
-        <CampaignMobilityTab
+      {activeTab === "exposure" ? (
+        <CampaignExposureTab
           campaignId={selectedCampaignId}
           startDate={startDate}
           endDate={endDate}

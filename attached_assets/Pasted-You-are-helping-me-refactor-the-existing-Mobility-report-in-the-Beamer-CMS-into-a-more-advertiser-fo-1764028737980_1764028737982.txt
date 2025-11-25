@@ -1,0 +1,338 @@
+You are helping me refactor the existing Mobility report in the Beamer CMS into a more advertiser-focused Exposure report that shows impression clusters on a map, for all screen types (not just vehicles).
+
+We already have:
+
+Campaign Reporting page at /reporting/campaigns with two tabs:
+
+“Delivery Report” (completed)
+
+“Mobility” (current GPS-route view)
+
+Delivery backend endpoint:
+GET /api/reports/campaigns/:campaignId?startDate=YYYY-MM-DD&endDate=YYYY-MM-DD
+returning total impressions + byScreen[] etc.
+
+Mobility backend endpoint:
+GET /api/reports/campaigns/:campaignId/mobility?...
+returning screenLocationHistory-based GPS paths
+
+Tables:
+
+play_events (or similar) with campaignId, screenId, playedAt, etc.
+
+screen_location_history (screenId, lat, lng, recordedAt)
+
+screens with screenType, coordinates for static/billboard/indoor screens
+
+Leaflet map integration already working in the Mobility tab.
+
+Realistic seed data for vehicle GPS and play events.
+
+Now we want to:
+
+Rename the “Mobility” tab → “Exposure” in the UI.
+
+Replace the Mobility tab’s main content with an Exposure Map that shows impression-weighted points/clusters.
+
+Have this Exposure view cover all screens in the campaign:
+
+Static (billboards/indoor) → impressions at fixed lat/lng
+
+Mobile (vehicles) → impressions attached to nearest GPS positions
+
+1. Backend – New Exposure Endpoint
+
+Add a new endpoint (keep the old mobility endpoint for now):
+
+GET /api/reports/campaigns/:campaignId/exposure?startDate=YYYY-MM-DD&endDate=YYYY-MM-DD
+
+Response Type
+
+Define:
+
+export interface CampaignExposureReport {
+  campaignId: string;
+  startDate: string;   // ISO date
+  endDate: string;     // ISO date;
+  totalImpressions: number;       // same as delivery for this range
+  totalExposureLocations: number; // number of aggregated exposure points
+  points: {
+    lat: number;
+    lng: number;
+    impressions: number;          // sum of impressions at/near this location
+  }[];
+  byScreen: {
+    screenId: string;
+    screenName?: string | null;
+    screenType?: string | null;
+    publisherName?: string | null;
+    publisherType?: string | null;
+    impressions: number;          // impressions for this screen in range
+    exposureLocations: number;    // number of distinct locations used for this screen
+  }[];
+}
+
+
+Place this in the existing reports backend module (reports.ts or similar).
+
+Backend Logic
+
+Parse campaignId + dates
+
+Use same date parsing + smart defaults as the Delivery endpoint.
+
+Validate startDate <= endDate.
+
+Get impression data
+
+Either:
+
+Reuse the Delivery logic to compute totalImpressions and byScreen for the campaign and date range
+OR
+
+Query play_events directly to compute impressions per screen in that range.
+
+We assume 1 play_event = 1 impression for now.
+
+Build exposure points
+
+We want impression-weighted locations for all screens:
+
+For static screens (billboard/indoor):
+
+Use screens.latitude / screens.longitude (or equivalent fields).
+
+For each screen, create one exposure point:
+
+lat/lng from screen
+
+impressions = impressions for that screen in the date range.
+
+This ensures their impact shows on the exposure map.
+
+For mobile screens (vehicles):
+
+For all play_events for the campaign in the date range:
+
+For each event with screenId that is mobile:
+
+Find the nearest GPS point from screen_location_history for that screen around playedAt:
+
+e.g. nearest recordedAt within ±60 seconds.
+
+Use that GPS coordinate as the “play location”.
+
+To avoid one marker per impression, aggregate by rounded coordinates:
+
+Round lat/lng to ~4 decimal places or similar.
+
+Group by (roundedLat, roundedLng), summing impressions.
+
+For each such group, create an exposure point with:
+
+lat, lng = grouped position
+
+impressions = count of matched play events
+
+Aggregate screen-level exposureLocations
+
+For byScreen:
+
+impressions = total impressions for that screen in range
+
+exposureLocations:
+
+For static screens: 1 (their fixed location)
+
+For mobile screens: number of distinct rounded (lat, lng) locations used for that screen
+
+Return report
+
+totalImpressions = sum of all impressions (from delivery logic)
+
+totalExposureLocations = total number of points[]
+
+points[] as described above
+
+byScreen[] as described above
+
+Permissions
+
+Apply same org / JWT scoping as Delivery:
+
+Advertiser users can only request exposure for their campaigns.
+
+Internal users can access any campaign.
+
+2. Frontend – Rename Tab & Wire New Endpoint
+
+In the Campaign Reporting page:
+
+Change tab labels:
+
+“Delivery Report”
+
+“Exposure” (instead of “Mobility”)
+
+Keep the underlying state shape (e.g. 'delivery' | 'exposure').
+
+Update the old CampaignMobilityTab into CampaignExposureTab:
+
+Rename the component/file if appropriate, e.g.
+CampaignMobilityTab.tsx → CampaignExposureTab.tsx
+
+Replace its data fetching logic to use the new API helper (below).
+
+3. Frontend – Exposure API Helper
+
+In cms-web/src/api/reports.ts:
+
+export interface CampaignExposureReport {
+  campaignId: string;
+  startDate: string;
+  endDate: string;
+  totalImpressions: number;
+  totalExposureLocations: number;
+  points: {
+    lat: number;
+    lng: number;
+    impressions: number;
+  }[];
+  byScreen: {
+    screenId: string;
+    screenName?: string | null;
+    screenType?: string | null;
+    publisherName?: string | null;
+    publisherType?: string | null;
+    impressions: number;
+    exposureLocations: number;
+  }[];
+}
+
+export async function getCampaignExposureReport(params: {
+  campaignId: string;
+  startDate: string;
+  endDate: string;
+}): Promise<CampaignExposureReport> {
+  const { campaignId, startDate, endDate } = params;
+  const query = new URLSearchParams({ startDate, endDate }).toString();
+  const res = await fetch(
+    `/api/reports/campaigns/${campaignId}/exposure?${query}`,
+    { method: "GET", credentials: "include" }
+  );
+  if (!res.ok) {
+    throw new Error("Failed to fetch campaign exposure report");
+  }
+  return res.json();
+}
+
+
+Use React Query to fetch this when the Exposure tab is active and campaign + dates are set.
+
+4. Frontend – Exposure Tab UI
+A. Summary Cards
+
+At the top of the Exposure tab, show:
+
+Total Impressions
+
+From report.totalImpressions
+
+Same formatting as Delivery.
+
+Exposure Locations
+
+report.totalExposureLocations
+
+Label: “Exposure Locations” (or “Impression Locations”).
+
+Tracked Date Range
+
+startDate → endDate formatted like Delivery.
+
+Remove the old “Total GPS Points” wording.
+
+B. Exposure Map
+
+Use the existing Leaflet map, but change what it renders:
+
+Use report.points as the data source.
+
+For each point:
+
+Render a circle marker at (lat, lng) with:
+
+Radius scaled based on impressions (e.g. sqrt/impressions bucket).
+
+Tooltip on hover:
+
+Impressions: X
+
+Optionally, use a simple color scale:
+
+Low impressions → lighter
+
+High impressions → darker
+
+The idea: denser exposure = larger, stronger circles.
+
+You can keep the existing tile layer and controls.
+
+If a Leaflet clustering or heatmap library is already present, you may use it; otherwise, simple circle markers are fine for v1.
+
+C. Screens Table (optional but useful)
+
+Below the map, reuse a table similar to the Mobility table, but with exposure-focused columns:
+
+Screen Name
+
+Screen Type
+
+Publisher
+
+Impressions
+
+Exposure Locations
+
+Sort by impressions descending.
+
+D. States
+
+Loading: “Loading exposure data…”
+
+Error: similar error alert as Delivery.
+
+Empty: if totalExposureLocations === 0:
+
+“No exposure locations for this campaign and date range.
+This usually means there were no impressions during this period.”
+
+5. Integration Notes
+
+The Delivery tab remains unchanged.
+
+The new Exposure tab uses the new /exposure endpoint.
+
+The old /mobility endpoint and map can remain in the codebase for now (used later for internal ops if needed), but it should not be the primary advertiser-facing view.
+
+6. Deliverables Summary
+
+When done, please output a summary of:
+
+Backend:
+
+New exposure endpoint path and implementation details.
+
+Frontend:
+
+Tabs updated (“Mobility” → “Exposure”).
+
+New getCampaignExposureReport helper.
+
+New Exposure map behaviour (markers sized by impressions).
+
+Updated summary cards & wording.
+
+How to test:
+
+Example campaign(s) from seed data that show both static and vehicle exposures on the map.

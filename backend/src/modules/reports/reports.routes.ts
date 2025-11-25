@@ -2,6 +2,7 @@ import { Router, Request, Response, NextFunction } from "express";
 import {
   getCampaignReport,
   getCampaignMobilityReport,
+  getCampaignExposureReport,
   getBookingReport,
   getScreenReport,
   getCreativeReport,
@@ -54,6 +55,49 @@ reportsRouter.get(
       }
 
       const report = await getCampaignMobilityReport(
+        id,
+        startDate as string | undefined,
+        endDate as string | undefined
+      );
+
+      if (!report) {
+        return res.status(404).json({
+          status: "error",
+          message: "Campaign not found",
+        });
+      }
+
+      res.json({
+        status: "success",
+        data: report,
+      });
+    } catch (err: any) {
+      if (err.message?.includes("Start date must be") || err.message?.includes("Invalid date")) {
+        return res.status(400).json({
+          status: "error",
+          message: err.message,
+        });
+      }
+      next(err);
+    }
+  }
+);
+
+reportsRouter.get(
+  "/campaigns/:id/exposure",
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { id } = req.params;
+      const { startDate, endDate } = req.query;
+
+      if (startDate && endDate && startDate > endDate) {
+        return res.status(400).json({
+          status: "error",
+          message: "Start date must be before or equal to end date",
+        });
+      }
+
+      const report = await getCampaignExposureReport(
         id,
         startDate as string | undefined,
         endDate as string | undefined

@@ -67,3 +67,38 @@ export async function getCampaignMobilityReport(
   );
   return response.data.data;
 }
+
+export interface CampaignExposureReport {
+  campaignId: string;
+  startDate: string;
+  endDate: string;
+  totalImpressions: number;
+  totalExposureLocations: number;
+  points: Array<{
+    lat: number;
+    lng: number;
+    impressions: number;
+  }>;
+  byScreen: Array<{
+    screenId: string;
+    screenName?: string | null;
+    screenType?: string | null;
+    publisherName?: string | null;
+    publisherType?: string | null;
+    impressions: number;
+    exposureLocations: number;
+  }>;
+}
+
+export async function getCampaignExposureReport(
+  params: CampaignReportParams
+): Promise<CampaignExposureReport> {
+  const queryParams = new URLSearchParams();
+  if (params.startDate) queryParams.append("startDate", params.startDate);
+  if (params.endDate) queryParams.append("endDate", params.endDate);
+
+  const response = await apiClient.get(
+    `/reports/campaigns/${params.campaignId}/exposure?${queryParams.toString()}`
+  );
+  return response.data.data;
+}
