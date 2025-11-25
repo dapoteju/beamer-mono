@@ -1,8 +1,8 @@
-// src/index.ts
 import "dotenv/config";
 
 import express from "express";
 import cors from "cors";
+import path from "path";
 import { json } from "body-parser";
 
 import { healthRouter } from "./modules/health/health.routes";
@@ -19,16 +19,21 @@ import { playerRouter } from "./modules/player/player.routes";
 import { reportsRouter } from "./modules/reports/reports.routes";
 import { publishersRouter } from "./modules/publishers/publishers.routes";
 import { advertisersRouter } from "./modules/advertisers/advertisers.routes";
+import { uploadsRouter, UPLOADS_DIR } from "./modules/uploads/uploads.routes";
 
 import { notFoundHandler, errorHandler } from "./middleware/errorhandler";
 
 const app = express();
 
-// Middlewares
 app.use(cors());
 app.use(json());
 
-// Routes
+app.use("/uploads", express.static(UPLOADS_DIR, {
+  setHeaders: (res) => {
+    res.set("Cache-Control", "public, max-age=31536000");
+  },
+}));
+
 app.use("/api/health", healthRouter);
 app.use("/api/auth", authRouter);
 app.use("/api/organisations", organisationsRouter);
@@ -36,8 +41,9 @@ app.use("/api/screens", screensRouter);
 app.use("/api/regions", regionsRouter);
 app.use("/api/campaigns", campaignsRouter);
 app.use("/api/flights", flightsRouter);
-app.use("/api/campaigns", creativesRouter);  // creation
-app.use("/api/creatives", creativesRouter);  // approval
+app.use("/api/campaigns", creativesRouter);
+app.use("/api/creatives", creativesRouter);
+app.use("/api/uploads", uploadsRouter);
 app.use("/api/bookings", bookingsRouter);
 app.use("/api/invoices", invoicesRouter);
 app.use("/api/player", playerRouter);
@@ -45,7 +51,6 @@ app.use("/api/reports", reportsRouter);
 app.use("/api/publishers", publishersRouter);
 app.use("/api/advertisers", advertisersRouter);
 
-// 404 + error handlers last
 app.use(notFoundHandler);
 app.use(errorHandler);
 
