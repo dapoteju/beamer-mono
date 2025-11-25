@@ -9,6 +9,15 @@ const cors_1 = __importDefault(require("cors"));
 const path_1 = __importDefault(require("path"));
 const fs_1 = __importDefault(require("fs"));
 const body_parser_1 = require("body-parser");
+process.on("uncaughtException", (error) => {
+    console.error("[FATAL] Uncaught Exception:", error);
+});
+process.on("unhandledRejection", (reason, promise) => {
+    console.error("[FATAL] Unhandled Rejection at:", promise, "reason:", reason);
+});
+console.log("[Startup] Environment:", process.env.NODE_ENV || "development");
+console.log("[Startup] DATABASE_URL exists:", !!process.env.DATABASE_URL);
+console.log("[Startup] PORT:", process.env.PORT || "default");
 const health_routes_1 = require("./modules/health/health.routes");
 const auth_routes_1 = require("./modules/auth/auth.routes");
 const organisations_routes_1 = require("./modules/organisations/organisations.routes");
@@ -26,6 +35,7 @@ const publishers_routes_1 = require("./modules/publishers/publishers.routes");
 const advertisers_routes_1 = require("./modules/advertisers/advertisers.routes");
 const uploads_routes_1 = require("./modules/uploads/uploads.routes");
 const errorhandler_1 = require("./middleware/errorhandler");
+console.log("[Startup] All modules imported successfully");
 const app = (0, express_1.default)();
 app.use((0, cors_1.default)());
 app.use((0, body_parser_1.json)());

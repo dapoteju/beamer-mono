@@ -6,6 +6,18 @@ import path from "path";
 import fs from "fs";
 import { json } from "body-parser";
 
+process.on("uncaughtException", (error) => {
+  console.error("[FATAL] Uncaught Exception:", error);
+});
+
+process.on("unhandledRejection", (reason, promise) => {
+  console.error("[FATAL] Unhandled Rejection at:", promise, "reason:", reason);
+});
+
+console.log("[Startup] Environment:", process.env.NODE_ENV || "development");
+console.log("[Startup] DATABASE_URL exists:", !!process.env.DATABASE_URL);
+console.log("[Startup] PORT:", process.env.PORT || "default");
+
 import { healthRouter } from "./modules/health/health.routes";
 import { authRouter } from "./modules/auth/auth.routes";
 import { organisationsRouter } from "./modules/organisations/organisations.routes";
@@ -24,6 +36,8 @@ import { advertisersRouter } from "./modules/advertisers/advertisers.routes";
 import { uploadsRouter, UPLOADS_DIR } from "./modules/uploads/uploads.routes";
 
 import { notFoundHandler, errorHandler } from "./middleware/errorhandler";
+
+console.log("[Startup] All modules imported successfully");
 
 const app = express();
 
