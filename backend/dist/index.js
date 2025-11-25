@@ -6,6 +6,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 require("dotenv/config");
 const express_1 = __importDefault(require("express"));
 const cors_1 = __importDefault(require("cors"));
+const path_1 = __importDefault(require("path"));
 const body_parser_1 = require("body-parser");
 const health_routes_1 = require("./modules/health/health.routes");
 const auth_routes_1 = require("./modules/auth/auth.routes");
@@ -49,9 +50,25 @@ app.use("/api/player", player_routes_1.playerRouter);
 app.use("/api/reports", reports_routes_1.reportsRouter);
 app.use("/api/publishers", publishers_routes_1.publishersRouter);
 app.use("/api/advertisers", advertisers_routes_1.advertisersRouter);
+const isProduction = process.env.NODE_ENV === "production";
+if (isProduction) {
+    const frontendDistPath = path_1.default.join(__dirname, "../../cms-web/dist");
+    app.use(express_1.default.static(frontendDistPath, {
+        setHeaders: (res) => {
+            res.set("Cache-Control", "no-cache");
+        },
+    }));
+    app.get("*", (req, res, next) => {
+        if (req.path.startsWith("/api/") || req.path.startsWith("/uploads/")) {
+            return next();
+        }
+        res.sendFile(path_1.default.join(frontendDistPath, "index.html"));
+    });
+}
 app.use(errorhandler_1.notFoundHandler);
 app.use(errorhandler_1.errorHandler);
-const port = parseInt(process.env.PORT || "3000", 10);
+const defaultPort = isProduction ? "5000" : "3000";
+const port = parseInt(process.env.PORT || defaultPort, 10);
 app.listen(port, "0.0.0.0", () => {
     console.log(`Beamer API listening on port ${port}`);
 });

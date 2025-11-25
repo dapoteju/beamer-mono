@@ -53,10 +53,29 @@ app.use("/api/reports", reportsRouter);
 app.use("/api/publishers", publishersRouter);
 app.use("/api/advertisers", advertisersRouter);
 
+const isProduction = process.env.NODE_ENV === "production";
+if (isProduction) {
+  const frontendDistPath = path.join(__dirname, "../../cms-web/dist");
+  
+  app.use(express.static(frontendDistPath, {
+    setHeaders: (res) => {
+      res.set("Cache-Control", "no-cache");
+    },
+  }));
+
+  app.get("*", (req, res, next) => {
+    if (req.path.startsWith("/api/") || req.path.startsWith("/uploads/")) {
+      return next();
+    }
+    res.sendFile(path.join(frontendDistPath, "index.html"));
+  });
+}
+
 app.use(notFoundHandler);
 app.use(errorHandler);
 
-const port = parseInt(process.env.PORT || "3000", 10);
+const defaultPort = isProduction ? "5000" : "3000";
+const port = parseInt(process.env.PORT || defaultPort, 10);
 app.listen(port, "0.0.0.0", () => {
   console.log(`Beamer API listening on port ${port}`);
 });
