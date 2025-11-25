@@ -35,6 +35,7 @@ export function CreativeFormModal({
   });
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [filePreview, setFilePreview] = useState<string | null>(null);
+  const [mediaDimensions, setMediaDimensions] = useState<{ width: number; height: number }>({ width: 0, height: 0 });
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [uploading, setUploading] = useState(false);
 
@@ -72,8 +73,8 @@ export function CreativeFormModal({
         file_url: uploadResult.file_url,
         mime_type: uploadResult.mime_type,
         duration_seconds: parseInt(formData.duration_seconds) || 0,
-        width: 0,
-        height: 0,
+        width: mediaDimensions.width,
+        height: mediaDimensions.height,
         regions_required: formData.regions_required
           .split(",")
           .map((r) => r.trim().toUpperCase())
@@ -153,15 +154,36 @@ export function CreativeFormModal({
     const file = e.target.files?.[0];
     if (file) {
       setSelectedFile(file);
+      setMediaDimensions({ width: 0, height: 0 });
 
       if (file.type.startsWith("image/")) {
         const reader = new FileReader();
         reader.onload = (event) => {
-          setFilePreview(event.target?.result as string);
+          const dataUrl = event.target?.result as string;
+          setFilePreview(dataUrl);
+
+          const img = new Image();
+          img.onload = () => {
+            setMediaDimensions({ width: img.naturalWidth, height: img.naturalHeight });
+          };
+          img.src = dataUrl;
         };
         reader.readAsDataURL(file);
       } else if (file.type.startsWith("video/")) {
-        setFilePreview(URL.createObjectURL(file));
+        const videoUrl = URL.createObjectURL(file);
+        setFilePreview(videoUrl);
+
+        const video = document.createElement("video");
+        video.onloadedmetadata = () => {
+          setMediaDimensions({ width: video.videoWidth, height: video.videoHeight });
+          if (video.duration && !formData.duration_seconds) {
+            setFormData((prev) => ({
+              ...prev,
+              duration_seconds: Math.ceil(video.duration).toString(),
+            }));
+          }
+        };
+        video.src = videoUrl;
       } else {
         setFilePreview(null);
       }
