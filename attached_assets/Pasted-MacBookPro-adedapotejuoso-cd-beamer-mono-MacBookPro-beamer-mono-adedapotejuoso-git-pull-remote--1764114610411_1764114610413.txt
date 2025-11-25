@@ -1,0 +1,100 @@
+MacBookPro:~ adedapotejuoso$ cd beamer-mono
+MacBookPro:beamer-mono adedapotejuoso$ git pull
+remote: Enumerating objects: 229, done.
+remote: Counting objects: 100% (229/229), done.
+remote: Compressing objects: 100% (48/48), done.
+remote: Total 180 (delta 130), reused 180 (delta 130), pack-reused 0 (from 0)
+Receiving objects: 100% (180/180), 73.31 KiB | 12.22 MiB/s, done.
+Resolving deltas: 100% (130/130), completed with 36 local objects.
+From https://github.com/dapoteju/beamer-mono
+   1bfcd3d..ae56930  main       -> origin/main
+Updating 1bfcd3d..ae56930
+Fast-forward
+ PLAYER_SETUP.md                                       | 267 +++++++++
+ ...eative-model-with--1764084314481_1764084314482.txt | 255 +++++++++
+ ...gement-Full-flight-1764080863276_1764080863277.txt | 177 ++++++
+ ...-that-it-is-resili-1764091039965_1764091039967.txt | 458 +++++++++++++++
+ ...mer-player-core-so-1764086579129_1764086579130.txt | 667 ++++++++++++++++++++++
+ ...kend-player-endpoi-1764086996296_1764086996297.txt | 229 ++++++++
+ ...er-mono-main-playe-1764089217847_1764089217849.txt | 427 ++++++++++++++
+ ...-DASHBOARD-at-dash-1764108712876_1764108712877.txt | 183 ++++++
+ .../drizzle/0002_add_heartbeat_metrics_columns.sql    |   5 +
+ backend/drizzle/meta/_journal.json                    |   7 +
+ backend/src/db/schema.ts                              |   2 +
+ backend/src/index.ts                                  |   4 +
+ .../modules/creatives/creative-approvals.routes.ts    |  31 +
+ backend/src/modules/creatives/creatives.routes.ts     |  74 +++
+ backend/src/modules/creatives/creatives.service.ts    | 104 ++++
+ backend/src/modules/dashboard/dashboard.routes.ts     |  33 ++
+ backend/src/modules/dashboard/dashboard.service.ts    | 180 ++++++
+ backend/src/modules/player/player.routes.ts           |  30 +-
+ backend/src/modules/player/player.service.ts          |  14 +-
+ backend/src/modules/screens/screens.routes.ts         |  55 ++
+ backend/src/modules/screens/screens.service.ts        | 233 +++++++-
+ cms-web/src/api/creatives.ts                          |  59 ++
+ cms-web/src/api/dashboard.ts                          |  63 ++
+ cms-web/src/api/screens.ts                            |  49 ++
+ cms-web/src/components/CreativeFormModal.tsx          | 205 +++++++
+ cms-web/src/components/FlightFormModal.tsx            |  67 ++-
+ cms-web/src/components/ScreenLastPlayedTab.tsx        | 289 ++++++++++
+ cms-web/src/components/ScreenPlaylistTab.tsx          | 222 +++++++
+ .../src/components/dashboard/DashboardKpiStrip.tsx    |  68 +++
+ .../src/components/dashboard/DashboardQuickLinks.tsx  |  64 +++
+ .../src/components/dashboard/NetworkMiniMapCard.tsx   | 120 ++++
+ .../src/components/dashboard/OfflineScreensWidget.tsx | 133 +++++
+ .../components/dashboard/PendingApprovalsWidget.tsx   | 174 ++++++
+ cms-web/src/layouts/AppLayout.tsx                     |   1 +
+ cms-web/src/pages/CompliancePendingApprovals.tsx      | 192 +++++++
+ cms-web/src/pages/Dashboard.tsx                       | 125 +++-
+ cms-web/src/pages/ScreenDetail.tsx                    |  58 +-
+ cms-web/src/router/index.tsx                          |   9 +
+ player-core/apiClient.ts                              |  35 +-
+ player-core/assetCache.ts                             |  94 ++-
+ player-core/beamer.config.json                        |   6 +
+ player-core/beamer.config.json.example                |   6 +
+ player-core/deviceMetricsService.ts                   |  63 ++
+ player-core/gpsService.ts                             |  61 ++
+ player-core/index.ts                                  |  35 +-
+ player-core/package.json                              |   2 +
+ player-core/player.json                               |   3 +-
+ player-core/playerEngine.ts                           |  71 ++-
+ player-core/storage.ts                                |  59 ++
+ player-core/telemetryService.ts                       |  87 ++-
+ player-core/types.ts                                  |  32 +-
+ player-electron/beamer.config.json.example            |   6 +
+ player-electron/index.html                            |   2 +-
+ replit.md                                             |   4 +-
+ 54 files changed, 5796 insertions(+), 103 deletions(-)
+ create mode 100644 PLAYER_SETUP.md
+ create mode 100644 attached_assets/Pasted-You-are-editing-my-Beamer-CMS-API-project-on-Replit-The-system-already-has-Creative-model-with--1764084314481_1764084314482.txt
+ create mode 100644 attached_assets/Pasted-You-are-editing-my-Beamer-CMS-project-on-Replit-We-now-have-Full-creative-management-Full-flight-1764080863276_1764080863277.txt
+ create mode 100644 attached_assets/Pasted-You-are-working-in-beamer-mono-main-player-core-Goal-Upgrade-the-player-core-so-that-it-is-resili-1764091039965_1764091039967.txt
+ create mode 100644 attached_assets/Pasted-You-are-working-in-the-folder-beamer-mono-main-player-core-Goal-Upgrade-the-Beamer-player-core-so-1764086579129_1764086579130.txt
+ create mode 100644 attached_assets/Pasted-You-are-working-inside-the-folder-beamer-mono-main-backend-Goal-Upgrade-the-backend-player-endpoi-1764086996296_1764086996297.txt
+ create mode 100644 attached_assets/Pasted-You-are-working-on-a-monorepo-with-at-least-beamer-mono-main-player-core-beamer-mono-main-playe-1764089217847_1764089217849.txt
+ create mode 100644 attached_assets/Pasted-You-are-working-on-the-Beamer-CMS-web-app-I-want-you-to-build-a-proper-INTERNAL-DASHBOARD-at-dash-1764108712876_1764108712877.txt
+ create mode 100644 backend/drizzle/0002_add_heartbeat_metrics_columns.sql
+ create mode 100644 backend/src/modules/creatives/creative-approvals.routes.ts
+ create mode 100644 backend/src/modules/dashboard/dashboard.routes.ts
+ create mode 100644 backend/src/modules/dashboard/dashboard.service.ts
+ create mode 100644 cms-web/src/api/dashboard.ts
+ create mode 100644 cms-web/src/components/ScreenLastPlayedTab.tsx
+ create mode 100644 cms-web/src/components/ScreenPlaylistTab.tsx
+ create mode 100644 cms-web/src/components/dashboard/DashboardKpiStrip.tsx
+ create mode 100644 cms-web/src/components/dashboard/DashboardQuickLinks.tsx
+ create mode 100644 cms-web/src/components/dashboard/NetworkMiniMapCard.tsx
+ create mode 100644 cms-web/src/components/dashboard/OfflineScreensWidget.tsx
+ create mode 100644 cms-web/src/components/dashboard/PendingApprovalsWidget.tsx
+ create mode 100644 cms-web/src/pages/CompliancePendingApprovals.tsx
+ create mode 100644 player-core/beamer.config.json
+ create mode 100644 player-core/beamer.config.json.example
+ create mode 100644 player-core/deviceMetricsService.ts
+ create mode 100644 player-core/gpsService.ts
+ create mode 100644 player-electron/beamer.config.json.example
+MacBookPro:beamer-mono adedapotejuoso$ cd player-electron
+MacBookPro:player-electron adedapotejuoso$ 
+MacBookPro:player-electron adedapotejuoso$ npm start
+
+> beamer-player-electron@1.0.0 start
+> electron .
+
