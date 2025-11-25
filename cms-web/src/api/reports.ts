@@ -102,3 +102,54 @@ export async function getCampaignExposureReport(
   );
   return response.data.data;
 }
+
+export type ComplianceScreenStatus = "OK" | "NO_DELIVERY" | "OFFLINE";
+
+export interface CampaignComplianceReport {
+  campaignId: string;
+  startDate: string;
+  endDate: string;
+  summary: {
+    totalScreensScheduled: number;
+    screensWithImpressions: number;
+    screensWithZeroImpressions: number;
+    screensWithoutHeartbeats: number;
+    totalImpressions: number;
+    activeDays: number;
+    daysWithImpressions: number;
+    daysWithHeartbeats: number;
+  };
+  byDay: Array<{
+    date: string;
+    impressions: number;
+    hasActiveFlight: boolean;
+    scheduledScreens: number;
+    activeScreens: number;
+    offlineScreens: number;
+  }>;
+  byScreen: Array<{
+    screenId: string;
+    screenName?: string | null;
+    screenType?: string | null;
+    publisherName?: string | null;
+    publisherType?: string | null;
+    impressions: number;
+    hasHeartbeats: boolean;
+    firstImpressionAt?: string | null;
+    lastImpressionAt?: string | null;
+    status: ComplianceScreenStatus;
+  }>;
+}
+
+export async function getCampaignComplianceReport(
+  params: CampaignReportParams
+): Promise<CampaignComplianceReport> {
+  const queryParams = new URLSearchParams();
+  if (params.startDate) queryParams.append("startDate", params.startDate);
+  if (params.endDate) queryParams.append("endDate", params.endDate);
+
+  const response = await apiClient.get(
+    `/reports/campaigns/${params.campaignId}/compliance?${queryParams.toString()}`
+  );
+  return response.data.data;
+}

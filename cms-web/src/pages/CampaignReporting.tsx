@@ -6,6 +6,7 @@ import { getCampaignReport, type CampaignReport } from "../api/reports";
 import { useAuthStore } from "../store/authStore";
 import { downloadCsv } from "../utils/csv";
 import CampaignExposureTab from "./reporting/CampaignExposureTab";
+import CampaignComplianceTab from "./reporting/CampaignComplianceTab";
 import {
   LineChart,
   Line,
@@ -22,7 +23,7 @@ import {
   ResponsiveContainer,
 } from "recharts";
 
-type ReportTab = "delivery" | "exposure";
+type ReportTab = "delivery" | "exposure" | "compliance";
 
 export default function CampaignReporting() {
   const { user } = useAuthStore();
@@ -280,11 +281,28 @@ export default function CampaignReporting() {
           >
             Exposure
           </button>
+          <button
+            onClick={() => setActiveTab("compliance")}
+            className={`whitespace-nowrap border-b-2 py-4 px-1 text-sm font-medium ${
+              activeTab === "compliance"
+                ? "border-blue-600 text-blue-600"
+                : "border-transparent text-zinc-500 hover:text-zinc-700 hover:border-zinc-300"
+            }`}
+          >
+            Compliance
+          </button>
         </nav>
       </div>
 
       {activeTab === "exposure" ? (
         <CampaignExposureTab
+          campaignId={selectedCampaignId}
+          startDate={startDate}
+          endDate={endDate}
+          hasLoadedOnce={hasLoadedOnce}
+        />
+      ) : activeTab === "compliance" ? (
+        <CampaignComplianceTab
           campaignId={selectedCampaignId}
           startDate={startDate}
           endDate={endDate}

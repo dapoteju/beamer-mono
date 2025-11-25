@@ -12,8 +12,49 @@ import {
   publisherProfiles,
   organisations,
   screenLocationHistory,
+  screenGroupMembers,
 } from "../../db/schema";
-import { eq, sql, and, desc, gte, lte, asc, inArray } from "drizzle-orm";
+import { eq, sql, and, desc, gte, lte, asc, inArray, or } from "drizzle-orm";
+
+// --- Compliance Report Types ---
+
+export type ComplianceScreenStatus = "OK" | "NO_DELIVERY" | "OFFLINE";
+
+export interface CampaignComplianceReport {
+  campaignId: string;
+  startDate: string;
+  endDate: string;
+  summary: {
+    totalScreensScheduled: number;
+    screensWithImpressions: number;
+    screensWithZeroImpressions: number;
+    screensWithoutHeartbeats: number;
+    totalImpressions: number;
+    activeDays: number;
+    daysWithImpressions: number;
+    daysWithHeartbeats: number;
+  };
+  byDay: Array<{
+    date: string;
+    impressions: number;
+    hasActiveFlight: boolean;
+    scheduledScreens: number;
+    activeScreens: number;
+    offlineScreens: number;
+  }>;
+  byScreen: Array<{
+    screenId: string;
+    screenName?: string | null;
+    screenType?: string | null;
+    publisherName?: string | null;
+    publisherType?: string | null;
+    impressions: number;
+    hasHeartbeats: boolean;
+    firstImpressionAt?: string | null;
+    lastImpressionAt?: string | null;
+    status: ComplianceScreenStatus;
+  }>;
+}
 
 export interface CampaignReport {
   campaignId: string;
@@ -946,6 +987,368 @@ export async function getCampaignExposureReport(
     totalImpressions,
     totalExposureLocations,
     points,
+    byScreen,
+  };
+}
+
+export async function getCampaignComplianceReport(
+  campaignId: string,
+  startDate?: string,
+  endDate?: string
+): Promise<CampaignComplianceReport | null> {
+  const campaign = await db
+    .select()
+    .from(campaigns)
+    .where(eq(campaigns.id, campaignId))
+    .limit(1);
+
+  if (campaign.length === 0) {
+    return null;
+  }
+
+  const campaignData = campaign[0];
+
+  const today = new Date().toISOString().split('T')[0];
+  const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+
+  let effectiveStartDate = startDate || campaignData.startDate || thirtyDaysAgo;
+  let effectiveEndDate = endDate || campaignData.endDate || today;
+
+  const startDateObj = new Date(effectiveStartDate);
+  const endDateObj = new Date(effectiveEndDate);
+  
+  if (isNaN(startDateObj.getTime()) || isNaN(endDateObj.getTime())) {
+    throw new Error("Invalid date format provided");
+  }
+
+  if (startDateObj > endDateObj) {
+    throw new Error("Start date must be before or equal to end date");
+  }
+
+  // Step 1: Find all flights for this campaign that overlap with the date range
+  const campaignFlights = await db
+    .select()
+    .from(flights)
+    .where(
+      and(
+        eq(flights.campaignId, campaignId),
+        lte(flights.startDatetime, new Date(effectiveEndDate + 'T23:59:59.999Z')),
+        gte(flights.endDatetime, new Date(effectiveStartDate))
+      )
+    );
+
+  // Step 2: Determine all scheduled screens from flights
+  // Flights can target: 'screen' directly, or 'screen_group'
+  // Pre-compute a mapping of each flight ID to its resolved screen IDs
+  const scheduledScreenIds = new Set<string>();
+  const flightToScreens = new Map<string, Set<string>>();
+  const screenGroupCache = new Map<string, Set<string>>();
+
+  for (const flight of campaignFlights) {
+    const flightScreens = new Set<string>();
+    
+    if (flight.targetType === 'screen') {
+      flightScreens.add(flight.targetId);
+      scheduledScreenIds.add(flight.targetId);
+    } else if (flight.targetType === 'screen_group') {
+      // Get all screens in this group (use cache if available)
+      let groupScreenIds = screenGroupCache.get(flight.targetId);
+      if (!groupScreenIds) {
+        const groupScreens = await db
+          .select({ screenId: screenGroupMembers.screenId })
+          .from(screenGroupMembers)
+          .where(eq(screenGroupMembers.groupId, flight.targetId));
+        
+        groupScreenIds = new Set<string>();
+        for (const gs of groupScreens) {
+          groupScreenIds.add(gs.screenId);
+        }
+        screenGroupCache.set(flight.targetId, groupScreenIds);
+      }
+      
+      for (const screenId of groupScreenIds) {
+        flightScreens.add(screenId);
+        scheduledScreenIds.add(screenId);
+      }
+    }
+    
+    flightToScreens.set(flight.id, flightScreens);
+  }
+
+  const scheduledScreenIdsArray = Array.from(scheduledScreenIds);
+
+  // If no screens scheduled, return early with empty report
+  if (scheduledScreenIdsArray.length === 0) {
+    // Generate byDay with all dates in range
+    const byDay: Array<{ date: string; impressions: number; hasActiveFlight: boolean; scheduledScreens: number; activeScreens: number; offlineScreens: number }> = [];
+    const current = new Date(effectiveStartDate);
+    const end = new Date(effectiveEndDate);
+    
+    while (current <= end) {
+      const dateStr = current.toISOString().split('T')[0];
+      byDay.push({ date: dateStr, impressions: 0, hasActiveFlight: false, scheduledScreens: 0, activeScreens: 0, offlineScreens: 0 });
+      current.setDate(current.getDate() + 1);
+    }
+
+    return {
+      campaignId: campaignData.id,
+      startDate: effectiveStartDate,
+      endDate: effectiveEndDate,
+      summary: {
+        totalScreensScheduled: 0,
+        screensWithImpressions: 0,
+        screensWithZeroImpressions: 0,
+        screensWithoutHeartbeats: 0,
+        totalImpressions: 0,
+        activeDays: 0,
+        daysWithImpressions: 0,
+        daysWithHeartbeats: 0,
+      },
+      byDay,
+      byScreen: [],
+    };
+  }
+
+  // Step 3: Get impressions per screen for this campaign in the date range
+  const impressionsByScreenResult = await db
+    .select({
+      screenId: playEvents.screenId,
+      impressions: sql<number>`COUNT(*)::int`,
+      firstImpressionAt: sql<string>`MIN(${playEvents.startedAt})::text`,
+      lastImpressionAt: sql<string>`MAX(${playEvents.startedAt})::text`,
+    })
+    .from(playEvents)
+    .where(
+      and(
+        eq(playEvents.campaignId, campaignId),
+        inArray(playEvents.screenId, scheduledScreenIdsArray),
+        gte(sql`DATE(${playEvents.startedAt})`, effectiveStartDate),
+        lte(sql`DATE(${playEvents.startedAt})`, effectiveEndDate)
+      )
+    )
+    .groupBy(playEvents.screenId);
+
+  const impressionsByScreen = new Map(
+    impressionsByScreenResult.map(r => [r.screenId, {
+      impressions: r.impressions,
+      firstImpressionAt: r.firstImpressionAt,
+      lastImpressionAt: r.lastImpressionAt,
+    }])
+  );
+
+  // Step 4: Get impressions per day for this campaign
+  const impressionsByDayResult = await db.execute(sql`
+    SELECT
+      DATE(${playEvents.startedAt}) AS date,
+      COUNT(*)::int AS impressions
+    FROM ${playEvents}
+    WHERE ${playEvents.campaignId} = ${campaignId}
+      AND DATE(${playEvents.startedAt}) >= ${effectiveStartDate}
+      AND DATE(${playEvents.startedAt}) <= ${effectiveEndDate}
+    GROUP BY DATE(${playEvents.startedAt})
+    ORDER BY date ASC
+  `);
+
+  const impressionsByDay = new Map(
+    impressionsByDayResult.rows.map((row: any) => [row.date, row.impressions])
+  );
+
+  // Step 5: Get heartbeat status for each scheduled screen in the date range
+  const heartbeatsByScreenResult = await db
+    .select({
+      screenId: heartbeats.screenId,
+      hasHeartbeats: sql<boolean>`true`,
+    })
+    .from(heartbeats)
+    .where(
+      and(
+        inArray(heartbeats.screenId, scheduledScreenIdsArray),
+        gte(heartbeats.timestamp, new Date(effectiveStartDate)),
+        lte(heartbeats.timestamp, new Date(effectiveEndDate + 'T23:59:59.999Z'))
+      )
+    )
+    .groupBy(heartbeats.screenId);
+
+  const heartbeatsByScreen = new Set(heartbeatsByScreenResult.map(r => r.screenId));
+
+  // Step 5b: Get heartbeats per screen per day for daily compliance tracking
+  const heartbeatsByScreenByDayResult = await db.execute(sql`
+    SELECT
+      ${heartbeats.screenId} AS screen_id,
+      DATE(${heartbeats.timestamp}) AS date
+    FROM ${heartbeats}
+    WHERE ${heartbeats.screenId} = ANY(${scheduledScreenIdsArray})
+      AND ${heartbeats.timestamp} >= ${effectiveStartDate}::date
+      AND ${heartbeats.timestamp} < (${effectiveEndDate}::date + INTERVAL '1 day')
+    GROUP BY ${heartbeats.screenId}, DATE(${heartbeats.timestamp})
+  `);
+
+  // Build a map of date -> Set<screenId> for screens with heartbeats
+  const heartbeatsByDay = new Map<string, Set<string>>();
+  for (const row of heartbeatsByScreenByDayResult.rows as any[]) {
+    const dateStr = row.date;
+    if (!heartbeatsByDay.has(dateStr)) {
+      heartbeatsByDay.set(dateStr, new Set());
+    }
+    heartbeatsByDay.get(dateStr)!.add(row.screen_id);
+  }
+
+  // Step 6: Get screen metadata for all scheduled screens
+  const screenMetadataResult = await db
+    .select({
+      screenId: screens.id,
+      screenName: screens.name,
+      screenType: screens.screenClassification,
+      publisherName: sql<string>`COALESCE(${publisherProfiles.fullName}, ${organisations.name}, 'Unknown')`,
+      publisherType: sql<string>`COALESCE(${publisherProfiles.publisherType}::text, ${organisations.type}::text, 'Unknown')`,
+    })
+    .from(screens)
+    .leftJoin(publisherProfiles, eq(screens.publisherId, publisherProfiles.id))
+    .leftJoin(organisations, eq(screens.publisherOrgId, organisations.id))
+    .where(inArray(screens.id, scheduledScreenIdsArray));
+
+  const screenMetadataMap = new Map(
+    screenMetadataResult.map(s => [s.screenId, s])
+  );
+
+  // Step 7: Build byDay array with hasActiveFlight flag and heartbeat-based metrics
+  const byDay: Array<{ date: string; impressions: number; hasActiveFlight: boolean; scheduledScreens: number; activeScreens: number; offlineScreens: number }> = [];
+  const current = new Date(effectiveStartDate);
+  const end = new Date(effectiveEndDate);
+  
+  let activeDays = 0;
+  let daysWithImpressions = 0;
+  let daysWithHeartbeats = 0;
+
+  while (current <= end) {
+    const dateStr = current.toISOString().split('T')[0];
+    const dayStart = new Date(dateStr);
+    const dayEnd = new Date(dateStr + 'T23:59:59.999Z');
+
+    // Determine which screens are scheduled for this specific day
+    // Use the pre-computed flightToScreens mapping for each active flight
+    const scheduledScreensForDay = new Set<string>();
+    for (const flight of campaignFlights) {
+      const flightStart = new Date(flight.startDatetime);
+      const flightEnd = new Date(flight.endDatetime);
+      if (flightStart <= dayEnd && flightEnd >= dayStart) {
+        // Flight is active on this day - add all its resolved screens
+        const flightScreens = flightToScreens.get(flight.id);
+        if (flightScreens) {
+          for (const screenId of flightScreens) {
+            scheduledScreensForDay.add(screenId);
+          }
+        }
+      }
+    }
+
+    // Check if any flight is active on this day
+    const hasActiveFlight = scheduledScreensForDay.size > 0;
+    const scheduledScreensCount = scheduledScreensForDay.size;
+
+    // Get screens with heartbeats on this day
+    const screensWithHeartbeatsToday = heartbeatsByDay.get(dateStr) || new Set<string>();
+    const activeScreens = [...scheduledScreensForDay].filter(sid => screensWithHeartbeatsToday.has(sid)).length;
+    const offlineScreens = scheduledScreensCount - activeScreens;
+
+    const impressions = impressionsByDay.get(dateStr) || 0;
+    
+    if (hasActiveFlight) activeDays++;
+    if (impressions > 0) daysWithImpressions++;
+    if (activeScreens > 0) daysWithHeartbeats++;
+
+    byDay.push({
+      date: dateStr,
+      impressions,
+      hasActiveFlight,
+      scheduledScreens: scheduledScreensCount,
+      activeScreens,
+      offlineScreens,
+    });
+
+    current.setDate(current.getDate() + 1);
+  }
+
+  // Step 8: Build byScreen array with status
+  const byScreen: CampaignComplianceReport['byScreen'] = [];
+  let totalImpressions = 0;
+  let screensWithImpressions = 0;
+  let screensWithZeroImpressions = 0;
+  let screensWithoutHeartbeats = 0;
+
+  for (const screenId of scheduledScreenIdsArray) {
+    const metadata = screenMetadataMap.get(screenId);
+    const impressionData = impressionsByScreen.get(screenId);
+    const impressions = impressionData?.impressions || 0;
+    const hasHeartbeats = heartbeatsByScreen.has(screenId);
+
+    totalImpressions += impressions;
+
+    if (impressions > 0) {
+      screensWithImpressions++;
+    } else {
+      screensWithZeroImpressions++;
+    }
+
+    if (!hasHeartbeats) {
+      screensWithoutHeartbeats++;
+    }
+
+    // Compute status
+    let status: ComplianceScreenStatus;
+    if (impressions > 0 && hasHeartbeats) {
+      status = "OK";
+    } else if (impressions === 0 && hasHeartbeats) {
+      status = "NO_DELIVERY";
+    } else if (impressions === 0 && !hasHeartbeats) {
+      status = "OFFLINE";
+    } else {
+      // impressions > 0 but no heartbeats - treat as OK (player might not send heartbeats)
+      status = "OK";
+    }
+
+    byScreen.push({
+      screenId,
+      screenName: metadata?.screenName || null,
+      screenType: metadata?.screenType || null,
+      publisherName: metadata?.publisherName || null,
+      publisherType: metadata?.publisherType || null,
+      impressions,
+      hasHeartbeats,
+      firstImpressionAt: impressionData?.firstImpressionAt || null,
+      lastImpressionAt: impressionData?.lastImpressionAt || null,
+      status,
+    });
+  }
+
+  // Sort byScreen: OFFLINE first, then NO_DELIVERY, then OK, then by impressions desc
+  const statusPriority: Record<ComplianceScreenStatus, number> = {
+    "OFFLINE": 0,
+    "NO_DELIVERY": 1,
+    "OK": 2,
+  };
+
+  byScreen.sort((a, b) => {
+    const statusDiff = statusPriority[a.status] - statusPriority[b.status];
+    if (statusDiff !== 0) return statusDiff;
+    return b.impressions - a.impressions;
+  });
+
+  return {
+    campaignId: campaignData.id,
+    startDate: effectiveStartDate,
+    endDate: effectiveEndDate,
+    summary: {
+      totalScreensScheduled: scheduledScreenIdsArray.length,
+      screensWithImpressions,
+      screensWithZeroImpressions,
+      screensWithoutHeartbeats,
+      totalImpressions,
+      activeDays,
+      daysWithImpressions,
+      daysWithHeartbeats,
+    },
+    byDay,
     byScreen,
   };
 }
