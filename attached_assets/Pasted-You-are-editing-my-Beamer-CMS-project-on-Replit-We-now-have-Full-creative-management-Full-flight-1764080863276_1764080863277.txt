@@ -1,0 +1,177 @@
+You are editing my Beamer CMS project on Replit.
+We now have:
+
+Full creative management
+
+Full flight → creative assignment
+
+Decision engine logic on the backend
+
+PlayEvent logging
+
+Screens UI in the CMS
+
+I now need you to implement the Screen Playlist Inspector, a new feature allowing ops and publishers to see:
+
+1. What content is currently assigned to a screen (playlist)
+2. What actually played last (from PlayEvents)
+
+This is critical for operations, compliance, and debugging.
+
+🔧 BACKEND WORK (new endpoints)
+
+Create two new API endpoints:
+
+1. /api/screens/:screenId/playlist
+
+This does NOT call the player API.
+It should run the same decision logic the playlist endpoint uses:
+
+Fetch active flights targeting this screen
+
+Fetch creatives assigned to those flights
+
+Apply region filtering
+
+Apply weight logic
+
+Build a “preview playlist” response object
+
+Response shape:
+
+{
+  "status": "success",
+  "data": {
+    "screen_id": "scr_001",
+    "generated_at": "2025-11-26T12:00:00Z",
+    "region": "NG",
+    "fallback_used": false,
+    "creatives": [
+      {
+        "creative_id": "cr_1",
+        "name": "Summer Sale",
+        "file_url": "...",
+        "weight": 70,
+        "duration_seconds": 15
+      }
+    ],
+    "flights": [
+      {
+        "flight_id": "fl_1",
+        "name": "Lagos Taxi Flight",
+        "start_datetime": "...",
+        "end_datetime": "..."
+      }
+    ]
+  }
+}
+
+
+This is for CMS preview only — not for the player.
+
+2. /api/screens/:screenId/last-play
+
+Query the last 20 PlayEvents for this screen.
+
+Response:
+
+{
+  "status": "success",
+  "data": [
+    {
+      "creative_id": "cr_1",
+      "creative_name": "Summer Sale",
+      "started_at": "2025-11-26T11:59:00Z",
+      "duration_seconds": 15,
+      "play_status": "success",
+      "lat": 6.4411,
+      "lng": 3.4780
+    }
+  ]
+}
+
+🎨 FRONTEND WORK
+
+In the CMS, update the Screen Detail page:
+
+Add two new tabs:
+
+Playlist
+
+Last Played
+
+PLAYLIST TAB UI
+
+Create a new component:
+
+cms-web/src/components/ScreenPlaylistTab.tsx
+
+This tab should:
+
+Call /api/screens/:screenId/playlist
+
+Display:
+
+Active creatives (thumbnail, name, weight, duration)
+
+Active flights (list with names & times)
+
+Region filtering status
+
+Whether fallback is being used
+
+Handle:
+
+Loading state
+
+Error state
+
+Empty playlist (show a warning banner)
+
+LAST PLAYED TAB UI
+
+Create:
+
+cms-web/src/components/ScreenLastPlayedTab.tsx
+
+This tab should:
+
+Call /api/screens/:screenId/last-play
+
+Show a table:
+
+Thumbnail
+
+Creative name
+
+Played at (timestamp)
+
+Duration
+
+Status (success/error/skipped)
+
+GPS location (optional map pin if Leaflet is already used)
+
+Should auto-refresh every 10 seconds to mimic “real-time”
+
+Use setInterval with cleanup
+
+UPDATE SCREEN DETAIL PAGE
+
+Add Playlist + Last Played tabs
+
+Use the same styling as CampaignDetail tabs
+
+Load ScreenPlaylistTab and ScreenLastPlayedTab accordingly
+
+AFTER IMPLEMENTING, REPORT:
+
+Files created
+
+Files modified
+
+Final endpoint URLs
+
+How to access the Screen Playlist Inspector in the CMS
+
+Make sure code compiles and the UI works end-to-end.
