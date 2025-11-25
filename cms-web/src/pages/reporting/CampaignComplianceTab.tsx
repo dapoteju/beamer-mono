@@ -5,14 +5,12 @@ import {
 } from "../../api/reports";
 import { downloadCsv } from "../../utils/csv";
 import {
-  BarChart,
   Bar,
   XAxis,
   YAxis,
   CartesianGrid,
   Tooltip,
   ResponsiveContainer,
-  Cell,
   Legend,
   ComposedChart,
   Line,

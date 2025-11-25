@@ -108,6 +108,7 @@ exports.screensRouter.get("/", auth_1.requireAuth, async (req, res, next) => {
             venueAddress: screen.venueAddress,
             latitude: screen.latitude,
             longitude: screen.longitude,
+            lastSeenAt: screen.lastSeenAt,
         }));
         res.json(formattedScreens);
     }
@@ -464,6 +465,33 @@ exports.screensRouter.get("/:id/play-events", auth_1.requireAuth, async (req, re
         const limit = req.query.limit ? parseInt(req.query.limit, 10) : undefined;
         const playEvents = await (0, screens_service_1.getScreenPlayEvents)(screenId, { from, to, limit });
         res.json(playEvents);
+    }
+    catch (err) {
+        next(err);
+    }
+});
+// GET /api/screens/:id/location-history
+exports.screensRouter.get("/:id/location-history", auth_1.requireAuth, async (req, res, next) => {
+    try {
+        if (!canAccessScreens(req)) {
+            return res.status(403).json({ error: "Forbidden" });
+        }
+        const screenId = req.params.id;
+        const basicScreen = await (0, screens_service_1.getScreen)(screenId);
+        if (!basicScreen) {
+            return res.status(404).json({ error: "Screen not found" });
+        }
+        if (!canAccessScreen(req, basicScreen.publisherOrgId)) {
+            return res.status(403).json({ error: "Forbidden" });
+        }
+        let from = req.query.from ? new Date(req.query.from) : undefined;
+        let to = req.query.to ? new Date(req.query.to) : undefined;
+        if (!from || !to) {
+            to = new Date();
+            from = new Date(to.getTime() - 24 * 60 * 60 * 1000);
+        }
+        const locationHistory = await (0, screens_service_1.getScreenLocationHistory)(screenId, from, to);
+        res.json(locationHistory);
     }
     catch (err) {
         next(err);

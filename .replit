@@ -72,5 +72,5 @@ JWT_SECRET = "48af750b5b18e42eb379fd3fd3e00c02272c34590ce149a180a183d46b1da089"
 
 [deployment]
 deploymentTarget = "vm"
-run = ["bash", "-c", "cd backend && npm run start:migrate & cd cms-web && npm run preview -- --host 0.0.0.0 --port 5000 & wait"]
-build = ["bash", "-c", "cd backend && npm run build && cd ../cms-web && npm run build"]
+run = ["bash", "-c", "cd backend && npm run start:migrate"]
+build = ["npm", "run", "build"]

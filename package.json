@@ -1,9 +1,13 @@
 {
-  "name": "workspace",
+  "name": "beamer-mono",
   "version": "1.0.0",
-  "description": "This is a fresh Replit project connected to the GitHub repository: https://github.com/dapoteju/beamer-mono",
+  "description": "Beamer Player platform - Digital signage and advertising solution",
   "main": "index.js",
   "scripts": {
+    "build": "npm run build:backend && npm run build:frontend",
+    "build:backend": "cd backend && npm install && npm run build",
+    "build:frontend": "cd cms-web && npm install && npm run build",
+    "start": "cd backend && npm run start:migrate",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [],

@@ -7,6 +7,7 @@ exports.getScreen = getScreen;
 exports.getScreenDetail = getScreenDetail;
 exports.getScreenHeartbeats = getScreenHeartbeats;
 exports.getScreenPlayEvents = getScreenPlayEvents;
+exports.getScreenLocationHistory = getScreenLocationHistory;
 exports.listPlayers = listPlayers;
 exports.getPlayerDetail = getPlayerDetail;
 exports.validateRegionExists = validateRegionExists;
@@ -116,6 +117,8 @@ async function listScreensWithPlayerInfo(filters) {
         venueAddress: schema_1.screens.venueAddress,
         latitude: schema_1.screens.latitude,
         longitude: schema_1.screens.longitude,
+        // Phase 3B: Last seen timestamp for vehicle screens
+        lastSeenAt: schema_1.screens.lastSeenAt,
         // Vehicle data (joined)
         vehicle: {
             id: schema_1.vehicles.id,
@@ -317,6 +320,22 @@ async function getScreenPlayEvents(screenId, params) {
         .where((0, drizzle_orm_1.and)((0, drizzle_orm_1.eq)(schema_1.playEvents.screenId, screenId), (0, drizzle_orm_1.gte)(schema_1.playEvents.startedAt, defaultFrom), (0, drizzle_orm_1.sql) `${schema_1.playEvents.startedAt} <= ${defaultTo}`))
         .orderBy((0, drizzle_orm_1.desc)(schema_1.playEvents.startedAt))
         .limit(limit);
+}
+async function getScreenLocationHistory(screenId, from, to) {
+    const history = await client_1.db
+        .select({
+        recordedAt: schema_1.screenLocationHistory.recordedAt,
+        latitude: schema_1.screenLocationHistory.latitude,
+        longitude: schema_1.screenLocationHistory.longitude,
+    })
+        .from(schema_1.screenLocationHistory)
+        .where((0, drizzle_orm_1.and)((0, drizzle_orm_1.eq)(schema_1.screenLocationHistory.screenId, screenId), (0, drizzle_orm_1.gte)(schema_1.screenLocationHistory.recordedAt, from), (0, drizzle_orm_1.sql) `${schema_1.screenLocationHistory.recordedAt} <= ${to}`))
+        .orderBy(schema_1.screenLocationHistory.recordedAt);
+    return history.map(h => ({
+        recordedAt: h.recordedAt.toISOString(),
+        latitude: parseFloat(h.latitude),
+        longitude: parseFloat(h.longitude),
+    }));
 }
 async function listPlayers() {
     return client_1.db

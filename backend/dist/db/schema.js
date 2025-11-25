@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.invoices = exports.bookingFlights = exports.screenGroupMembers = exports.screenGroups = exports.heartbeats = exports.playEvents = exports.players = exports.creativeApprovals = exports.users = exports.regions = exports.creatives = exports.flightCreatives = exports.flights = exports.bookings = exports.campaigns = exports.screens = exports.vehicles = exports.publisherProfiles = exports.publisherTypeEnum = exports.organisations = exports.userRoleEnum = exports.screenStatusEnum = exports.orgTypeEnum = void 0;
+exports.invoices = exports.screenLocationHistory = exports.bookingFlights = exports.screenGroupMembers = exports.screenGroups = exports.heartbeats = exports.playEvents = exports.players = exports.creativeApprovals = exports.users = exports.regions = exports.creatives = exports.flightCreatives = exports.flights = exports.bookings = exports.campaigns = exports.screens = exports.vehicles = exports.publisherProfiles = exports.publisherTypeEnum = exports.organisations = exports.userRoleEnum = exports.screenStatusEnum = exports.orgTypeEnum = void 0;
 // src/db/schema.ts
 const pg_core_1 = require("drizzle-orm/pg-core");
 // --- Enums ---
@@ -112,6 +112,8 @@ exports.screens = (0, pg_core_1.pgTable)("screens", {
     // Geographic coordinates (nullable, more precise than existing lat/lng strings)
     latitude: (0, pg_core_1.numeric)("latitude", { precision: 10, scale: 7 }),
     longitude: (0, pg_core_1.numeric)("longitude", { precision: 10, scale: 7 }),
+    // Phase 3B: Last known position timestamp (for vehicle screens)
+    lastSeenAt: (0, pg_core_1.timestamp)("last_seen_at", { withTimezone: true }),
 });
 // --- Campaigns ---
 exports.campaigns = (0, pg_core_1.pgTable)("campaigns", {
@@ -347,6 +349,18 @@ exports.bookingFlights = (0, pg_core_1.pgTable)("booking_flights", {
 }, (table) => ({
     uniqueBookingFlight: (0, pg_core_1.unique)().on(table.bookingId, table.flightId),
 }));
+// --- Screen Location History (Phase 3B) ---
+exports.screenLocationHistory = (0, pg_core_1.pgTable)("screen_location_history", {
+    id: (0, pg_core_1.text)("id").primaryKey(),
+    screenId: (0, pg_core_1.uuid)("screen_id")
+        .notNull()
+        .references(() => exports.screens.id, { onDelete: "cascade" }),
+    playerId: (0, pg_core_1.text)("player_id").references(() => exports.players.id),
+    recordedAt: (0, pg_core_1.timestamp)("recorded_at", { withTimezone: true }).notNull(),
+    latitude: (0, pg_core_1.numeric)("latitude", { precision: 10, scale: 7 }).notNull(),
+    longitude: (0, pg_core_1.numeric)("longitude", { precision: 10, scale: 7 }).notNull(),
+    source: (0, pg_core_1.text)("source").notNull().default("heartbeat"),
+});
 // --- Invoices ---
 exports.invoices = (0, pg_core_1.pgTable)("invoices", {
     id: (0, pg_core_1.uuid)("id").primaryKey().defaultRandom(),

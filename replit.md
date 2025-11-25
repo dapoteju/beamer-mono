@@ -51,6 +51,15 @@ The project is organized as a monorepo with distinct applications and libraries:
 - **Data Integrity**: Transaction-based updates for critical operations.
 - **Role-Based Access Control**: Granular permissions enforced at the API level.
 
+### Deployment Configuration
+- **Build Command**: `npm run build` (runs `build:backend` then `build:frontend`)
+- **Run Command**: `cd backend && npm run start:migrate` (runs migrations then starts server)
+- **Deployment Type**: Reserved VM for stateful backend operations
+- **Root Scripts**:
+  - `npm run build` - Builds both backend and frontend
+  - `npm run build:backend` - TypeScript compilation for backend
+  - `npm run build:frontend` - TypeScript + Vite build for CMS
+
 ## External Dependencies
 
 - **Database**: PostgreSQL (via Replit integration)

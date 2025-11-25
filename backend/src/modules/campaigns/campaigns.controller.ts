@@ -16,7 +16,7 @@ export const getCampaignsController = async (
     if (!orgId) {
       return res.status(400).json({ message: "orgId query param is required" });
     }
-    const campaigns = await listCampaigns(orgId);
+    const campaigns = await listCampaigns({ advertiserOrgId: orgId });
     res.json(campaigns);
   } catch (err) {
     next(err);
@@ -47,29 +47,29 @@ export const createCampaignController = async (
 ) => {
   try {
     const {
-      advertiser_org_id,
+      advertiserOrgId,
       name,
       objective,
-      start_date,
-      end_date,
-      total_budget,
+      startDate,
+      endDate,
+      totalBudget,
       currency,
-      targeting
+      targetingJson
     } = req.body;
 
-    if (!advertiser_org_id || !name || !start_date || !end_date || !total_budget || !currency) {
+    if (!advertiserOrgId || !name || !startDate || !endDate || !totalBudget || !currency) {
       return res.status(400).json({ message: "Missing required fields" });
     }
 
     const campaign = await createCampaign({
-      advertiser_org_id,
+      advertiserOrgId,
       name,
       objective,
-      start_date,
-      end_date,
-      total_budget,
+      startDate,
+      endDate,
+      totalBudget,
       currency,
-      targeting
+      targetingJson
     });
 
     res.status(201).json(campaign);
