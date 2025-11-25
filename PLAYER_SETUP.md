@@ -42,27 +42,33 @@ The Beamer Player is the client-side application that runs on digital signage de
 ### Step 1: Clone the Repository
 
 ```bash
-git clone <REPO_URL>
-cd beamer-mono-main
+git clone https://github.com/dapoteju/beamer-mono
+cd beamer-mono
 ```
 
 ### Step 2: Install Dependencies
 
 ```bash
-# Navigate to player-electron folder
+# Navigate to player-electron folder (from beamer-mono root)
 cd player-electron
 
 # Install dependencies
 npm install
+
+# Go back to repo root
+cd ..
 ```
 
 ### Step 3: Build Player Core (if needed)
 
 ```bash
-# From repo root
+# From beamer-mono root
 cd player-core
 npm install
 npm run build
+
+# Go back to repo root
+cd ..
 ```
 
 ## Configuration
@@ -101,6 +107,7 @@ In the `player-electron` folder, create a file named `beamer.config.json`:
 ### Start the Player
 
 ```bash
+# From beamer-mono root
 cd player-electron
 npm start
 ```
@@ -142,7 +149,7 @@ After=network.target graphical.target
 [Service]
 Type=simple
 User=<YOUR_USER>
-WorkingDirectory=/opt/beamer/player-electron
+WorkingDirectory=/opt/beamer-mono/player-electron
 ExecStart=/usr/bin/npm start
 Restart=always
 RestartSec=10
@@ -175,7 +182,7 @@ journalctl -u beamer-player -f  # View logs
 npm install -g pm2
 
 # Start the player
-cd /opt/beamer/player-electron
+cd /opt/beamer-mono/player-electron
 pm2 start npm --name "beamer-player" -- start
 
 # Save configuration
