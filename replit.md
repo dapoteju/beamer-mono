@@ -12,7 +12,7 @@ Beamer Mono is a monorepo for the Beamer Player platform, a digital signage and 
 The project is organized as a monorepo with distinct applications and libraries:
 - `backend/`: Express API server (TypeScript + Drizzle ORM)
 - `cms-web/`: CMS Frontend (React + Vite + TypeScript + Tailwind)
-- `player-core/`: Core TypeScript library (planned)
+- `player-core/`: Core TypeScript library for player devices with GPS tracking and device metrics
 - `player-electron/`: Electron desktop application (planned)
 - `player-web-sim/`: Web simulator (planned)
 
