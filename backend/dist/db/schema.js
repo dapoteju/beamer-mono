@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.invoices = exports.screenLocationHistory = exports.bookingFlights = exports.screenGroupMembers = exports.screenGroups = exports.heartbeats = exports.playEvents = exports.players = exports.creativeApprovals = exports.users = exports.regions = exports.creatives = exports.flightCreatives = exports.flights = exports.bookings = exports.campaigns = exports.screens = exports.vehicles = exports.publisherProfiles = exports.publisherTypeEnum = exports.organisations = exports.userRoleEnum = exports.screenStatusEnum = exports.orgTypeEnum = void 0;
+exports.invoices = exports.passwordResetTokens = exports.screenLocationHistory = exports.bookingFlights = exports.screenGroupMembers = exports.screenGroups = exports.heartbeats = exports.playEvents = exports.players = exports.creativeApprovals = exports.users = exports.regions = exports.creatives = exports.flightCreatives = exports.flights = exports.bookings = exports.campaigns = exports.screens = exports.vehicles = exports.publisherProfiles = exports.publisherTypeEnum = exports.organisations = exports.userRoleEnum = exports.screenStatusEnum = exports.orgTypeEnum = void 0;
 // src/db/schema.ts
 const pg_core_1 = require("drizzle-orm/pg-core");
 // --- Enums ---
@@ -360,6 +360,19 @@ exports.screenLocationHistory = (0, pg_core_1.pgTable)("screen_location_history"
     latitude: (0, pg_core_1.numeric)("latitude", { precision: 10, scale: 7 }).notNull(),
     longitude: (0, pg_core_1.numeric)("longitude", { precision: 10, scale: 7 }).notNull(),
     source: (0, pg_core_1.text)("source").notNull().default("heartbeat"),
+});
+// --- Password Reset Tokens ---
+exports.passwordResetTokens = (0, pg_core_1.pgTable)("password_reset_tokens", {
+    id: (0, pg_core_1.uuid)("id").primaryKey().defaultRandom(),
+    userId: (0, pg_core_1.uuid)("user_id")
+        .notNull()
+        .references(() => exports.users.id, { onDelete: "cascade" }),
+    token: (0, pg_core_1.text)("token").notNull().unique(),
+    expiresAt: (0, pg_core_1.timestamp)("expires_at", { withTimezone: true }).notNull(),
+    usedAt: (0, pg_core_1.timestamp)("used_at", { withTimezone: true }),
+    createdAt: (0, pg_core_1.timestamp)("created_at", { withTimezone: true })
+        .defaultNow()
+        .notNull(),
 });
 // --- Invoices ---
 exports.invoices = (0, pg_core_1.pgTable)("invoices", {

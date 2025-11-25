@@ -43,3 +43,43 @@ export async function registerUser(data: {
   const response = await apiClient.post<AuthResponse>("/auth/register", data);
   return response.data;
 }
+
+export async function setupAdminRequest(
+  email: string,
+  password: string,
+  fullName: string
+): Promise<{ success: boolean; message: string }> {
+  const response = await apiClient.post<{ success: boolean; message: string }>("/auth/setup", {
+    email,
+    password,
+    fullName,
+  });
+  return response.data;
+}
+
+export async function forgotPasswordRequest(
+  email: string
+): Promise<{ message: string; devOnly?: { resetToken: string; expiresAt: string; note: string } }> {
+  const response = await apiClient.post<{ message: string; devOnly?: { resetToken: string; expiresAt: string; note: string } }>("/auth/forgot-password", {
+    email,
+  });
+  return response.data;
+}
+
+export async function verifyResetTokenRequest(
+  token: string
+): Promise<{ valid: boolean }> {
+  const response = await apiClient.get<{ valid: boolean }>(`/auth/reset-password/${token}`);
+  return response.data;
+}
+
+export async function resetPasswordRequest(
+  token: string,
+  password: string
+): Promise<{ message: string }> {
+  const response = await apiClient.post<{ message: string }>("/auth/reset-password", {
+    token,
+    password,
+  });
+  return response.data;
+}

@@ -1,5 +1,5 @@
 import { Request, Response } from "express";
-import { registerUser, loginUser, getUserById } from "./auth.service";
+import { registerUser, loginUser, getUserById, setupInitialAdmin, requestPasswordReset, verifyResetToken, resetPassword } from "./auth.service";
 import { RegisterInput, LoginInput } from "./auth.types";
 import { AuthRequest } from "../../middleware/auth";
 
@@ -81,4 +81,95 @@ export async function me(req: AuthRequest, res: Response) {
 
 export async function logout(req: Request, res: Response) {
   res.status(200).json({ message: "Logged out successfully" });
+}
+
+export async function setup(req: Request, res: Response) {
+  try {
+    const { email, password, fullName } = req.body;
+
+    if (!email || !password || !fullName) {
+      res.status(400).json({ error: "Email, password, and full name are required" });
+      return;
+    }
+
+    if (password.length < 8) {
+      res.status(400).json({ error: "Password must be at least 8 characters" });
+      return;
+    }
+
+    const result = await setupInitialAdmin(email, password, fullName);
+    res.status(201).json(result);
+  } catch (error: any) {
+    res.status(400).json({ error: error.message || "Setup failed" });
+  }
+}
+
+export async function forgotPassword(req: Request, res: Response) {
+  try {
+    const { email } = req.body;
+
+    if (!email) {
+      res.status(400).json({ error: "Email is required" });
+      return;
+    }
+
+    const result = await requestPasswordReset(email);
+    
+    const isDevelopment = process.env.NODE_ENV !== "production";
+    
+    if (isDevelopment) {
+      console.log(`[DEV ONLY] Password reset token for ${email}: ${result.token}`);
+      res.status(200).json({ 
+        message: "If this email exists, a reset link has been sent.",
+        devOnly: {
+          resetToken: result.token,
+          expiresAt: result.expiresAt,
+          note: "This is only shown in development mode. In production, configure an email service."
+        }
+      });
+    } else {
+      res.status(200).json({ 
+        message: "If this email exists, a reset link has been sent to your email address."
+      });
+    }
+  } catch (error: any) {
+    res.status(200).json({ message: "If this email exists, a reset link has been sent." });
+  }
+}
+
+export async function verifyReset(req: Request, res: Response) {
+  try {
+    const { token } = req.params;
+
+    if (!token) {
+      res.status(400).json({ error: "Token is required" });
+      return;
+    }
+
+    const result = await verifyResetToken(token);
+    res.status(200).json({ valid: result.valid });
+  } catch (error: any) {
+    res.status(400).json({ error: error.message || "Verification failed" });
+  }
+}
+
+export async function performReset(req: Request, res: Response) {
+  try {
+    const { token, password } = req.body;
+
+    if (!token || !password) {
+      res.status(400).json({ error: "Token and password are required" });
+      return;
+    }
+
+    if (password.length < 8) {
+      res.status(400).json({ error: "Password must be at least 8 characters" });
+      return;
+    }
+
+    await resetPassword(token, password);
+    res.status(200).json({ message: "Password reset successfully" });
+  } catch (error: any) {
+    res.status(400).json({ error: error.message || "Password reset failed" });
+  }
 }

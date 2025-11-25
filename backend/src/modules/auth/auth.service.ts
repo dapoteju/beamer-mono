@@ -1,8 +1,9 @@
 import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
+import crypto from "crypto";
 import { db } from "../../db/client";
-import { users, organisations } from "../../db/schema";
-import { eq } from "drizzle-orm";
+import { users, organisations, passwordResetTokens } from "../../db/schema";
+import { eq, and, gt, isNull } from "drizzle-orm";
 import { User, AuthResponse, JWTPayload, RegisterInput, LoginInput } from "./auth.types";
 import config from "../../config/config";
 
@@ -168,4 +169,124 @@ export function verifyToken(token: string): JWTPayload {
   } catch (error) {
     throw new Error("Invalid or expired token");
   }
+}
+
+export async function setupInitialAdmin(email: string, password: string, fullName: string): Promise<{ success: boolean; message: string }> {
+  const existingUsers = await db.select().from(users).limit(1);
+  
+  if (existingUsers.length > 0) {
+    throw new Error("Setup already completed. Users exist in the system.");
+  }
+
+  let beamerOrg = await db
+    .select()
+    .from(organisations)
+    .where(eq(organisations.name, "Beamer Internal"))
+    .limit(1);
+
+  let beamerOrgId: string;
+
+  if (beamerOrg.length === 0) {
+    const [org] = await db
+      .insert(organisations)
+      .values({
+        name: "Beamer Internal",
+        type: "beamer_internal",
+        organisationCategory: "beamer_internal",
+        billingEmail: email,
+        country: "NG",
+      })
+      .returning();
+    beamerOrgId = org.id;
+  } else {
+    beamerOrgId = beamerOrg[0].id;
+  }
+
+  const passwordHash = await bcrypt.hash(password, SALT_ROUNDS);
+
+  await db.insert(users).values({
+    email,
+    passwordHash,
+    fullName,
+    orgId: beamerOrgId,
+    role: "admin",
+    updatedAt: new Date(),
+  });
+
+  return { success: true, message: "Initial admin user created successfully" };
+}
+
+export async function requestPasswordReset(email: string): Promise<{ token: string; expiresAt: Date }> {
+  const [user] = await db
+    .select()
+    .from(users)
+    .where(eq(users.email, email))
+    .limit(1);
+
+  if (!user) {
+    throw new Error("If this email exists, a reset link has been sent.");
+  }
+
+  const token = crypto.randomBytes(32).toString("hex");
+  const expiresAt = new Date(Date.now() + 60 * 60 * 1000);
+
+  await db.insert(passwordResetTokens).values({
+    userId: user.id,
+    token,
+    expiresAt,
+  });
+
+  return { token, expiresAt };
+}
+
+export async function verifyResetToken(token: string): Promise<{ valid: boolean; userId?: string }> {
+  const [resetToken] = await db
+    .select()
+    .from(passwordResetTokens)
+    .where(
+      and(
+        eq(passwordResetTokens.token, token),
+        gt(passwordResetTokens.expiresAt, new Date()),
+        isNull(passwordResetTokens.usedAt)
+      )
+    )
+    .limit(1);
+
+  if (!resetToken) {
+    return { valid: false };
+  }
+
+  return { valid: true, userId: resetToken.userId };
+}
+
+export async function resetPassword(token: string, newPassword: string): Promise<{ success: boolean }> {
+  const [resetToken] = await db
+    .select()
+    .from(passwordResetTokens)
+    .where(
+      and(
+        eq(passwordResetTokens.token, token),
+        gt(passwordResetTokens.expiresAt, new Date()),
+        isNull(passwordResetTokens.usedAt)
+      )
+    )
+    .limit(1);
+
+  if (!resetToken) {
+    throw new Error("Invalid or expired reset token");
+  }
+
+  const passwordHash = await bcrypt.hash(newPassword, SALT_ROUNDS);
+
+  await db
+    .update(users)
+    .set({ passwordHash, updatedAt: new Date() })
+    .where(eq(users.id, resetToken.userId));
+
+  await db
+    .update(passwordResetTokens)
+    .set({ usedAt: new Date() })
+    .where(eq(passwordResetTokens.id, resetToken.id));
+
+  return { success: true };
 }

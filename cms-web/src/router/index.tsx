@@ -20,6 +20,9 @@ import Reporting from "../pages/Reporting";
 import CampaignReporting from "../pages/CampaignReporting";
 import InventoryMap from "../pages/InventoryMap";
 import Login from "../pages/Login";
+import ForgotPassword from "../pages/ForgotPassword";
+import ResetPassword from "../pages/ResetPassword";
+import Setup from "../pages/Setup";
 
 function ProtectedRoute({ children }: { children: ReactElement }) {
   const { isAuthenticated, hasHydrated } = useAuthStore();
@@ -67,6 +70,18 @@ export const router = createBrowserRouter([
   {
     path: "/login",
     element: <Login />,
+  },
+  {
+    path: "/forgot-password",
+    element: <ForgotPassword />,
+  },
+  {
+    path: "/reset-password",
+    element: <ResetPassword />,
+  },
+  {
+    path: "/setup",
+    element: <Setup />,
   },
   {
     path: "/",
