@@ -1,0 +1,255 @@
+You are editing my Beamer CMS + API project on Replit.
+The system already has:
+
+Creative model with regions_required and status
+
+CreativeApproval model/table (per creative, per region) as per spec
+
+Backend route POST /api/creatives/:creativeId/approval for updating approval status (internal only)
+
+Campaign Creatives UI (CampaignCreativesTab.tsx + CreativeFormModal.tsx) with an Edit Creative modal.
+
+I need you to implement a proper Creative Approval workflow for internal users, including:
+
+API endpoints to read approvals
+
+A per-creative approvals panel in the Edit Creative modal
+
+An internal “Compliance” view listing all pending approvals.
+
+🔧 BACKEND CHANGES
+1. List approvals for a creative
+
+Add a new endpoint:
+
+GET /api/creatives/:creativeId/approvals
+
+Behaviour:
+
+Validate that the creative exists and that the requesting user is authorised to view it.
+
+Users from the advertiser org that owns the campaign OR beamer_internal can see approvals.
+
+Return all CreativeApproval rows for that creative, joined with the Region table to get country name and code.
+
+Response shape:
+
+{
+  "status": "success",
+  "data": [
+    {
+      "id": "approval-id",
+      "creative_id": "cr_123",
+      "region_code": "NG",
+      "region_name": "Nigeria",
+      "status": "pending",
+      "approval_code": null,
+      "documents": [],
+      "approved_by_user_id": null,
+      "approved_at": null,
+      "rejected_reason": null,
+      "created_at": "2025-11-26T12:00:00Z"
+    }
+  ]
+}
+
+2. Global list of pending approvals (for internal ops)
+
+Add a new endpoint:
+
+GET /api/creative-approvals?status=pending
+
+Behaviour:
+
+Only accessible to users in an organisation with type = "beamer_internal" (internal ops).
+
+Return a list of approvals with:
+
+region (name + code)
+
+creative id + name
+
+campaign id + name
+
+advertiser org name
+
+created_at
+
+Response shape:
+
+{
+  "status": "success",
+  "data": [
+    {
+      "id": "approval-id",
+      "region_code": "NG",
+      "region_name": "Nigeria",
+      "creative_id": "cr_123",
+      "creative_name": "New Year Promo 50% Off",
+      "campaign_id": "cmp_1",
+      "campaign_name": "New Year Blast",
+      "advertiser_org_name": "Acme Corp",
+      "status": "pending",
+      "created_at": "2025-11-26T12:00:00Z"
+    }
+  ]
+}
+
+
+Use the existing CreativeApproval + Creative + Campaign + Organisation tables to build this response.
+
+3. Reuse the existing approval update endpoint
+
+Keep using: POST /api/creatives/:creativeId/approval
+
+Body (already in spec, but restate for clarity):
+
+{
+  "region": "NG",
+  "status": "approved",         // or "rejected" or "pending"
+  "approval_code": "ARCON-2025-00123",
+  "documents": ["https://.../letter.pdf"],
+  "rejected_reason": "Reason if rejected"
+}
+
+
+Behaviour:
+
+Upsert the CreativeApproval row for (creative_id, region_id).
+
+Set approved_by_user_id and approved_at when status = "approved".
+
+Clear approval_code and approved_at when status goes back to "pending".
+
+Only internal users (beamer_internal) can modify approvals.
+
+Make sure all these routes use the same auth middleware + error format as existing routes.
+
+🎨 FRONTEND CHANGES – PER-CREATIVE APPROVAL PANEL
+1. Extend API client
+
+In cms-web/src/api/creatives.ts:
+
+Add:
+
+fetchCreativeApprovals(creativeId: string): Promise<CreativeApproval[]>
+
+updateCreativeApproval(creativeId: string, payload: { region: string; status: string; approval_code?: string; documents?: string[]; rejected_reason?: string; }): Promise<CreativeApproval>
+
+Define a CreativeApproval type matching the new GET response.
+
+2. Edit Creative modal – add “Region Approvals” section
+
+In CreativeFormModal.tsx (or the relevant component for editing a creative):
+
+Below the existing fields (name, preview, status, regions_required), add a new section only visible to internal users (e.g. if currentOrg.type === "beamer_internal" or if user role indicates internal).
+
+Section title: “Region Approvals”
+
+Behaviour:
+
+When the modal opens in edit mode, call fetchCreativeApprovals(creative.id) to load approval rows.
+
+For each region in creative.regions_required, show a row:
+
+Region name + code (e.g. “Nigeria (NG)”)
+
+Status (dropdown): pending, approved, rejected
+
+Approval code (text input)
+
+Rejected reason (text input shown only when status = rejected)
+
+A Save button (or auto-save on change, but simpler is explicit Save per row).
+
+When Save is clicked for a row:
+
+Call updateCreativeApproval(creative.id, { region: regionCode, status, approval_code, rejected_reason, documents })
+
+Show a success toast and refresh that row state.
+
+UX details:
+
+Show a small badge colour-coded for status:
+
+pending → yellow
+
+approved → green
+
+rejected → red
+
+If any region is pending for an active campaign, show a small warning text like:
+
+“Some regions are still pending approval. These creatives will not play where pre-approval is required.”
+
+🎨 FRONTEND CHANGES – GLOBAL COMPLIANCE VIEW
+
+Add a new internal-only page to quickly review pending approvals.
+
+1. New route & page
+
+Add a new menu item in the sidebar visible only to internal users:
+
+Label: “Compliance”
+
+Route: /compliance
+
+Create a new page component, e.g.:
+
+cms-web/src/pages/CompliancePendingApprovals.tsx
+
+2. Page behaviour
+
+On mount:
+
+Call GET /api/creative-approvals?status=pending.
+
+Show a table with columns:
+
+Region (name + code)
+
+Creative name (clickable → opens that campaign’s Creatives tab, or at least shows creative id)
+
+Campaign name (clickable → go to Campaign Detail)
+
+Advertiser org name
+
+Created at (relative time or formatted date)
+
+Action: “Review” button
+
+When clicking “Review”:
+
+Open the Edit Creative modal for that creative (reuse existing component and flow).
+
+Scroll/jump directly to the “Region Approvals” section if possible.
+
+Handle:
+
+Loading state
+
+Empty state (“No pending approvals 🎉”)
+
+Error state with a retry button
+
+✔️ DELIVERABLES
+
+When you’re done, please tell me:
+
+Which backend files were created/modified (services, routes, migrations).
+
+Which frontend files were created/modified (creatives.ts, CreativeFormModal, new Compliance page, etc.).
+
+The final endpoint URLs for:
+
+GET /api/creatives/:creativeId/approvals
+
+GET /api/creative-approvals?status=pending
+
+How to:
+
+Open the Edit Creative modal and manage region approvals
+
+Navigate to the Compliance page and review pending approvals.
+
+Make sure everything compiles and the approval UI works end-to-end for an internal user.
