@@ -8,6 +8,7 @@ import {
   type UpdateFlightPayload,
   type FlightStatus,
 } from "../api/campaigns";
+import { fetchScreens, type Screen } from "../api/screens";
 
 interface FlightFormModalProps {
   campaignId: string;
@@ -35,12 +36,27 @@ export function FlightFormModal({
 
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(false);
+  const [screens, setScreens] = useState<Screen[]>([]);
+  const [screensLoading, setScreensLoading] = useState(false);
 
   useEffect(() => {
+    loadScreens();
     if (flightId) {
       loadFlightData();
     }
   }, [flightId]);
+
+  async function loadScreens() {
+    try {
+      setScreensLoading(true);
+      const data = await fetchScreens();
+      setScreens(data);
+    } catch (err) {
+      console.error("Failed to load screens:", err);
+    } finally {
+      setScreensLoading(false);
+    }
+  }
 
   async function loadFlightData() {
     try {
@@ -242,6 +258,7 @@ export function FlightFormModal({
                   setFormData({
                     ...formData,
                     targetType: e.target.value as "screen" | "screen_group",
+                    targetId: "",
                   })
                 }
                 className="w-full px-3 py-2 border border-zinc-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
@@ -253,25 +270,45 @@ export function FlightFormModal({
 
             <div>
               <label className="block text-sm font-medium text-zinc-700 mb-1">
-                Target ID <span className="text-red-500">*</span>
+                {formData.targetType === "screen" ? "Select Screen" : "Screen Group ID"}{" "}
+                <span className="text-red-500">*</span>
               </label>
-              <input
-                type="text"
-                value={formData.targetId}
-                onChange={(e) =>
-                  setFormData({ ...formData, targetId: e.target.value })
-                }
-                className={`w-full px-3 py-2 border rounded-md text-sm font-mono focus:outline-none focus:ring-2 focus:ring-blue-500 ${
-                  errors.targetId ? "border-red-500" : "border-zinc-300"
-                }`}
-                placeholder="Enter screen ID or screen group ID"
-              />
+              {formData.targetType === "screen" ? (
+                <select
+                  value={formData.targetId}
+                  onChange={(e) =>
+                    setFormData({ ...formData, targetId: e.target.value })
+                  }
+                  disabled={screensLoading}
+                  className={`w-full px-3 py-2 border rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+                    errors.targetId ? "border-red-500" : "border-zinc-300"
+                  }`}
+                >
+                  <option value="">
+                    {screensLoading ? "Loading screens..." : "Select a screen"}
+                  </option>
+                  {screens.map((screen) => (
+                    <option key={screen.id} value={screen.id}>
+                      {screen.code} - {screen.name || screen.city} ({screen.publisherOrgName})
+                    </option>
+                  ))}
+                </select>
+              ) : (
+                <input
+                  type="text"
+                  value={formData.targetId}
+                  onChange={(e) =>
+                    setFormData({ ...formData, targetId: e.target.value })
+                  }
+                  className={`w-full px-3 py-2 border rounded-md text-sm font-mono focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+                    errors.targetId ? "border-red-500" : "border-zinc-300"
+                  }`}
+                  placeholder="Enter screen group ID"
+                />
+              )}
               {errors.targetId && (
                 <p className="text-xs text-red-600 mt-1">{errors.targetId}</p>
               )}
-              <p className="text-xs text-zinc-500 mt-1">
-                Enter the ID of the screen or screen group to target
-              </p>
             </div>
 
             <div>
