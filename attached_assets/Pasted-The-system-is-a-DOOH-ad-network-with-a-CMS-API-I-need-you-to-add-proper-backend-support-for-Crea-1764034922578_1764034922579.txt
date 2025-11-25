@@ -1,0 +1,103 @@
+The system is a DOOH ad network with a CMS + API.
+I need you to add proper backend support for “Creatives” (media assets) that belong to a Campaign, following the spec below.
+
+Context
+
+Campaigns already exist in the backend.
+
+A Creative is a media file (image/video) attached to a campaign.
+
+A Flight will later reference one or more Creatives via a joining table.
+
+Tech stack: Node.js/TypeScript backend using Express + Postgres + Drizzle ORM (or whatever ORM you detect in the repo).
+
+What to implement (backend)
+
+Database / ORM models
+
+Check if a creatives table/model already exists.
+
+If not, create one with (or adapt to) these fields:
+
+id: primary key (string or uuid)
+
+campaign_id: FK to campaigns.id
+
+name: string
+
+file_url: string (URL to the media asset)
+
+mime_type: string (e.g. video/mp4, image/png)
+
+duration_seconds: integer
+
+width: integer
+
+height: integer
+
+status: enum or string (pending_review | approved | rejected)
+
+regions_required: JSON or text[] (list of region codes like ["NG", "KE"])
+
+created_at: timestamp default now
+
+Simple file handling
+
+Implement a simple upload endpoint that accepts a file and returns a URL that can be stored in file_url.
+
+For now, storing on the local filesystem is fine (e.g. /uploads/...).
+
+Use something like Multer (or whatever is already used) to handle uploads.
+
+Serve /uploads as a static directory so the CMS can preview media by URL.
+
+Return the full accessible URL in the response.
+
+REST API endpoints for Creatives
+Under something like /api/campaigns/:campaignId/creatives implement:
+
+POST /api/campaigns/:campaignId/creatives
+
+Body should support two flows:
+
+Direct URL: { name, file_url, mime_type, duration_seconds, width, height, regions_required }
+
+Upload-first flow: the frontend hits an /api/uploads endpoint to get file_url, then calls this endpoint.
+
+Validate that the campaign exists.
+
+Save the Creative row.
+
+Return the created Creative.
+
+GET /api/campaigns/:campaignId/creatives
+
+Return all Creatives for that campaign.
+
+PATCH /api/creatives/:id
+
+Allow updating name, status, regions_required, and optionally metadata if needed.
+
+DELETE /api/creatives/:id
+
+Soft delete or hard delete, whichever matches existing patterns.
+
+Permissions
+
+Reuse existing auth/authorisation patterns you find in the project.
+
+Only users belonging to the advertiser org that owns the campaign (or Beamer internal) should be able to manage creatives for that campaign.
+
+Testing & docs
+
+Add or update any existing OpenAPI/Swagger typings or TypeScript types used on the frontend, if that pattern already exists.
+
+Make sure the endpoints are reachable and return JSON in a consistent shape with other APIs.
+
+Please implement all of this end-to-end and tell me:
+
+which files you changed
+
+the final endpoint URLs
+
+example request/response JSON for POST and GET creatives.
