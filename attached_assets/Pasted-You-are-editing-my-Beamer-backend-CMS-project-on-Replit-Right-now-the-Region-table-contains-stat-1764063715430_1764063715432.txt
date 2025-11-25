@@ -1,0 +1,101 @@
+You are editing my Beamer backend + CMS project on Replit.
+Right now, the Region table contains state-level entries (e.g., Lagos State, Rivers State), but according to the Beamer MVP spec, Regions must be country-level regulatory jurisdictions (e.g., Nigeria = NG, Kenya = KE).
+
+I need you to convert the Region system back to country-level, update seeds, and update the CMS dropdown.
+
+🔧 BACKEND CHANGES
+1. Update Region seed data
+
+Remove all existing state-level regions from the DB seed/migrations.
+
+Replace them with a clean country-level region set:
+
+[
+  { name: "Nigeria", code: "NG", regulator_name: "ARCON", requires_pre_approval: true },
+  { name: "Kenya", code: "KE", regulator_name: "KFCB", requires_pre_approval: true },
+  { name: "Ghana", code: "GH", regulator_name: "GACA", requires_pre_approval: false },
+  { name: "South Africa", code: "ZA", regulator_name: "AR", requires_pre_approval: false }
+]
+
+
+Insert them using a proper seeding or default migration.
+
+Ensure no state-level regions remain.
+
+2. Add a DB cleanup migration
+
+Create a migration that:
+
+Deletes all rows where code contains a dash (e.g., NG-LA, NG-RI).
+
+Ensures Region table is clean and only has the new entries.
+
+3. Update validation logic
+
+Ensure any backend logic expecting regions (Creative creation, CreativeApproval creation, Screen.region_id validation) accepts only country-level codes.
+
+No state-level codes should pass validation anymore.
+
+4. Creative creation fallback logic
+
+If the frontend does not send regions_required, default it automatically to the campaign-level regions in targeting_json.regions.
+
+This matches the original spec’s intended behavior.
+
+🎨 FRONTEND (CMS) CHANGES
+1. Fix the regions dropdown in CreativeFormModal.tsx
+
+The dropdown is currently populated from GET /api/regions, which returns only your 3 state-level rows.
+
+Update it to show the new country-level regions after backend seed update.
+
+Make no other changes to the UI logic — it should work automatically once new region data is coming from the backend.
+
+2. Ensure Edit Creative modal shows the updated regions list
+
+After backend data changes, confirm:
+
+Regions Required shows Nigeria, Kenya, Ghana, South Africa
+
+Old codes like NG-LA no longer appear
+
+🧹 CLEANUP
+1. Update any existing creatives with invalid region codes
+
+For any creative with regions_required containing NG-LA, NG-FC, etc.:
+
+Replace them with the parent campaign's country region based on:
+
+campaign.targeting_json.regions
+
+OR default to "NG" for now if no targeting exists.
+
+2. Update screens
+
+For every screen whose region_id references a deleted state-level region:
+
+Set region_id to "NG" (Nigeria) by default.
+
+✔️ AFTER IMPLEMENTATION
+
+Print out:
+
+Final list returned by GET /api/regions
+
+Number of creatives updated
+
+Number of screens updated
+
+Confirmation that the Creative “Regions Required” select now shows country names only
+
+File paths modified (backend + frontend)
+
+Make sure everything compiles and the dropdown now displays only:
+
+Nigeria (NG)
+
+Kenya (KE)
+
+Ghana (GH)
+
+South Africa (ZA)
