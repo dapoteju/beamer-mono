@@ -225,9 +225,10 @@ async function seedRegions() {
   console.log("\n🌍 Seeding regions...");
 
   const regionsData = [
-    { name: "Lagos State", code: "NG-LA", regulatorName: "Lagos Advertising Practitioners Council", requiresPreApproval: true },
-    { name: "Federal Capital Territory", code: "NG-FC", regulatorName: "FCT Signage & Advertisement Agency", requiresPreApproval: true },
-    { name: "Rivers State", code: "NG-RI", regulatorName: "Rivers State Signage Agency", requiresPreApproval: false },
+    { name: "Nigeria", code: "NG", regulatorName: "ARCON", requiresPreApproval: true },
+    { name: "Kenya", code: "KE", regulatorName: "KFCB", requiresPreApproval: true },
+    { name: "Ghana", code: "GH", regulatorName: "GACA", requiresPreApproval: false },
+    { name: "South Africa", code: "ZA", regulatorName: "AR", requiresPreApproval: false },
   ];
 
   const regionIds: Record<string, string> = {};
@@ -337,28 +338,28 @@ async function seedScreensAndGroups(orgIds: any, publisherIds: any) {
 
   const screensData = [
     // LagosCabs Taxi Screens (6 vehicle screens)
-    { code: "SCR-LC-001", name: "Lekki-VI-Taxi-01", publisherOrgId: orgIds.lagosCabsOrgId, publisherId: publisherIds.lagosCabsPublisherId, screenType: "taxi_top", classification: "vehicle", vehicleId: "VEH-LC-001", city: "Lagos", regionCode: "NG-LA", lat: "6.4281", lng: "3.4219", lastSeenAt: daysFromNow(0) },
-    { code: "SCR-LC-002", name: "Ikeja-GRA-Taxi-02", publisherOrgId: orgIds.lagosCabsOrgId, publisherId: publisherIds.lagosCabsPublisherId, screenType: "taxi_top", classification: "vehicle", vehicleId: "VEH-LC-002", city: "Lagos", regionCode: "NG-LA", lat: "6.5833", lng: "3.3561", lastSeenAt: daysFromNow(0) },
-    { code: "SCR-LC-003", name: "Lekki-Phase1-Taxi-03", publisherOrgId: orgIds.lagosCabsOrgId, publisherId: publisherIds.lagosCabsPublisherId, screenType: "taxi_top", classification: "vehicle", vehicleId: "VEH-LC-003", city: "Lagos", regionCode: "NG-LA", lat: "6.4475", lng: "3.4702", lastSeenAt: daysFromNow(0) },
-    { code: "SCR-LC-004", name: "Yaba-Mainland-Taxi-04", publisherOrgId: orgIds.lagosCabsOrgId, publisherId: publisherIds.lagosCabsPublisherId, screenType: "taxi_top", classification: "vehicle", vehicleId: "VEH-LC-004", city: "Lagos", regionCode: "NG-LA", lat: "6.5158", lng: "3.3776", lastSeenAt: daysFromNow(0) },
-    { code: "SCR-LC-005", name: "Ajah-Express-Taxi-05", publisherOrgId: orgIds.lagosCabsOrgId, publisherId: publisherIds.lagosCabsPublisherId, screenType: "taxi_top", classification: "vehicle", vehicleId: "VEH-LC-005", city: "Lagos", regionCode: "NG-LA", lat: "6.4667", lng: "3.5667", lastSeenAt: daysFromNow(-3) },
-    { code: "SCR-LC-006", name: "Surulere-Taxi-06", publisherOrgId: orgIds.lagosCabsOrgId, publisherId: publisherIds.lagosCabsPublisherId, screenType: "taxi_top", classification: "vehicle", vehicleId: "VEH-LC-006", city: "Lagos", regionCode: "NG-LA", lat: "6.4963", lng: "3.3611", lastSeenAt: daysFromNow(0) },
+    { code: "SCR-LC-001", name: "Lekki-VI-Taxi-01", publisherOrgId: orgIds.lagosCabsOrgId, publisherId: publisherIds.lagosCabsPublisherId, screenType: "taxi_top", classification: "vehicle", vehicleId: "VEH-LC-001", city: "Lagos", regionCode: "NG", lat: "6.4281", lng: "3.4219", lastSeenAt: daysFromNow(0) },
+    { code: "SCR-LC-002", name: "Ikeja-GRA-Taxi-02", publisherOrgId: orgIds.lagosCabsOrgId, publisherId: publisherIds.lagosCabsPublisherId, screenType: "taxi_top", classification: "vehicle", vehicleId: "VEH-LC-002", city: "Lagos", regionCode: "NG", lat: "6.5833", lng: "3.3561", lastSeenAt: daysFromNow(0) },
+    { code: "SCR-LC-003", name: "Lekki-Phase1-Taxi-03", publisherOrgId: orgIds.lagosCabsOrgId, publisherId: publisherIds.lagosCabsPublisherId, screenType: "taxi_top", classification: "vehicle", vehicleId: "VEH-LC-003", city: "Lagos", regionCode: "NG", lat: "6.4475", lng: "3.4702", lastSeenAt: daysFromNow(0) },
+    { code: "SCR-LC-004", name: "Yaba-Mainland-Taxi-04", publisherOrgId: orgIds.lagosCabsOrgId, publisherId: publisherIds.lagosCabsPublisherId, screenType: "taxi_top", classification: "vehicle", vehicleId: "VEH-LC-004", city: "Lagos", regionCode: "NG", lat: "6.5158", lng: "3.3776", lastSeenAt: daysFromNow(0) },
+    { code: "SCR-LC-005", name: "Ajah-Express-Taxi-05", publisherOrgId: orgIds.lagosCabsOrgId, publisherId: publisherIds.lagosCabsPublisherId, screenType: "taxi_top", classification: "vehicle", vehicleId: "VEH-LC-005", city: "Lagos", regionCode: "NG", lat: "6.4667", lng: "3.5667", lastSeenAt: daysFromNow(-3) },
+    { code: "SCR-LC-006", name: "Surulere-Taxi-06", publisherOrgId: orgIds.lagosCabsOrgId, publisherId: publisherIds.lagosCabsPublisherId, screenType: "taxi_top", classification: "vehicle", vehicleId: "VEH-LC-006", city: "Lagos", regionCode: "NG", lat: "6.4963", lng: "3.3611", lastSeenAt: daysFromNow(0) },
     
     // Capital OOH Billboards (6 billboard screens)
-    { code: "SCR-CO-001", name: "Eko-Bridge-Billboard-01", publisherOrgId: orgIds.capitalOOHOrgId, publisherId: publisherIds.capitalPublisherId, screenType: "billboard", classification: "billboard", structureType: "Digital LED", sizeDescription: "48-sheet (6m x 3m)", illuminationType: "LED Backlit", address: "Eko Bridge, Lagos Island", city: "Lagos", regionCode: "NG-LA", lat: "6.4531", lng: "3.3958", lastSeenAt: daysFromNow(0) },
-    { code: "SCR-CO-002", name: "Third-Mainland-Billboard-02", publisherOrgId: orgIds.capitalOOHOrgId, publisherId: publisherIds.capitalPublisherId, screenType: "billboard", classification: "billboard", structureType: "Digital LED", sizeDescription: "96-sheet (12m x 3m)", illuminationType: "LED Backlit", address: "Third Mainland Bridge, VI", city: "Lagos", regionCode: "NG-LA", lat: "6.4698", lng: "3.3889", lastSeenAt: daysFromNow(0) },
-    { code: "SCR-CO-003", name: "Lekki-Toll-Billboard-03", publisherOrgId: orgIds.capitalOOHOrgId, publisherId: publisherIds.capitalPublisherId, screenType: "billboard", classification: "billboard", structureType: "Digital LED", sizeDescription: "48-sheet (6m x 3m)", illuminationType: "LED Backlit", address: "Lekki-Epe Expressway, Lekki", city: "Lagos", regionCode: "NG-LA", lat: "6.4404", lng: "3.4635", lastSeenAt: daysFromNow(0) },
-    { code: "SCR-CO-004", name: "Allen-Avenue-Billboard-04", publisherOrgId: orgIds.capitalOOHOrgId, publisherId: publisherIds.capitalPublisherId, screenType: "billboard", classification: "billboard", structureType: "Static Vinyl", sizeDescription: "48-sheet (6m x 3m)", illuminationType: "Front Lit", address: "Allen Avenue, Ikeja", city: "Lagos", regionCode: "NG-LA", lat: "6.6018", lng: "3.3515", lastSeenAt: daysFromNow(0) },
-    { code: "SCR-CO-005", name: "Falomo-Roundabout-Billboard-05", publisherOrgId: orgIds.capitalOOHOrgId, publisherId: publisherIds.capitalPublisherId, screenType: "billboard", classification: "billboard", structureType: "Digital LED", sizeDescription: "96-sheet (12m x 3m)", illuminationType: "LED Backlit", address: "Falomo Roundabout, Ikoyi", city: "Lagos", regionCode: "NG-LA", lat: "6.4467", lng: "3.4314", lastSeenAt: daysFromNow(-4) },
-    { code: "SCR-CO-006", name: "Ojota-Junction-Billboard-06", publisherOrgId: orgIds.capitalOOHOrgId, publisherId: publisherIds.capitalPublisherId, screenType: "billboard", classification: "billboard", structureType: "Digital LED", sizeDescription: "48-sheet (6m x 3m)", illuminationType: "LED Backlit", address: "Ikorodu Road, Ojota", city: "Lagos", regionCode: "NG-LA", lat: "6.5795", lng: "3.3676", lastSeenAt: daysFromNow(0) },
+    { code: "SCR-CO-001", name: "Eko-Bridge-Billboard-01", publisherOrgId: orgIds.capitalOOHOrgId, publisherId: publisherIds.capitalPublisherId, screenType: "billboard", classification: "billboard", structureType: "Digital LED", sizeDescription: "48-sheet (6m x 3m)", illuminationType: "LED Backlit", address: "Eko Bridge, Lagos Island", city: "Lagos", regionCode: "NG", lat: "6.4531", lng: "3.3958", lastSeenAt: daysFromNow(0) },
+    { code: "SCR-CO-002", name: "Third-Mainland-Billboard-02", publisherOrgId: orgIds.capitalOOHOrgId, publisherId: publisherIds.capitalPublisherId, screenType: "billboard", classification: "billboard", structureType: "Digital LED", sizeDescription: "96-sheet (12m x 3m)", illuminationType: "LED Backlit", address: "Third Mainland Bridge, VI", city: "Lagos", regionCode: "NG", lat: "6.4698", lng: "3.3889", lastSeenAt: daysFromNow(0) },
+    { code: "SCR-CO-003", name: "Lekki-Toll-Billboard-03", publisherOrgId: orgIds.capitalOOHOrgId, publisherId: publisherIds.capitalPublisherId, screenType: "billboard", classification: "billboard", structureType: "Digital LED", sizeDescription: "48-sheet (6m x 3m)", illuminationType: "LED Backlit", address: "Lekki-Epe Expressway, Lekki", city: "Lagos", regionCode: "NG", lat: "6.4404", lng: "3.4635", lastSeenAt: daysFromNow(0) },
+    { code: "SCR-CO-004", name: "Allen-Avenue-Billboard-04", publisherOrgId: orgIds.capitalOOHOrgId, publisherId: publisherIds.capitalPublisherId, screenType: "billboard", classification: "billboard", structureType: "Static Vinyl", sizeDescription: "48-sheet (6m x 3m)", illuminationType: "Front Lit", address: "Allen Avenue, Ikeja", city: "Lagos", regionCode: "NG", lat: "6.6018", lng: "3.3515", lastSeenAt: daysFromNow(0) },
+    { code: "SCR-CO-005", name: "Falomo-Roundabout-Billboard-05", publisherOrgId: orgIds.capitalOOHOrgId, publisherId: publisherIds.capitalPublisherId, screenType: "billboard", classification: "billboard", structureType: "Digital LED", sizeDescription: "96-sheet (12m x 3m)", illuminationType: "LED Backlit", address: "Falomo Roundabout, Ikoyi", city: "Lagos", regionCode: "NG", lat: "6.4467", lng: "3.4314", lastSeenAt: daysFromNow(-4) },
+    { code: "SCR-CO-006", name: "Ojota-Junction-Billboard-06", publisherOrgId: orgIds.capitalOOHOrgId, publisherId: publisherIds.capitalPublisherId, screenType: "billboard", classification: "billboard", structureType: "Digital LED", sizeDescription: "48-sheet (6m x 3m)", illuminationType: "LED Backlit", address: "Ikorodu Road, Ojota", city: "Lagos", regionCode: "NG", lat: "6.5795", lng: "3.3676", lastSeenAt: daysFromNow(0) },
     
     // Capital OOH Indoor Screens (6 indoor screens)
-    { code: "SCR-CO-007", name: "Palms-Mall-Indoor-01", publisherOrgId: orgIds.capitalOOHOrgId, publisherId: publisherIds.capitalPublisherId, screenType: "indoor_display", classification: "indoor", venueName: "The Palms Shopping Mall", venueType: "Shopping Mall", venueAddress: "Lekki-Epe Expressway, Lekki", city: "Lagos", regionCode: "NG-LA", lat: "6.4394", lng: "3.5467", lastSeenAt: daysFromNow(0) },
-    { code: "SCR-CO-008", name: "Ikeja-City-Mall-Indoor-02", publisherOrgId: orgIds.capitalOOHOrgId, publisherId: publisherIds.capitalPublisherId, screenType: "indoor_display", classification: "indoor", venueName: "Ikeja City Mall", venueType: "Shopping Mall", venueAddress: "Obafemi Awolowo Way, Ikeja", city: "Lagos", regionCode: "NG-LA", lat: "6.6208", lng: "3.3421", lastSeenAt: daysFromNow(0) },
-    { code: "SCR-CO-009", name: "Silverbird-Galleria-Indoor-03", publisherOrgId: orgIds.capitalOOHOrgId, publisherId: publisherIds.capitalPublisherId, screenType: "indoor_display", classification: "indoor", venueName: "Silverbird Galleria", venueType: "Shopping Mall", venueAddress: "Festival Road, Victoria Island", city: "Lagos", regionCode: "NG-LA", lat: "6.4244", lng: "3.4272", lastSeenAt: daysFromNow(0) },
-    { code: "SCR-CO-010", name: "Fitness-Hub-Lekki-Indoor-04", publisherOrgId: orgIds.capitalOOHOrgId, publisherId: publisherIds.capitalPublisherId, screenType: "indoor_display", classification: "indoor", venueName: "iFitness Lekki Phase 1", venueType: "Gym/Fitness Center", venueAddress: "Admiralty Way, Lekki Phase 1", city: "Lagos", regionCode: "NG-LA", lat: "6.4470", lng: "3.4708", lastSeenAt: daysFromNow(0) },
-    { code: "SCR-CO-011", name: "Airport-Lounge-Indoor-05", publisherOrgId: orgIds.capitalOOHOrgId, publisherId: publisherIds.capitalPublisherId, screenType: "indoor_display", classification: "indoor", venueName: "Murtala Muhammed Airport Terminal 2", venueType: "Airport", venueAddress: "Airport Road, Ikeja", city: "Lagos", regionCode: "NG-LA", lat: "6.5774", lng: "3.3213", lastSeenAt: daysFromNow(0) },
-    { code: "SCR-CO-012", name: "Abuja-Mall-Indoor-06", publisherOrgId: orgIds.capitalOOHOrgId, publisherId: publisherIds.capitalPublisherId, screenType: "indoor_display", classification: "indoor", venueName: "Jabi Lake Mall", venueType: "Shopping Mall", venueAddress: "Jabi District, Abuja", city: "Abuja", regionCode: "NG-FC", lat: "9.0765", lng: "7.4165", lastSeenAt: daysFromNow(-5) },
+    { code: "SCR-CO-007", name: "Palms-Mall-Indoor-01", publisherOrgId: orgIds.capitalOOHOrgId, publisherId: publisherIds.capitalPublisherId, screenType: "indoor_display", classification: "indoor", venueName: "The Palms Shopping Mall", venueType: "Shopping Mall", venueAddress: "Lekki-Epe Expressway, Lekki", city: "Lagos", regionCode: "NG", lat: "6.4394", lng: "3.5467", lastSeenAt: daysFromNow(0) },
+    { code: "SCR-CO-008", name: "Ikeja-City-Mall-Indoor-02", publisherOrgId: orgIds.capitalOOHOrgId, publisherId: publisherIds.capitalPublisherId, screenType: "indoor_display", classification: "indoor", venueName: "Ikeja City Mall", venueType: "Shopping Mall", venueAddress: "Obafemi Awolowo Way, Ikeja", city: "Lagos", regionCode: "NG", lat: "6.6208", lng: "3.3421", lastSeenAt: daysFromNow(0) },
+    { code: "SCR-CO-009", name: "Silverbird-Galleria-Indoor-03", publisherOrgId: orgIds.capitalOOHOrgId, publisherId: publisherIds.capitalPublisherId, screenType: "indoor_display", classification: "indoor", venueName: "Silverbird Galleria", venueType: "Shopping Mall", venueAddress: "Festival Road, Victoria Island", city: "Lagos", regionCode: "NG", lat: "6.4244", lng: "3.4272", lastSeenAt: daysFromNow(0) },
+    { code: "SCR-CO-010", name: "Fitness-Hub-Lekki-Indoor-04", publisherOrgId: orgIds.capitalOOHOrgId, publisherId: publisherIds.capitalPublisherId, screenType: "indoor_display", classification: "indoor", venueName: "iFitness Lekki Phase 1", venueType: "Gym/Fitness Center", venueAddress: "Admiralty Way, Lekki Phase 1", city: "Lagos", regionCode: "NG", lat: "6.4470", lng: "3.4708", lastSeenAt: daysFromNow(0) },
+    { code: "SCR-CO-011", name: "Airport-Lounge-Indoor-05", publisherOrgId: orgIds.capitalOOHOrgId, publisherId: publisherIds.capitalPublisherId, screenType: "indoor_display", classification: "indoor", venueName: "Murtala Muhammed Airport Terminal 2", venueType: "Airport", venueAddress: "Airport Road, Ikeja", city: "Lagos", regionCode: "NG", lat: "6.5774", lng: "3.3213", lastSeenAt: daysFromNow(0) },
+    { code: "SCR-CO-012", name: "Abuja-Mall-Indoor-06", publisherOrgId: orgIds.capitalOOHOrgId, publisherId: publisherIds.capitalPublisherId, screenType: "indoor_display", classification: "indoor", venueName: "Jabi Lake Mall", venueType: "Shopping Mall", venueAddress: "Jabi District, Abuja", city: "Abuja", regionCode: "NG", lat: "9.0765", lng: "7.4165", lastSeenAt: daysFromNow(-5) },
   ];
 
   const screenIdMap: Record<string, string> = {};
@@ -475,7 +476,7 @@ async function seedCampaignsFlightsTargeting(orgIds: any, screenIdMap: Record<st
       totalBudget: 500000,
       currency: "NGN",
       status: "completed",
-      targetingJson: { cities: ["Lagos"], regions: ["NG-LA"], demographics: ["18-35", "fitness-oriented"] },
+      targetingJson: { cities: ["Lagos"], regions: ["NG"], demographics: ["18-35", "fitness-oriented"] },
     }).onConflictDoNothing().returning();
     adidasCampaignAId = created?.id || deterministicUUID("campaign-adidas-ultraboost-2024");
     if (created) counts.campaigns++;
@@ -500,7 +501,7 @@ async function seedCampaignsFlightsTargeting(orgIds: any, screenIdMap: Record<st
       totalBudget: 750000,
       currency: "NGN",
       status: "active",
-      targetingJson: { cities: ["Lagos", "Abuja"], regions: ["NG-LA", "NG-FC"], timeWindows: ["06:00-10:00", "17:00-21:00"] },
+      targetingJson: { cities: ["Lagos", "Abuja"], regions: ["NG"], timeWindows: ["06:00-10:00", "17:00-21:00"] },
     }).onConflictDoNothing().returning();
     adidasCampaignBId = created?.id || deterministicUUID("campaign-adidas-summer-2025");
     if (created) counts.campaigns++;
@@ -525,7 +526,7 @@ async function seedCampaignsFlightsTargeting(orgIds: any, screenIdMap: Record<st
       totalBudget: 1000000,
       currency: "NGN",
       status: "scheduled",
-      targetingJson: { cities: ["Lagos", "Abuja"], regions: ["NG-LA", "NG-FC"], demographics: ["sports-fans", "18-45"] },
+      targetingJson: { cities: ["Lagos", "Abuja"], regions: ["NG"], demographics: ["sports-fans", "18-45"] },
     }).onConflictDoNothing().returning();
     adidasCampaignCId = created?.id || deterministicUUID("campaign-adidas-worldcup-2025");
     if (created) counts.campaigns++;
@@ -551,7 +552,7 @@ async function seedCampaignsFlightsTargeting(orgIds: any, screenIdMap: Record<st
       totalBudget: 150000,
       currency: "NGN",
       status: "active",
-      targetingJson: { cities: ["Lagos"], regions: ["NG-LA"], screenGroups: ["Lekki Fitness Loop"], timeWindows: ["06:00-10:00", "17:00-21:00"] },
+      targetingJson: { cities: ["Lagos"], regions: ["NG"], screenGroups: ["Lekki Fitness Loop"], timeWindows: ["06:00-10:00", "17:00-21:00"] },
     }).onConflictDoNothing().returning();
     iFitnessCampaignId = created?.id || deterministicUUID("campaign-ifitness-newyear-2025");
     if (created) counts.campaigns++;
@@ -665,7 +666,7 @@ async function seedCampaignsFlightsTargeting(orgIds: any, screenIdMap: Record<st
       width: 1920,
       height: 1080,
       status: "approved",
-      regionsRequired: ["NG-LA"],
+      regionsRequired: ["NG"],
     }).returning();
     adidasCreativeA1Id = created.id;
     counts.creatives++;
@@ -687,7 +688,7 @@ async function seedCampaignsFlightsTargeting(orgIds: any, screenIdMap: Record<st
       width: 1920,
       height: 1080,
       status: "approved",
-      regionsRequired: ["NG-LA", "NG-FC"],
+      regionsRequired: ["NG"],
     }).returning();
     adidasCreativeB1Id = created.id;
     counts.creatives++;
@@ -709,7 +710,7 @@ async function seedCampaignsFlightsTargeting(orgIds: any, screenIdMap: Record<st
       width: 1920,
       height: 1080,
       status: "pending_review",
-      regionsRequired: ["NG-LA", "NG-FC"],
+      regionsRequired: ["NG"],
     }).returning();
     adidasCreativeC1Id = created.id;
     counts.creatives++;
@@ -732,7 +733,7 @@ async function seedCampaignsFlightsTargeting(orgIds: any, screenIdMap: Record<st
       width: 1920,
       height: 1080,
       status: "approved",
-      regionsRequired: ["NG-LA"],
+      regionsRequired: ["NG"],
     }).returning();
     iFitnessCreative1Id = created.id;
     counts.creatives++;
