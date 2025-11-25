@@ -1,0 +1,667 @@
+You are working in the folder: beamer-mono-main/player-core
+
+Goal:
+Upgrade the Beamer player-core so that:
+1) Heartbeats include GPS location and basic device metrics.
+2) Playback events also include GPS location (at the time of play).
+3) All changes are compatible with the existing code structure.
+4) We keep things simple and mock GPS in dev until real hardware is wired in.
+
+Do NOT change any backend code in this prompt. Only touch files inside player-core.
+
+--------------------
+STEP 1 – Update shared types
+--------------------
+
+Open src file: beamer-mono-main/player-core/types.ts
+
+1. Add new interfaces for Location and DeviceMetrics above the existing Playlist and PlayerConfig interfaces:
+
+   ```ts
+   export interface Location {
+     lat: number;
+     lng: number;
+     accuracy_m?: number;
+     timestamp?: string; // ISO string
+   }
+
+   export interface DeviceMetrics {
+     cpu_usage: number;          // 0–1
+     memory_free_mb: number;
+     storage_free_mb: number;
+     network_type: string;       // "wifi" | "ethernet" | "mobile" | "unknown"
+     online: boolean;
+   }
+Extend the existing PlayerConfig to include a software_version field:
+
+ts
+Copy code
+export interface PlayerConfig {
+  player_id: string;
+  auth_token: string;
+  screen_id: string;
+  software_version: string;   // NEW
+}
+Extend PlaybackEvent to include screen_id, status, and optional location:
+
+ts
+Copy code
+export interface PlaybackEvent {
+  creative_id: string;
+  screen_id: string;
+  played_at: string;  // ISO timestamp
+  duration_seconds: number;
+  status: "success" | "error" | "skipped";
+  location?: Location;
+}
+Extend HeartbeatEvent to include screen_id, software_version, optional location, and optional metrics:
+
+ts
+Copy code
+export interface HeartbeatEvent {
+  player_id: string;
+  screen_id: string;
+  timestamp: string;
+  status: string;
+  software_version: string;
+  location?: Location;
+  metrics?: DeviceMetrics;
+}
+Make sure all exports remain at the bottom of the file so other modules can import them.
+
+STEP 2 – Add gpsService.ts
+Create a new file: beamer-mono-main/player-core/gpsService.ts
+
+Implement a simple GPS abstraction with a mock for now:
+
+ts
+Copy code
+import { Location } from "./types";
+
+let lastLocation: Location | null = null;
+
+// Simple mock provider for now.
+// Later this can be replaced with real hardware GPS or OS APIs.
+async function mockGpsProvider(): Promise<Location> {
+  // Default: somewhere in Lagos, with a tiny random jitter to simulate movement
+  const baseLat = 6.4410;
+  const baseLng = 3.4780;
+
+  const jitterLat = (Math.random() - 0.5) * 0.001;
+  const jitterLng = (Math.random() - 0.5) * 0.001;
+
+  return {
+    lat: baseLat + jitterLat,
+    lng: baseLng + jitterLng,
+    accuracy_m: 30,
+    timestamp: new Date().toISOString(),
+  };
+}
+
+export function getLastLocation(): Location | null {
+  return lastLocation;
+}
+
+// Start polling GPS periodically.
+// In the future this can choose between real hardware and mock provider.
+export async function startGpsPolling(pollIntervalMs: number = 30_000) {
+  // If window.navigator.geolocation is available (browser), use it.
+  const hasBrowserGeolocation =
+    typeof window !== "undefined" && !!navigator.geolocation;
+
+  const provider = hasBrowserGeolocation
+    ? async (): Promise<Location> =>
+        new Promise((resolve, reject) => {
+          navigator.geolocation.getCurrentPosition(
+            (pos) => {
+              resolve({
+                lat: pos.coords.latitude,
+                lng: pos.coords.longitude,
+                accuracy_m: pos.coords.accuracy,
+                timestamp: new Date().toISOString(),
+              });
+            },
+            (err) => {
+              console.warn("Geolocation error, falling back to mock:", err);
+              mockGpsProvider().then(resolve).catch(reject);
+            }
+          );
+        })
+    : mockGpsProvider;
+
+  // Initial fetch
+  try {
+    lastLocation = await provider();
+  } catch (err) {
+    console.error("Initial GPS fetch failed:", err);
+  }
+
+  // Polling loop
+  setInterval(async () => {
+    try {
+      lastLocation = await provider();
+    } catch (err) {
+      console.error("GPS polling error:", err);
+    }
+  }, pollIntervalMs);
+}
+This gives us a consistent getLastLocation() that other modules can use.
+
+STEP 3 – Add deviceMetricsService.ts
+Create a new file: beamer-mono-main/player-core/deviceMetricsService.ts
+
+Implement basic device metrics using Node’s os module for Electron / Node:
+
+ts
+Copy code
+import os from "os";
+import { DeviceMetrics } from "./types";
+
+// Very simple CPU usage estimation: we can refine this later if needed.
+let lastCpuInfo = os.cpus();
+
+function estimateCpuUsage(): number {
+  const cpus = os.cpus();
+
+  let idleDiff = 0;
+  let totalDiff = 0;
+
+  cpus.forEach((cpu, idx) => {
+    const prev = lastCpuInfo[idx] || cpu;
+    const prevTimes = prev.times;
+    const currTimes = cpu.times;
+
+    const prevIdle = prevTimes.idle;
+    const prevTotal =
+      prevTimes.user +
+      prevTimes.nice +
+      prevTimes.sys +
+      prevTimes.idle +
+      prevTimes.irq;
+
+    const currIdle = currTimes.idle;
+    const currTotal =
+      currTimes.user +
+      currTimes.nice +
+      currTimes.sys +
+      currTimes.idle +
+      currTimes.irq;
+
+    idleDiff += currIdle - prevIdle;
+    totalDiff += currTotal - prevTotal;
+  });
+
+  lastCpuInfo = cpus;
+
+  if (totalDiff === 0) return 0;
+  const usage = 1 - idleDiff / totalDiff;
+  return Math.min(Math.max(usage, 0), 1);
+}
+
+// For now we keep network_type and storage_free_mb simple.
+// These can be improved later with platform-specific libs.
+export function getDeviceMetrics(): DeviceMetrics {
+  const memoryFreeMb = Math.round(os.freemem() / (1024 * 1024));
+
+  // Placeholder: if you want real disk info, use a dedicated library later.
+  const storageFreeMb = 0;
+
+  const hasNavigator =
+    typeof window !== "undefined" && typeof navigator !== "undefined";
+
+  const online = hasNavigator ? navigator.onLine : true;
+
+  const network_type = "unknown";
+
+  return {
+    cpu_usage: estimateCpuUsage(),
+    memory_free_mb: memoryFreeMb,
+    storage_free_mb: storageFreeMb,
+    network_type,
+    online,
+  };
+}
+This gives us a getDeviceMetrics() function that we can call when building heartbeats.
+
+STEP 4 – Wire GPS + metrics into telemetry
+Open: beamer-mono-main/player-core/telemetryService.ts
+
+Update imports at the top to include the new helpers and types:
+
+ts
+Copy code
+import { PlaybackEvent, HeartbeatEvent, PlayerConfig } from "./types";
+import { sendPlaybackEvent, sendHeartbeat } from "./apiClient";
+import { getLastLocation } from "./gpsService";
+import { getDeviceMetrics } from "./deviceMetricsService";
+Keep the in-memory playbackQueue as is, but ensure PlaybackEvent now includes screen_id, status, and optional location (provided by types.ts already).
+
+Update queuePlayback callers later (in playerEngine.ts) to pass the extra fields, NOT here. Leave queuePlayback itself as-is.
+
+Replace sendHeartbeatEvent so that it accepts the full PlayerConfig instead of just player_id, and builds a rich HeartbeatEvent:
+
+ts
+Copy code
+export async function sendHeartbeatEvent(
+  auth_token: string,
+  config: PlayerConfig
+) {
+  const location = getLastLocation() || undefined;
+  const metrics = getDeviceMetrics();
+
+  const hb: HeartbeatEvent = {
+    player_id: config.player_id,
+    screen_id: config.screen_id,
+    timestamp: new Date().toISOString(),
+    status: "ok",
+    software_version: config.software_version || "1.0.0",
+    location,
+    metrics,
+  };
+
+  try {
+    await sendHeartbeat(auth_token, hb);
+  } catch (e) {
+    console.error("Heartbeat failed", e);
+  }
+}
+Make sure there is no old version of sendHeartbeatEvent lingering; only this version should exist.
+
+Leave flushPlaybacks logic mostly intact (still sending one event at a time via sendPlaybackEvent), but now it will send enriched PlaybackEvent objects.
+
+STEP 5 – Include GPS + screen_id in playbacks
+Open: beamer-mono-main/player-core/playerEngine.ts
+
+Import getLastLocation from gpsService:
+
+ts
+Copy code
+import { getLastLocation } from "./gpsService";
+Inside the main playback loop, find where queuePlayback is called. It currently does something like:
+
+ts
+Copy code
+queuePlayback({
+  creative_id: creative.creative_id,
+  played_at: new Date().toISOString(),
+  duration_seconds: creative.duration_seconds,
+});
+Update that call to include screen_id, status, and location. You can access the screen_id from the playlist object:
+
+ts
+Copy code
+const location = getLastLocation() || undefined;
+
+queuePlayback({
+  creative_id: creative.creative_id,
+  screen_id: playlist.screen_id,
+  played_at: new Date().toISOString(),
+  duration_seconds: creative.duration_seconds,
+  status: "success",
+  location,
+});
+Leave the rest of the playback loop unchanged.
+
+STEP 6 – Start GPS polling at player init
+Open: beamer-mono-main/player-core/index.ts
+
+At the top, import startGpsPolling:
+
+ts
+Copy code
+import { startGpsPolling } from "./gpsService";
+Inside initPlayer, after you load or register the config and before you load the playlist, start the GPS polling:
+
+ts
+Copy code
+async function initPlayer(onPlay: any) {
+  let config = loadJSON("player.json");
+
+  if (!config) {
+    console.log("Registering player...");
+    config = await registerPlayer();
+    // Add a default software version if registerPlayer does not set it
+    if (!config.software_version) {
+      config.software_version = "1.0.0";
+    }
+    saveJSON("player.json", config);
+  }
+
+  // Ensure software_version is always present
+  if (!config.software_version) {
+    config.software_version = "1.0.0";
+    saveJSON("player.json", config);
+  }
+
+  console.log("Player config:", config);
+
+  // 🔹 Start GPS polling (every 30 seconds by default)
+  startGpsPolling(30_000);
+
+  const playlist = await updatePlaylist(config.auth_token);
+  console.log("Loaded playlist:", playlist);
+
+  // Heartbeat every 60s
+  setInterval(() => {
+    sendHeartbeatEvent(config.auth_token, config);
+    flushPlaybacks(config.auth_token);
+  }, 60_000);
+
+  // Start playback
+  startPlaybackLoop(playlist, onPlay);
+}
+Ensure the export at the bottom is unchanged:
+
+ts
+Copy code
+export { initPlayer };
+STEP 7 – Ensure registerPlayer sets software_version
+Open: beamer-mono-main/player-core/apiClient.ts
+
+In registerPlayer(), after you construct the PlayerConfig, set a software_version field if it’s not already set by the API response. For now, hardcode "1.0.0":
+
+ts
+Copy code
+const config: PlayerConfig = {
+  player_id: data.player_id,
+  auth_token: combinedToken,
+  screen_id: data.screen_id,
+  software_version: "1.0.0",
+};
+Make sure the PlayerConfig type import from "./types" matches the updated PlayerConfig.
+
+STEP 8 – Run TypeScript checks
+Now run TypeScript compilation for player-core and fix any type errors introduced by these changes.
+
+Summary of what should now be true:
+
+PlaybackEvent includes screen_id, status, and location.
+
+HeartbeatEvent includes screen_id, software_version, location, and metrics.
+
+Heartbeats use GPS + device metrics via gpsService and deviceMetricsService.
+
+Playbacks are stamped with last known GPS location.
+
+GPS polling starts automatically when the player initializes.
+
+yaml
+Copy code
+
+---
+
+## 🗄️ PROMPT 2 — Make backend player endpoints store GPS + metrics
+
+> 💻 Paste this into Replit’s AI while you’re in the **backend** folder: `beamer-mono-main/backend`.
+
+This prompt assumes the new player payloads from Prompt 1, and asks it to wire them into the DB.
+
+```text
+You are working in the folder: beamer-mono-main/backend
+
+Goal:
+Update the player endpoints so that:
+1) /api/player/heartbeats accepts the richer HeartbeatEvent shape (with location + metrics) and stores it correctly.
+2) /api/player/events/playbacks accepts the richer PlaybackEvent shape (with location) and stores it correctly.
+3) Existing behaviour is preserved where possible (no breaking changes for other fields).
+
+The player-core now sends:
+- HeartbeatEvent:
+  {
+    player_id,
+    screen_id,
+    timestamp,
+    status,
+    software_version,
+    location?: { lat, lng, accuracy_m?, timestamp? },
+    metrics?: {
+      cpu_usage,
+      memory_free_mb,
+      storage_free_mb,
+      network_type,
+      online
+    }
+  }
+
+- PlaybackEvent (single event per request):
+  {
+    creative_id,
+    screen_id,
+    played_at,
+    duration_seconds,
+    status,                // "success" | "error" | "skipped"
+    location?: { lat, lng, accuracy_m?, timestamp? }
+  }
+
+--------------------------
+STEP 1 – Locate player module
+--------------------------
+
+Find the player module in:
+- beamer-mono-main/backend/src/modules/player/player.routes.ts
+- beamer-mono-main/backend/src/modules/player/player.service.ts
+
+If the structure is slightly different, adapt accordingly, but keep everything under src/modules/player.
+
+----------------------------
+STEP 2 – Update heartbeat route
+----------------------------
+
+In player.routes.ts, locate the POST route for heartbeats, probably something like:
+
+```ts
+router.post("/heartbeat", async (req, res) => { ... });
+Update the handler to expect the new HeartbeatEvent shape. Validate minimally:
+
+player_id and screen_id present
+
+timestamp present
+
+Pass the full body to player.service.ts, e.g.:
+
+ts
+Copy code
+router.post("/heartbeat", async (req, res) => {
+  try {
+    const hb = req.body; // HeartbeatEvent
+
+    if (!hb.player_id || !hb.screen_id || !hb.timestamp) {
+      return res.status(400).json({
+        status: "error",
+        message: "player_id, screen_id, and timestamp are required",
+      });
+    }
+
+    await playerService.recordHeartbeat(hb);
+
+    return res.json({ status: "success" });
+  } catch (err) {
+    console.error("Heartbeat error", err);
+    return res.status(500).json({ status: "error", message: "Server error" });
+  }
+});
+STEP 3 – Implement recordHeartbeat logic
+In player.service.ts, add or update a function like:
+
+ts
+Copy code
+import { db } from "../../db";
+import { heartbeats } from "../../db/schema"; // adjust path based on existing schema
+// Also import screens if needed to validate screen_id
+
+export async function recordHeartbeat(hb: any) {
+  const {
+    player_id,
+    screen_id,
+    timestamp,
+    status,
+    software_version,
+    location,
+    metrics,
+  } = hb;
+
+  const lat = location?.lat ?? null;
+  const lng = location?.lng ?? null;
+
+  // If your heartbeats table has extra cols (storage_free_mb, cpu_usage, etc),
+  // map metrics to them here:
+  const storage_free_mb = metrics?.storage_free_mb ?? null;
+  const cpu_usage = metrics?.cpu_usage ?? null;
+  const network_type = metrics?.network_type ?? null;
+  const signal_strength = null; // if you don't have this yet
+  const memory_free_mb = metrics?.memory_free_mb ?? null;
+
+  await db.insert(heartbeats).values({
+    player_id,
+    screen_id,
+    timestamp: new Date(timestamp),
+    status,
+    software_version,
+    lat,
+    lng,
+    storage_free_mb,
+    cpu_usage,
+    network_type,
+    // Add memory_free_mb or online if your schema has those fields.
+  });
+
+  // If you maintain lastSeenAt or a location history, update them here too.
+}
+Adjust field names to match your actual Drizzle schema in backend/drizzle/schema.ts.
+
+STEP 4 – Update playback events route
+In player.routes.ts, locate the POST route for playbacks, probably:
+
+ts
+Copy code
+router.post("/events/playbacks", async (req, res) => { ... });
+Currently, the player-core sends a single event per request (not an array), with the enriched PlaybackEvent shape.
+
+Update the handler to expect a single event in the body:
+
+ts
+Copy code
+router.post("/events/playbacks", async (req, res) => {
+  try {
+    const ev = req.body; // PlaybackEvent
+
+    if (!ev.creative_id || !ev.screen_id || !ev.played_at) {
+      return res.status(400).json({
+        status: "error",
+        message: "creative_id, screen_id, and played_at are required",
+      });
+    }
+
+    await playerService.recordPlayback(ev);
+
+    return res.json({ status: "success" });
+  } catch (err) {
+    console.error("Playback event error", err);
+    return res.status(500).json({ status: "error", message: "Server error" });
+  }
+});
+If you already support an array of events, you can keep that and simply handle both:
+
+if Array → loop
+
+else → treat req.body as a single event.
+
+STEP 5 – Implement recordPlayback logic
+In player.service.ts, add or update:
+
+ts
+Copy code
+import { playEvents } from "../../db/schema"; // adjust path to your PlayEvent table
+
+export async function recordPlayback(ev: any) {
+  const {
+    creative_id,
+    screen_id,
+    played_at,
+    duration_seconds,
+    status,
+    location,
+  } = ev;
+
+  const lat = location?.lat ?? null;
+  const lng = location?.lng ?? null;
+
+  // Derive player_id and campaign_id/flight_id if you can:
+  // - player_id may be inferred from auth, or included in ev in the future.
+  // For now, set player_id to null or look up based on screen_id if your schema allows.
+  const player_id = null;
+
+  await db.insert(playEvents).values({
+    player_id,
+    screen_id,
+    creative_id,
+    // If your schema uses started_at, map played_at to started_at
+    started_at: new Date(played_at),
+    duration_seconds,
+    play_status: status,
+    lat,
+    lng,
+    // campaign_id / flight_id can be null for now if you don't have them
+  });
+}
+Again, align field names with the actual Drizzle schema in backend/drizzle/schema.ts.
+
+STEP 6 – Make sure schema matches
+Open backend/drizzle/schema.ts (or wherever your PlayEvent and Heartbeat tables are defined) and ensure:
+
+Heartbeat table has:
+
+player_id
+
+screen_id
+
+timestamp
+
+status
+
+software_version (if not, add it in a new migration)
+
+lat, lng (floats)
+
+storage_free_mb, cpu_usage, network_type, etc, as needed
+
+PlayEvent table has:
+
+id
+
+player_id (nullable for now)
+
+screen_id
+
+creative_id
+
+started_at (or played_at)
+
+duration_seconds
+
+play_status
+
+lat, lng
+
+If any fields are missing, create a NEW Drizzle migration to add them, rather than editing existing migration files.
+
+STEP 7 – Test end-to-end
+Restart the backend server.
+
+Run the player-electron app so the player-core sends:
+
+a heartbeat (every 60 seconds)
+
+playback events (as creatives loop)
+
+Confirm:
+
+Heartbeat records in the DB have lat/lng and some metrics.
+
+PlayEvent records in the DB have lat/lng and the correct timestamps.
+
+We should now have:
+
+GPS-aware heartbeats and playbacks from the player.
+
+Backend endpoints that persist this data correctly for exposure and coverage reporting.
