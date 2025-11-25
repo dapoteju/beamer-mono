@@ -19,6 +19,8 @@ import {
   getRegionsList,
   getVehiclesList,
   getScreenLocationHistory,
+  getPlaylistPreview,
+  getLastPlayEvents,
 } from "./screens.service";
 import { requireAuth, AuthRequest } from "../../middleware/auth";
 import { db } from "../../db/client";
@@ -602,6 +604,59 @@ screensRouter.get("/:id/location-history", requireAuth, async (req: AuthRequest,
     const locationHistory = await getScreenLocationHistory(screenId, from, to);
 
     res.json(locationHistory);
+  } catch (err) {
+    next(err);
+  }
+});
+
+// GET /api/screens/:id/playlist - Screen Playlist Inspector: preview what would play
+screensRouter.get("/:id/playlist", requireAuth, async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    if (!canAccessScreens(req)) {
+      return res.status(403).json({ error: "Forbidden" });
+    }
+
+    const screenId = req.params.id;
+    const basicScreen = await getScreen(screenId);
+
+    if (!basicScreen) {
+      return res.status(404).json({ error: "Screen not found" });
+    }
+
+    if (!canAccessScreen(req, basicScreen.publisherOrgId)) {
+      return res.status(403).json({ error: "Forbidden" });
+    }
+
+    const playlist = await getPlaylistPreview(screenId);
+
+    res.json({ status: "success", data: playlist });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// GET /api/screens/:id/last-play - Screen Playlist Inspector: last 20 play events
+screensRouter.get("/:id/last-play", requireAuth, async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    if (!canAccessScreens(req)) {
+      return res.status(403).json({ error: "Forbidden" });
+    }
+
+    const screenId = req.params.id;
+    const basicScreen = await getScreen(screenId);
+
+    if (!basicScreen) {
+      return res.status(404).json({ error: "Screen not found" });
+    }
+
+    if (!canAccessScreen(req, basicScreen.publisherOrgId)) {
+      return res.status(403).json({ error: "Forbidden" });
+    }
+
+    const limit = req.query.limit ? parseInt(req.query.limit as string, 10) : 20;
+    const lastPlays = await getLastPlayEvents(screenId, limit);
+
+    res.json({ status: "success", data: lastPlays });
   } catch (err) {
     next(err);
   }

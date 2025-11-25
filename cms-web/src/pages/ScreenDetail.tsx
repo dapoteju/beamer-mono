@@ -14,6 +14,8 @@ import type {
   LocationHistoryPoint,
 } from "../api/screens";
 import { ScreenFormModal } from "../components/ScreenFormModal";
+import { ScreenPlaylistTab } from "../components/ScreenPlaylistTab";
+import { ScreenLastPlayedTab } from "../components/ScreenLastPlayedTab";
 import { useAuthStore } from "../store/authStore";
 import "leaflet/dist/leaflet.css";
 
@@ -30,7 +32,7 @@ export default function ScreenDetail() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const [activeTab, setActiveTab] = useState<"overview" | "play-events" | "heartbeats" | "movement">(
+  const [activeTab, setActiveTab] = useState<"overview" | "playlist" | "last-played" | "play-events" | "heartbeats" | "movement">(
     "overview"
   );
   const [timeRange, setTimeRange] = useState("24h");
@@ -320,6 +322,26 @@ export default function ScreenDetail() {
                 Overview
               </button>
               <button
+                onClick={() => setActiveTab("playlist")}
+                className={`py-4 px-1 border-b-2 font-medium text-sm ${
+                  activeTab === "playlist"
+                    ? "border-blue-500 text-blue-600"
+                    : "border-transparent text-zinc-500 hover:text-zinc-700 hover:border-zinc-300"
+                }`}
+              >
+                Playlist
+              </button>
+              <button
+                onClick={() => setActiveTab("last-played")}
+                className={`py-4 px-1 border-b-2 font-medium text-sm ${
+                  activeTab === "last-played"
+                    ? "border-blue-500 text-blue-600"
+                    : "border-transparent text-zinc-500 hover:text-zinc-700 hover:border-zinc-300"
+                }`}
+              >
+                Last Played
+              </button>
+              <button
                 onClick={() => setActiveTab("play-events")}
                 className={`py-4 px-1 border-b-2 font-medium text-sm ${
                   activeTab === "play-events"
@@ -527,6 +549,14 @@ export default function ScreenDetail() {
                 </div>
               )}
             </div>
+          )}
+
+          {activeTab === "playlist" && id && (
+            <ScreenPlaylistTab screenId={id} />
+          )}
+
+          {activeTab === "last-played" && id && (
+            <ScreenLastPlayedTab screenId={id} />
           )}
 
           {activeTab === "play-events" && (

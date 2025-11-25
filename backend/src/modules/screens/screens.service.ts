@@ -1,6 +1,7 @@
 // src/modules/screens/screens.service.ts
 import { db } from "../../db/client";
-import { screens, organisations, players, heartbeats, playEvents, creatives, campaigns, regions, vehicles, publisherProfiles, screenLocationHistory } from "../../db/schema";
+import { pool } from "../../db";
+import { screens, organisations, players, heartbeats, playEvents, creatives, campaigns, regions, vehicles, publisherProfiles, screenLocationHistory, flights, flightCreatives } from "../../db/schema";
 import { eq, desc, and, gte, sql, isNull } from "drizzle-orm";
 
 // Phase 3B: Screen code generation helper
@@ -759,4 +760,234 @@ export async function updateScreenData(screenId: string, input: {
 
     return updated;
   });
+}
+
+export interface PlaylistPreviewCreative {
+  creative_id: string;
+  name: string;
+  file_url: string;
+  weight: number;
+  duration_seconds: number;
+}
+
+export interface PlaylistPreviewFlight {
+  flight_id: string;
+  name: string;
+  start_datetime: string;
+  end_datetime: string;
+}
+
+export interface PlaylistPreviewResponse {
+  screen_id: string;
+  generated_at: string;
+  region: string;
+  fallback_used: boolean;
+  creatives: PlaylistPreviewCreative[];
+  flights: PlaylistPreviewFlight[];
+}
+
+export async function getPlaylistPreview(screenId: string): Promise<PlaylistPreviewResponse> {
+  const client = await pool.connect();
+
+  try {
+    await client.query("BEGIN");
+
+    const screenRow = await client.query(
+      `
+      SELECT
+        s.id AS screen_id,
+        s.region_code
+      FROM public.screens s
+      WHERE s.id = $1
+      `,
+      [screenId]
+    );
+
+    if (screenRow.rowCount === 0) {
+      throw new Error("Screen not found");
+    }
+
+    const { screen_id, region_code } = screenRow.rows[0];
+
+    const flightsResult = await client.query(
+      `
+      SELECT DISTINCT 
+        f.id, 
+        f.name,
+        f.start_datetime,
+        f.end_datetime,
+        f.campaign_id
+      FROM public.flights f
+      WHERE f.status = 'active'
+        AND now() BETWEEN f.start_datetime AND f.end_datetime
+        AND (
+          (f.target_type = 'screen' AND f.target_id = $1)
+          OR (f.target_type = 'screen_group' AND EXISTS (
+            SELECT 1 FROM public.screen_group_members sgm
+            WHERE sgm.screen_id = $1 AND sgm.group_id = f.target_id
+          ))
+        )
+      `,
+      [screenId]
+    );
+
+    const regionRow = await client.query(
+      `
+      SELECT r.requires_pre_approval
+      FROM public.regions r
+      WHERE r.code = $1
+      `,
+      [region_code]
+    );
+
+    const requiresPreApproval = regionRow.rowCount && regionRow.rowCount > 0 
+      ? regionRow.rows[0].requires_pre_approval 
+      : false;
+
+    const activeFlights: PlaylistPreviewFlight[] = flightsResult.rows.map(row => ({
+      flight_id: row.id,
+      name: row.name,
+      start_datetime: row.start_datetime,
+      end_datetime: row.end_datetime,
+    }));
+
+    const creativeWeightMap = new Map<string, { 
+      creative_id: string;
+      name: string;
+      file_url: string;
+      duration_seconds: number;
+      weight: number;
+    }>();
+
+    let fallbackUsed = false;
+
+    if (flightsResult.rowCount && flightsResult.rowCount > 0) {
+      const flightIds = flightsResult.rows.map((r) => r.id);
+
+      const creativesResult = await client.query(
+        `
+        SELECT DISTINCT
+          c.id AS creative_id,
+          c.name,
+          c.file_url,
+          c.duration_seconds,
+          fc.weight,
+          ca.approval_code
+        FROM public.flight_creatives fc
+        JOIN public.creatives c ON c.id = fc.creative_id
+        JOIN public.creative_approvals ca ON ca.creative_id = c.id
+        JOIN public.regions r ON r.id = ca.region_id
+        WHERE fc.flight_id = ANY($1::uuid[])
+          AND r.code = $2
+          AND ca.status = 'approved'
+          ${requiresPreApproval ? "AND ca.approval_code IS NOT NULL" : ""}
+        `,
+        [flightIds, region_code]
+      );
+
+      for (const row of creativesResult.rows) {
+        const existingWeight = creativeWeightMap.get(row.creative_id)?.weight || 0;
+        creativeWeightMap.set(row.creative_id, {
+          creative_id: row.creative_id,
+          name: row.name,
+          file_url: row.file_url,
+          duration_seconds: row.duration_seconds,
+          weight: existingWeight + (row.weight || 1),
+        });
+      }
+    }
+
+    if (creativeWeightMap.size === 0) {
+      const fallbackResult = await client.query(
+        `
+        SELECT
+          c.id AS creative_id,
+          c.name,
+          c.file_url,
+          c.duration_seconds,
+          ca.approval_code
+        FROM public.creatives c
+        JOIN public.creative_approvals ca ON ca.creative_id = c.id
+        JOIN public.regions r ON r.id = ca.region_id
+        JOIN public.campaigns camp ON camp.id = c.campaign_id
+        WHERE r.code = $1
+          AND ca.status = 'approved'
+          AND camp.status = 'active'
+        ORDER BY c.created_at DESC
+        LIMIT 1
+        `,
+        [region_code]
+      );
+
+      if (fallbackResult.rowCount && fallbackResult.rowCount > 0) {
+        const fb = fallbackResult.rows[0];
+        const isCompliant = !requiresPreApproval || (fb.approval_code != null && fb.approval_code !== '');
+        
+        if (isCompliant) {
+          creativeWeightMap.set(fb.creative_id, {
+            creative_id: fb.creative_id,
+            name: fb.name,
+            file_url: fb.file_url,
+            duration_seconds: fb.duration_seconds,
+            weight: 1,
+          });
+          fallbackUsed = true;
+        }
+      }
+    }
+
+    await client.query("COMMIT");
+
+    return {
+      screen_id,
+      generated_at: new Date().toISOString(),
+      region: region_code,
+      fallback_used: fallbackUsed,
+      creatives: Array.from(creativeWeightMap.values()),
+      flights: activeFlights,
+    };
+  } catch (err) {
+    await client.query("ROLLBACK");
+    throw err;
+  } finally {
+    client.release();
+  }
+}
+
+export interface LastPlayEvent {
+  creative_id: string;
+  creative_name: string | null;
+  started_at: string;
+  duration_seconds: number;
+  play_status: string;
+  lat: number | null;
+  lng: number | null;
+}
+
+export async function getLastPlayEvents(screenId: string, limit: number = 20): Promise<LastPlayEvent[]> {
+  const events = await db
+    .select({
+      creativeId: playEvents.creativeId,
+      creativeName: creatives.name,
+      startedAt: playEvents.startedAt,
+      durationSeconds: playEvents.durationSeconds,
+      playStatus: playEvents.playStatus,
+      lat: playEvents.lat,
+      lng: playEvents.lng,
+    })
+    .from(playEvents)
+    .leftJoin(creatives, eq(playEvents.creativeId, creatives.id))
+    .where(eq(playEvents.screenId, screenId))
+    .orderBy(desc(playEvents.startedAt))
+    .limit(limit);
+
+  return events.map(e => ({
+    creative_id: e.creativeId,
+    creative_name: e.creativeName,
+    started_at: e.startedAt.toISOString(),
+    duration_seconds: e.durationSeconds,
+    play_status: e.playStatus,
+    lat: e.lat ? parseFloat(e.lat as string) : null,
+    lng: e.lng ? parseFloat(e.lng as string) : null,
+  }));
 }

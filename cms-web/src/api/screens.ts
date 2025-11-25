@@ -305,3 +305,52 @@ export async function fetchScreenLocationHistory(
   );
   return response.data;
 }
+
+export interface PlaylistPreviewCreative {
+  creative_id: string;
+  name: string;
+  file_url: string;
+  weight: number;
+  duration_seconds: number;
+}
+
+export interface PlaylistPreviewFlight {
+  flight_id: string;
+  name: string;
+  start_datetime: string;
+  end_datetime: string;
+}
+
+export interface PlaylistPreviewResponse {
+  screen_id: string;
+  generated_at: string;
+  region: string;
+  fallback_used: boolean;
+  creatives: PlaylistPreviewCreative[];
+  flights: PlaylistPreviewFlight[];
+}
+
+export interface LastPlayEventResponse {
+  creative_id: string;
+  creative_name: string | null;
+  started_at: string;
+  duration_seconds: number;
+  play_status: string;
+  lat: number | null;
+  lng: number | null;
+}
+
+export async function fetchScreenPlaylist(screenId: string): Promise<PlaylistPreviewResponse> {
+  const response = await apiClient.get<{ status: string; data: PlaylistPreviewResponse }>(
+    `/screens/${screenId}/playlist`
+  );
+  return response.data.data;
+}
+
+export async function fetchScreenLastPlay(screenId: string, limit: number = 20): Promise<LastPlayEventResponse[]> {
+  const response = await apiClient.get<{ status: string; data: LastPlayEventResponse[] }>(
+    `/screens/${screenId}/last-play`,
+    { params: { limit } }
+  );
+  return response.data.data;
+}
