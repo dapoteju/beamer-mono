@@ -7,6 +7,8 @@ import {
   updateCreative,
   deleteCreative,
   getCampaignById,
+  getCreativeApprovals,
+  getPendingApprovals,
 } from "./creatives.service";
 import { requireAuth, AuthRequest } from "../../middleware/auth";
 
@@ -117,6 +119,41 @@ router.post(
       });
 
       res.status(201).json({
+        status: "success",
+        data: creative,
+      });
+    } catch (err) {
+      next(err);
+    }
+  }
+);
+
+router.get(
+  "/:id",
+  requireAuth,
+  async (req: AuthRequest, res: Response, next: NextFunction) => {
+    try {
+      if (!canAccessCampaigns(req)) {
+        return res.status(403).json({ status: "error", message: "Forbidden" });
+      }
+
+      const { id } = req.params;
+
+      const creative = await getCreativeById(id);
+      if (!creative) {
+        return res.status(404).json({ status: "error", message: "Creative not found" });
+      }
+
+      const campaign = await getCampaignById(creative.campaign_id);
+      if (!campaign) {
+        return res.status(404).json({ status: "error", message: "Campaign not found" });
+      }
+
+      if (!canAccessCampaign(req, campaign.advertiserOrgId)) {
+        return res.status(403).json({ status: "error", message: "Forbidden" });
+      }
+
+      res.json({
         status: "success",
         data: creative,
       });
@@ -245,6 +282,43 @@ router.post(
       return res.status(200).json({
         status: "success",
         message: "Creative approval updated successfully",
+      });
+    } catch (err) {
+      next(err);
+    }
+  }
+);
+
+router.get(
+  "/:creativeId/approvals",
+  requireAuth,
+  async (req: AuthRequest, res: Response, next: NextFunction) => {
+    try {
+      if (!canAccessCampaigns(req)) {
+        return res.status(403).json({ status: "error", message: "Forbidden" });
+      }
+
+      const { creativeId } = req.params;
+
+      const creative = await getCreativeById(creativeId);
+      if (!creative) {
+        return res.status(404).json({ status: "error", message: "Creative not found" });
+      }
+
+      const campaign = await getCampaignById(creative.campaign_id);
+      if (!campaign) {
+        return res.status(404).json({ status: "error", message: "Campaign not found" });
+      }
+
+      if (!canAccessCampaign(req, campaign.advertiserOrgId)) {
+        return res.status(403).json({ status: "error", message: "Forbidden" });
+      }
+
+      const approvals = await getCreativeApprovals(creativeId);
+
+      return res.json({
+        status: "success",
+        data: approvals,
       });
     } catch (err) {
       next(err);

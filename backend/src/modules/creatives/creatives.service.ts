@@ -217,3 +217,107 @@ export async function setCreativeApproval(params: {
     ]
   );
 }
+
+export interface CreativeApprovalResponse {
+  id: string;
+  creative_id: string;
+  region_code: string;
+  region_name: string;
+  status: CreativeApprovalStatus;
+  approval_code: string | null;
+  documents: string[];
+  approved_by_user_id: string | null;
+  approved_at: string | null;
+  rejected_reason: string | null;
+  created_at: string;
+}
+
+export async function getCreativeApprovals(creativeId: string): Promise<CreativeApprovalResponse[]> {
+  const result = await pool.query(
+    `
+    SELECT 
+      ca.id,
+      ca.creative_id,
+      r.code as region_code,
+      r.name as region_name,
+      ca.status,
+      ca.approval_code,
+      ca.documents,
+      ca.approved_by_user_id,
+      ca.approved_at,
+      ca.rejected_reason,
+      ca.created_at
+    FROM creative_approvals ca
+    JOIN regions r ON r.id = ca.region_id
+    WHERE ca.creative_id = $1
+    ORDER BY r.name ASC
+    `,
+    [creativeId]
+  );
+
+  return result.rows.map((row: any) => ({
+    id: row.id,
+    creative_id: row.creative_id,
+    region_code: row.region_code,
+    region_name: row.region_name,
+    status: row.status,
+    approval_code: row.approval_code,
+    documents: row.documents || [],
+    approved_by_user_id: row.approved_by_user_id,
+    approved_at: row.approved_at?.toISOString() || null,
+    rejected_reason: row.rejected_reason,
+    created_at: row.created_at?.toISOString() || new Date().toISOString(),
+  }));
+}
+
+export interface PendingApprovalResponse {
+  id: string;
+  region_code: string;
+  region_name: string;
+  creative_id: string;
+  creative_name: string;
+  campaign_id: string;
+  campaign_name: string;
+  advertiser_org_name: string;
+  status: CreativeApprovalStatus;
+  created_at: string;
+}
+
+export async function getPendingApprovals(statusFilter?: string): Promise<PendingApprovalResponse[]> {
+  const result = await pool.query(
+    `
+    SELECT 
+      ca.id,
+      r.code as region_code,
+      r.name as region_name,
+      c.id as creative_id,
+      c.name as creative_name,
+      cmp.id as campaign_id,
+      cmp.name as campaign_name,
+      org.name as advertiser_org_name,
+      ca.status,
+      ca.created_at
+    FROM creative_approvals ca
+    JOIN regions r ON r.id = ca.region_id
+    JOIN creatives c ON c.id = ca.creative_id
+    JOIN campaigns cmp ON cmp.id = c.campaign_id
+    JOIN organisations org ON org.id = cmp.advertiser_org_id
+    WHERE ($1::text IS NULL OR ca.status = $1)
+    ORDER BY ca.created_at DESC
+    `,
+    [statusFilter || null]
+  );
+
+  return result.rows.map((row: any) => ({
+    id: row.id,
+    region_code: row.region_code,
+    region_name: row.region_name,
+    creative_id: row.creative_id,
+    creative_name: row.creative_name,
+    campaign_id: row.campaign_id,
+    campaign_name: row.campaign_name,
+    advertiser_org_name: row.advertiser_org_name,
+    status: row.status,
+    created_at: row.created_at?.toISOString() || new Date().toISOString(),
+  }));
+}

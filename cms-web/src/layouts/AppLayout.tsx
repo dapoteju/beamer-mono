@@ -20,6 +20,7 @@ const navItemsByOrgType: Record<string, NavItem[]> = {
     { to: "/screens", label: "Screens & Players" },
     { to: "/publishers", label: "Publishers" },
     { to: "/advertisers", label: "Advertisers" },
+    { to: "/compliance", label: "Compliance" },
     { to: "/reporting", label: "Reporting" },
   ],
   advertiser: [

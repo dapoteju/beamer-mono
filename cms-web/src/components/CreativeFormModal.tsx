@@ -4,12 +4,17 @@ import {
   uploadFile,
   createCreative,
   updateCreative,
+  fetchCreativeApprovals,
+  updateCreativeApproval,
   type Creative,
   type CreateCreativePayload,
   type UpdateCreativePayload,
   type CreativeStatus,
+  type CreativeApproval,
+  type CreativeApprovalStatus,
 } from "../api/creatives";
 import { fetchRegions, type Region } from "../api/screens";
+import { useAuthStore } from "../store/authStore";
 
 interface CreativeFormModalProps {
   mode: "create" | "edit";
@@ -27,6 +32,8 @@ export function CreativeFormModal({
   onSuccess,
 }: CreativeFormModalProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const { user } = useAuthStore();
+  const isInternalUser = user?.orgType === "beamer_internal";
 
   const [formData, setFormData] = useState({
     name: "",
@@ -41,9 +48,23 @@ export function CreativeFormModal({
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [uploading, setUploading] = useState(false);
 
+  const [approvalEdits, setApprovalEdits] = useState<Record<string, {
+    status: CreativeApprovalStatus;
+    approval_code: string;
+    rejected_reason: string;
+  }>>({});
+  const [savingApproval, setSavingApproval] = useState<string | null>(null);
+  const [approvalSuccess, setApprovalSuccess] = useState<string | null>(null);
+
   const { data: regions = [] } = useQuery<Region[]>({
     queryKey: ["regions"],
     queryFn: fetchRegions,
+  });
+
+  const { data: approvals = [], refetch: refetchApprovals } = useQuery<CreativeApproval[]>({
+    queryKey: ["creative-approvals", creative?.id],
+    queryFn: () => fetchCreativeApprovals(creative!.id),
+    enabled: mode === "edit" && !!creative?.id,
   });
 
   useEffect(() => {
@@ -66,7 +87,23 @@ export function CreativeFormModal({
       setFilePreview(null);
     }
     setErrors({});
+    setApprovalEdits({});
+    setApprovalSuccess(null);
   }, [mode, creative]);
+
+  useEffect(() => {
+    if (approvals.length > 0) {
+      const edits: Record<string, { status: CreativeApprovalStatus; approval_code: string; rejected_reason: string }> = {};
+      approvals.forEach((approval) => {
+        edits[approval.region_code] = {
+          status: approval.status,
+          approval_code: approval.approval_code || "",
+          rejected_reason: approval.rejected_reason || "",
+        };
+      });
+      setApprovalEdits(edits);
+    }
+  }, [approvals]);
 
   const createMutation = useMutation({
     mutationFn: async () => {
@@ -192,6 +229,51 @@ export function CreativeFormModal({
   };
 
   const isSubmitting = createMutation.isPending || updateMutation.isPending || uploading;
+
+  const handleSaveApproval = async (regionCode: string) => {
+    if (!creative) return;
+    
+    const edit = approvalEdits[regionCode];
+    if (!edit) return;
+
+    setSavingApproval(regionCode);
+    setApprovalSuccess(null);
+
+    try {
+      await updateCreativeApproval(creative.id, {
+        region: regionCode,
+        status: edit.status,
+        approval_code: edit.approval_code || undefined,
+        rejected_reason: edit.status === "rejected" ? edit.rejected_reason || undefined : undefined,
+      });
+      
+      await refetchApprovals();
+      setApprovalSuccess(regionCode);
+      
+      setTimeout(() => {
+        setApprovalSuccess(null);
+      }, 2000);
+    } catch (error) {
+      console.error("Failed to save approval:", error);
+    } finally {
+      setSavingApproval(null);
+    }
+  };
+
+  const getStatusBadgeColor = (status: CreativeApprovalStatus) => {
+    switch (status) {
+      case "pending":
+        return "bg-yellow-100 text-yellow-800";
+      case "approved":
+        return "bg-green-100 text-green-800";
+      case "rejected":
+        return "bg-red-100 text-red-800";
+      default:
+        return "bg-gray-100 text-gray-800";
+    }
+  };
+
+  const hasPendingApprovals = approvals.some((a) => a.status === "pending");
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
@@ -343,6 +425,129 @@ export function CreativeFormModal({
                   <option value="rejected">Rejected</option>
                 </select>
               </div>
+
+              {isInternalUser && approvals.length > 0 && (
+                <div id="region-approvals" className="border-t border-zinc-200 pt-4 mt-4">
+                  <h3 className="text-sm font-semibold text-zinc-900 mb-3">Region Approvals</h3>
+                  
+                  {hasPendingApprovals && (
+                    <div className="bg-yellow-50 border border-yellow-200 text-yellow-800 px-3 py-2 rounded text-xs mb-3">
+                      Some regions are still pending approval. These creatives will not play where pre-approval is required.
+                    </div>
+                  )}
+
+                  <div className="space-y-4">
+                    {approvals.map((approval) => {
+                      const edit = approvalEdits[approval.region_code] || {
+                        status: approval.status,
+                        approval_code: "",
+                        rejected_reason: "",
+                      };
+                      return (
+                        <div key={approval.id} className="border border-zinc-200 rounded-lg p-3">
+                          <div className="flex items-center justify-between mb-2">
+                            <div className="flex items-center gap-2">
+                              <span className="font-medium text-sm text-zinc-900">
+                                {approval.region_name} ({approval.region_code})
+                              </span>
+                              <span
+                                className={`px-2 py-0.5 text-xs font-medium rounded-full ${getStatusBadgeColor(
+                                  edit.status
+                                )}`}
+                              >
+                                {edit.status}
+                              </span>
+                            </div>
+                            {approvalSuccess === approval.region_code && (
+                              <span className="text-xs text-green-600 flex items-center gap-1">
+                                <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
+                                  <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                                </svg>
+                                Saved
+                              </span>
+                            )}
+                          </div>
+
+                          <div className="space-y-2">
+                            <div>
+                              <label className="block text-xs text-zinc-500 mb-1">Status</label>
+                              <select
+                                value={edit.status}
+                                onChange={(e) =>
+                                  setApprovalEdits({
+                                    ...approvalEdits,
+                                    [approval.region_code]: {
+                                      ...edit,
+                                      status: e.target.value as CreativeApprovalStatus,
+                                    },
+                                  })
+                                }
+                                className="w-full px-2 py-1.5 text-sm border border-zinc-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
+                                disabled={savingApproval === approval.region_code}
+                              >
+                                <option value="pending">Pending</option>
+                                <option value="approved">Approved</option>
+                                <option value="rejected">Rejected</option>
+                              </select>
+                            </div>
+
+                            <div>
+                              <label className="block text-xs text-zinc-500 mb-1">Approval Code</label>
+                              <input
+                                type="text"
+                                value={edit.approval_code}
+                                onChange={(e) =>
+                                  setApprovalEdits({
+                                    ...approvalEdits,
+                                    [approval.region_code]: {
+                                      ...edit,
+                                      approval_code: e.target.value,
+                                    },
+                                  })
+                                }
+                                className="w-full px-2 py-1.5 text-sm border border-zinc-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
+                                placeholder="e.g., ARCON-2025-00123"
+                                disabled={savingApproval === approval.region_code}
+                              />
+                            </div>
+
+                            {edit.status === "rejected" && (
+                              <div>
+                                <label className="block text-xs text-zinc-500 mb-1">Rejection Reason</label>
+                                <input
+                                  type="text"
+                                  value={edit.rejected_reason}
+                                  onChange={(e) =>
+                                    setApprovalEdits({
+                                      ...approvalEdits,
+                                      [approval.region_code]: {
+                                        ...edit,
+                                        rejected_reason: e.target.value,
+                                      },
+                                    })
+                                  }
+                                  className="w-full px-2 py-1.5 text-sm border border-zinc-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
+                                  placeholder="Reason for rejection"
+                                  disabled={savingApproval === approval.region_code}
+                                />
+                              </div>
+                            )}
+
+                            <button
+                              type="button"
+                              onClick={() => handleSaveApproval(approval.region_code)}
+                              disabled={savingApproval === approval.region_code}
+                              className="mt-1 px-3 py-1.5 text-xs font-medium bg-blue-600 text-white rounded hover:bg-blue-700 disabled:bg-zinc-300 disabled:cursor-not-allowed transition-colors"
+                            >
+                              {savingApproval === approval.region_code ? "Saving..." : "Save Approval"}
+                            </button>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
             </>
           )}
 

@@ -23,6 +23,7 @@ import Login from "../pages/Login";
 import ForgotPassword from "../pages/ForgotPassword";
 import ResetPassword from "../pages/ResetPassword";
 import Setup from "../pages/Setup";
+import CompliancePendingApprovals from "../pages/CompliancePendingApprovals";
 
 function ProtectedRoute({ children }: { children: ReactElement }) {
   const { isAuthenticated, hasHydrated } = useAuthStore();
@@ -166,6 +167,14 @@ export const router = createBrowserRouter([
         element: (
           <OrgTypeGuard allowedOrgTypes={["beamer_internal"]}>
             <AdvertiserDetail />
+          </OrgTypeGuard>
+        ),
+      },
+      {
+        path: "compliance",
+        element: (
+          <OrgTypeGuard allowedOrgTypes={["beamer_internal"]}>
+            <CompliancePendingApprovals />
           </OrgTypeGuard>
         ),
       },
