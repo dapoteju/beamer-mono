@@ -313,6 +313,8 @@ export const players = pgTable("players", {
   lastSeenAt: timestamp("last_seen_at", { withTimezone: true }),
   softwareVersion: text("software_version"),
   configHash: text("config_hash"),
+  isActive: boolean("is_active").notNull().default(true),
+  revokedAt: timestamp("revoked_at", { withTimezone: true }),
   createdAt: timestamp("created_at", { withTimezone: true })
     .defaultNow()
     .notNull(),
