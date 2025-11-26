@@ -191,8 +191,11 @@ export function ScreenFormModal({ mode, screenId, initialValues, onClose, onSucc
       }
 
       // Handle player assignment
-      if (formData.playerId !== initialValues?.playerId) {
-        payload.playerId = formData.playerId || null;
+      // Normalize both values: treat null, undefined, and empty string as equivalent (no player)
+      const currentPlayerId = formData.playerId || null;
+      const originalPlayerId = initialValues?.playerId || null;
+      if (currentPlayerId !== originalPlayerId) {
+        payload.playerId = currentPlayerId;
       }
 
       updateMutation.mutate(payload);
