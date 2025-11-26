@@ -43,6 +43,12 @@ The project is organized as a monorepo with distinct applications and libraries:
 - **Player Configuration**: Ops-friendly device provisioning via `beamer.config.json` file. Configuration includes api_base_url, serial_number, screen_id, and optional provisioning_code. Player fails fast with clear error messages if config is missing or invalid. See `PLAYER_SETUP.md` for detailed setup instructions.
 - **Player Registration Conflict Detection**: Explicit detection when a screen is already linked to another player. Registration endpoint returns structured `PLAYER_ALREADY_REGISTERED` error (HTTP 409) with existing player ID. Player-core throws `PlayerAlreadyRegisteredError` with detailed console logging. Electron UI displays actionable instructions for technicians to disconnect the current player via CMS.
 - **Regions**: Country-level regulatory jurisdictions for creative approval tracking. Supported regions: Nigeria (NG, ARCON), Kenya (KE, KFCB), Ghana (GH, GACA), South Africa (ZA, AR). Migration script available at `backend/scripts/migrate-regions-to-country-level.ts` for converting from state-level to country-level regions.
+- **Publisher-scoped Screen Groups**: Screen groups are strictly scoped to publisher organizations (not advertisers). Groups can only contain screens owned by the same publisher. Key features:
+  - Publisher validation on group creation (rejects advertiser orgs)
+  - Membership integrity enforcement (screens can only be added to groups owned by their publisher)
+  - Targeting preview endpoint (`POST /api/screen-groups/targeting-preview`) with screen counts, online/offline status, and warnings
+  - Campaign by-screen-group reporting (`GET /api/reports/campaigns/:id/by-screen-group`)
+  - Frontend UI with "Publisher" labeling and publisher-only org filtering
 
 ### System Design Choices
 - **Monorepo Architecture**: Centralized repository for all platform components.
