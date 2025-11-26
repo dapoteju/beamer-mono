@@ -377,32 +377,36 @@ export const heartbeats = pgTable("heartbeats", {
 
 export const screenGroups = pgTable("screen_groups", {
   id: uuid("id").primaryKey().defaultRandom(),
-  publisherOrgId: uuid("publisher_org_id")
+  orgId: uuid("org_id")
     .notNull()
-    .references(() => organisations.id),
-  name: varchar("name", { length: 255 }).notNull(),
+    .references(() => organisations.id, { onDelete: "cascade" }),
+  name: varchar("name", { length: 100 }).notNull(),
   description: text("description"),
+  isArchived: boolean("is_archived").notNull().default(false),
   createdAt: timestamp("created_at", { withTimezone: true })
+    .defaultNow()
+    .notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true })
     .defaultNow()
     .notNull(),
 });
 
-export const screenGroupMembers = pgTable(
-  "screen_group_members",
+export const screenGroupMemberships = pgTable(
+  "screen_group_memberships",
   {
-    id: uuid("id").primaryKey().defaultRandom(),
     groupId: uuid("group_id")
       .notNull()
       .references(() => screenGroups.id, { onDelete: "cascade" }),
     screenId: uuid("screen_id")
       .notNull()
       .references(() => screens.id, { onDelete: "cascade" }),
-    createdAt: timestamp("created_at", { withTimezone: true })
+    addedByUserId: uuid("added_by_user_id").references(() => users.id),
+    addedAt: timestamp("added_at", { withTimezone: true })
       .defaultNow()
       .notNull(),
   },
   (table) => ({
-    uniqueGroupScreen: unique().on(table.groupId, table.screenId),
+    pk: unique().on(table.groupId, table.screenId),
   })
 );
 
