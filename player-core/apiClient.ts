@@ -25,6 +25,17 @@ function authHeader(auth_token: string) {
   };
 }
 
+export class PlayerAlreadyRegisteredError extends Error {
+  public readonly code = "PLAYER_ALREADY_REGISTERED";
+  public readonly existingPlayerId: string;
+
+  constructor(message: string, existingPlayerId: string) {
+    super(message);
+    this.name = "PlayerAlreadyRegisteredError";
+    this.existingPlayerId = existingPlayerId;
+  }
+}
+
 export async function registerPlayer(beamerConfig: RawBeamerConfig): Promise<PlayerConfig> {
   ensureBaseUrl();
 
@@ -49,6 +60,25 @@ export async function registerPlayer(beamerConfig: RawBeamerConfig): Promise<Pla
 
   if (json.status !== "success") {
     console.error("Request failed. BASE_URL:", BASE_URL, "HTTP:", res.status, "response:", json);
+    
+    if (json.code === "PLAYER_ALREADY_REGISTERED") {
+      const existingPlayerId = json.data?.existing_player_id || "unknown";
+      console.error(
+        `\n========================================\n` +
+        `Registration failed: screen already linked to player ${existingPlayerId}.\n` +
+        `Action required: Go to CMS → Screen → "Disconnect Player"\n` +
+        `========================================\n`
+      );
+      throw new PlayerAlreadyRegisteredError(
+        "Screen already linked to another player. Please disconnect the player from the Beamer CMS to continue.",
+        existingPlayerId
+      );
+    }
+
+    if (json.code === "SCREEN_NOT_FOUND") {
+      throw new Error("Screen not found. Check your beamer.config.json screen_id.");
+    }
+
     throw new Error(json.message || `Failed to register player (HTTP ${res.status})`);
   }
 

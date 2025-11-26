@@ -1,5 +1,5 @@
 import { loadJSON, saveJSON, loadBeamerConfig } from "./storage";
-import { registerPlayer, setApiBaseUrl } from "./apiClient";
+import { registerPlayer, setApiBaseUrl, PlayerAlreadyRegisteredError } from "./apiClient";
 import { updatePlaylist } from "./playlistService";
 import { startPlaybackLoop } from "./playerEngine";
 import { queueHeartbeat, flushHeartbeats, flushPlaybacks } from "./telemetryService";
@@ -48,4 +48,4 @@ async function initPlayer(onPlay: any) {
   startPlaybackLoop(playlist, onPlay);
 }
 
-export { initPlayer };
+export { initPlayer, PlayerAlreadyRegisteredError };

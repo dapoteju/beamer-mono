@@ -16,7 +16,7 @@ router.post(
       if (!screen_id) {
         return res
           .status(400)
-          .json({ status: "error", message: "screen_id is required" });
+          .json({ status: "error", code: "MISSING_SCREEN_ID", message: "screen_id is required" });
       }
 
       const result = await playerService.registerPlayer({
@@ -24,9 +24,16 @@ router.post(
         software_version,
       });
 
+      if (result.status === "error") {
+        const statusCode = result.code === "PLAYER_ALREADY_REGISTERED" ? 409 
+          : result.code === "SCREEN_NOT_FOUND" ? 404 
+          : 400;
+        return res.status(statusCode).json(result);
+      }
+
       res.status(201).json({ 
         status: "success", 
-        data: result,
+        data: result.data,
         message: "Player registered successfully. Use player_id and auth_token for authentication."
       });
     } catch (err) {

@@ -69,20 +69,57 @@ type RegisterPlayerResponse = {
   screen_id: string;
 };
 
+type RegisterPlayerErrorResponse = {
+  status: "error";
+  code: string;
+  message: string;
+  data?: {
+    existing_player_id?: string;
+  };
+};
+
+type RegisterPlayerResult = 
+  | { status: "success"; data: RegisterPlayerResponse }
+  | RegisterPlayerErrorResponse;
+
 export class PlayerService {
   /**
    * Register a new player for a screen.
    * - Validates screen exists
+   * - Checks if an active player is already linked to this screen
    * - Generates unique player ID and secure auth token
    * - Stores player in database
+   * 
+   * Returns structured response (success or error) instead of throwing exceptions
    */
-  async registerPlayer(input: RegisterPlayerInput): Promise<RegisterPlayerResponse> {
+  async registerPlayer(input: RegisterPlayerInput): Promise<RegisterPlayerResult> {
     const screen = await db.query.screens.findFirst({
       where: eq(screens.id, input.screen_id),
     });
 
     if (!screen) {
-      throw new Error("Screen not found");
+      return {
+        status: "error",
+        code: "SCREEN_NOT_FOUND",
+        message: "Screen not found. Verify the screen_id in your configuration.",
+      };
+    }
+
+    const existingPlayer = await db.query.players.findFirst({
+      where: (p, { and, eq: whereEq }) => 
+        and(whereEq(p.screenId, input.screen_id), whereEq(p.isActive, true)),
+    });
+
+    if (existingPlayer) {
+      console.log(`[PlayerService] Registration blocked: Screen ${input.screen_id} already has active player ${existingPlayer.id}`);
+      return {
+        status: "error",
+        code: "PLAYER_ALREADY_REGISTERED",
+        message: "This screen is already linked to another player. Disconnect the current player from the CMS to proceed.",
+        data: {
+          existing_player_id: existingPlayer.id,
+        },
+      };
     }
 
     const playerId = `player_${nanoid(21)}`;
@@ -94,12 +131,18 @@ export class PlayerService {
       authToken: authToken,
       softwareVersion: input.software_version || null,
       lastSeenAt: new Date(),
+      isActive: true,
     });
 
+    console.log(`[PlayerService] New player registered: ${playerId} for screen ${input.screen_id}`);
+
     return {
-      player_id: playerId,
-      auth_token: authToken,
-      screen_id: input.screen_id,
+      status: "success",
+      data: {
+        player_id: playerId,
+        auth_token: authToken,
+        screen_id: input.screen_id,
+      },
     };
   }
 

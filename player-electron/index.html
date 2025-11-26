@@ -72,6 +72,43 @@
 
         console.error("Beamer player failed to start:", err);
 
+        const isAlreadyLinked = 
+          (err && err.name === "PlayerAlreadyRegisteredError") ||
+          (err && err.code === "PLAYER_ALREADY_REGISTERED") ||
+          (message && message.toLowerCase().includes("already linked"));
+
+        if (isAlreadyLinked) {
+          const playerId = err.existingPlayerId || "unknown";
+          console.error(
+            `\n========================================\n` +
+            `Registration failed: screen already linked to player ${playerId}.\n` +
+            `Action required: Go to CMS → Screen → "Disconnect Player"\n` +
+            `========================================\n`
+          );
+
+          root.innerHTML = `
+            <div style="padding: 32px; font-family: system-ui; max-width: 500px; text-align: center;">
+              <div style="font-size: 48px; margin-bottom: 16px;">⚠️</div>
+              <div style="font-size: 24px; font-weight: bold; color: #ff8080; margin-bottom: 12px;">
+                Screen Already Linked
+              </div>
+              <div style="font-size: 16px; color: #cccccc; margin-bottom: 20px;">
+                This screen is already linked to another player.
+              </div>
+              <div style="font-size: 14px; color: #888888; background: #222; padding: 16px; border-radius: 8px;">
+                <div style="margin-bottom: 8px;">To fix this:</div>
+                <div style="text-align: left; padding-left: 20px;">
+                  1. Open the Beamer CMS<br/>
+                  2. Go to the Screen detail page<br/>
+                  3. Click <strong style="color: #ff6666;">"Disconnect Player"</strong><br/>
+                  4. Restart this player device
+                </div>
+              </div>
+            </div>
+          `;
+          return;
+        }
+
         root.innerHTML = `
           <div style="padding: 24px; font-family: system-ui; color: #ff8080;">
             <div style="font-size: 20px; font-weight: bold; margin-bottom: 8px;">
