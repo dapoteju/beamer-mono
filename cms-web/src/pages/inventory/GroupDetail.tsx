@@ -137,7 +137,7 @@ export default function GroupDetail() {
 
   async function loadAvailableScreens() {
     try {
-      const screens = await fetchScreens({ publisherOrgId: group?.orgId });
+      const screens = await fetchScreens({ publisherOrgId: group?.publisherOrgId });
       setAvailableScreens(screens);
     } catch (err: any) {
       console.error("Failed to load screens:", err);
@@ -329,7 +329,7 @@ export default function GroupDetail() {
               <p className="text-zinc-500 mt-1">{group.description}</p>
             )}
             <p className="text-sm text-zinc-400 mt-2">
-              {group.orgName} &bull; {group.screenCount} screens &bull; Updated{" "}
+              {group.publisherName} &bull; {group.screenCount} screens &bull; Updated{" "}
               {formatDate(group.updatedAt)}
             </p>
           </div>

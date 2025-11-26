@@ -2,8 +2,8 @@ import apiClient from "./client";
 
 export interface ScreenGroup {
   id: string;
-  orgId: string;
-  orgName: string;
+  publisherOrgId: string;
+  publisherName: string;
   name: string;
   description: string | null;
   isArchived: boolean;
@@ -54,7 +54,7 @@ export interface GroupHealth {
 }
 
 export interface ListGroupsParams {
-  org_id?: string;
+  publisher_org_id?: string;
   q?: string;
   archived?: boolean;
 }
@@ -83,7 +83,7 @@ export async function fetchScreenGroups(
   params?: ListGroupsParams
 ): Promise<{ items: ScreenGroup[]; count: number }> {
   const queryParams = new URLSearchParams();
-  if (params?.org_id) queryParams.append("org_id", params.org_id);
+  if (params?.publisher_org_id) queryParams.append("publisher_org_id", params.publisher_org_id);
   if (params?.q) queryParams.append("q", params.q);
   if (params?.archived !== undefined)
     queryParams.append("archived", String(params.archived));
@@ -98,10 +98,10 @@ export async function fetchScreenGroup(id: string): Promise<ScreenGroupDetail> {
 }
 
 export async function createScreenGroup(data: {
-  org_id: string;
+  publisher_org_id: string;
   name: string;
   description?: string;
-}): Promise<{ id: string; name: string }> {
+}): Promise<{ id: string; name: string; publisherOrgId: string }> {
   const response = await apiClient.post("/screen-groups", data);
   return response.data.data;
 }

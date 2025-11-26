@@ -8,6 +8,7 @@ import {
   getScreenReport,
   getCreativeReport,
 } from "./reports.service";
+import { getReportByScreenGroup } from "../screen-groups/screenGroups.service";
 
 export const reportsRouter = Router();
 
@@ -249,6 +250,24 @@ reportsRouter.get(
           message: "Creative not found",
         });
       }
+
+      res.json({
+        status: "success",
+        data: report,
+      });
+    } catch (err) {
+      next(err);
+    }
+  }
+);
+
+reportsRouter.get(
+  "/campaigns/:id/by-screen-group",
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { id } = req.params;
+
+      const report = await getReportByScreenGroup(id);
 
       res.json({
         status: "success",

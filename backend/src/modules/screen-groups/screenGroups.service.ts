@@ -11,12 +11,12 @@ import {
   campaigns,
   playEvents
 } from "../../db/schema";
-import { eq, and, sql, desc, ilike, or, inArray, count } from "drizzle-orm";
+import { eq, and, sql, desc, ilike, or, inArray, count, ne } from "drizzle-orm";
 
 export interface ScreenGroupWithCounts {
   id: string;
-  orgId: string;
-  orgName: string;
+  publisherOrgId: string;
+  publisherName: string;
   name: string;
   description: string | null;
   isArchived: boolean;
@@ -27,8 +27,8 @@ export interface ScreenGroupWithCounts {
 
 export interface ScreenGroupDetail {
   id: string;
-  orgId: string;
-  orgName: string;
+  publisherOrgId: string;
+  publisherName: string;
   name: string;
   description: string | null;
   isArchived: boolean;
@@ -56,16 +56,45 @@ export interface GroupMember {
   groupCount: number;
 }
 
+export async function validatePublisherOrg(orgId: string): Promise<{ 
+  valid: boolean; 
+  error?: string;
+  org?: { id: string; name: string; type: string };
+}> {
+  const [org] = await db
+    .select({
+      id: organisations.id,
+      name: organisations.name,
+      type: organisations.type,
+    })
+    .from(organisations)
+    .where(eq(organisations.id, orgId))
+    .limit(1);
+
+  if (!org) {
+    return { valid: false, error: "Organisation not found" };
+  }
+
+  if (org.type !== "publisher") {
+    return { 
+      valid: false, 
+      error: "Screen groups can only be created for publisher organisations" 
+    };
+  }
+
+  return { valid: true, org };
+}
+
 export async function listScreenGroups(params: {
-  orgId?: string;
+  publisherOrgId?: string;
   q?: string;
   archived?: boolean;
   isBeamerInternal: boolean;
 }): Promise<{ items: ScreenGroupWithCounts[]; count: number }> {
   const conditions = [];
 
-  if (params.orgId) {
-    conditions.push(eq(screenGroups.orgId, params.orgId));
+  if (params.publisherOrgId) {
+    conditions.push(eq(screenGroups.orgId, params.publisherOrgId));
   } else if (!params.isBeamerInternal) {
     return { items: [], count: 0 };
   }
@@ -90,8 +119,8 @@ export async function listScreenGroups(params: {
   const groups = await db
     .select({
       id: screenGroups.id,
-      orgId: screenGroups.orgId,
-      orgName: organisations.name,
+      publisherOrgId: screenGroups.orgId,
+      publisherName: organisations.name,
       name: screenGroups.name,
       description: screenGroups.description,
       isArchived: screenGroups.isArchived,
@@ -118,8 +147,8 @@ export async function getScreenGroup(id: string): Promise<ScreenGroupDetail | nu
   const [group] = await db
     .select({
       id: screenGroups.id,
-      orgId: screenGroups.orgId,
-      orgName: organisations.name,
+      publisherOrgId: screenGroups.orgId,
+      publisherName: organisations.name,
       name: screenGroups.name,
       description: screenGroups.description,
       isArchived: screenGroups.isArchived,
@@ -161,7 +190,7 @@ export async function getScreenGroup(id: string): Promise<ScreenGroupDetail | nu
 
   return {
     ...group,
-    orgName: group.orgName || '',
+    publisherName: group.publisherName || '',
     screenCount: memberStats.length,
     onlineCount,
     offlineCount,
@@ -169,16 +198,16 @@ export async function getScreenGroup(id: string): Promise<ScreenGroupDetail | nu
 }
 
 export async function createScreenGroup(input: {
-  orgId: string;
+  publisherOrgId: string;
   name: string;
   description?: string;
-}): Promise<{ id: string; name: string }> {
+}): Promise<{ id: string; name: string; publisherOrgId: string }> {
   const existing = await db
     .select({ id: screenGroups.id })
     .from(screenGroups)
     .where(
       and(
-        eq(screenGroups.orgId, input.orgId),
+        eq(screenGroups.orgId, input.publisherOrgId),
         sql`lower(${screenGroups.name}) = lower(${input.name})`,
         eq(screenGroups.isArchived, false)
       )
@@ -186,17 +215,21 @@ export async function createScreenGroup(input: {
     .limit(1);
 
   if (existing.length > 0) {
-    throw new Error(`A group with name "${input.name}" already exists in this organisation`);
+    throw new Error(`A group with name "${input.name}" already exists for this publisher`);
   }
 
   const [created] = await db
     .insert(screenGroups)
     .values({
-      orgId: input.orgId,
+      orgId: input.publisherOrgId,
       name: input.name.trim(),
       description: input.description?.trim() || null,
     })
-    .returning({ id: screenGroups.id, name: screenGroups.name });
+    .returning({ 
+      id: screenGroups.id, 
+      name: screenGroups.name,
+      publisherOrgId: screenGroups.orgId 
+    });
 
   return created;
 }
@@ -396,13 +429,69 @@ export async function getGroupMembers(
   };
 }
 
+export async function validateScreensForGroup(
+  publisherOrgId: string,
+  screenIds: string[]
+): Promise<{ 
+  validScreenIds: string[]; 
+  invalidScreenIds: string[];
+}> {
+  if (screenIds.length === 0) {
+    return { validScreenIds: [], invalidScreenIds: [] };
+  }
+
+  const screensData = await db
+    .select({
+      id: screens.id,
+      publisherOrgId: screens.publisherOrgId,
+    })
+    .from(screens)
+    .where(inArray(screens.id, screenIds));
+
+  const validScreenIds: string[] = [];
+  const invalidScreenIds: string[] = [];
+
+  const screenMap = new Map(screensData.map(s => [s.id, s.publisherOrgId]));
+
+  for (const screenId of screenIds) {
+    const screenPubOrgId = screenMap.get(screenId);
+    if (!screenPubOrgId) {
+      invalidScreenIds.push(screenId);
+    } else if (screenPubOrgId !== publisherOrgId) {
+      invalidScreenIds.push(screenId);
+    } else {
+      validScreenIds.push(screenId);
+    }
+  }
+
+  return { validScreenIds, invalidScreenIds };
+}
+
 export async function addGroupMembers(
   groupId: string,
   screenIds: string[],
-  addedByUserId: string | null
-): Promise<{ added: number; skipped: number }> {
+  addedByUserId: string | null,
+  publisherOrgId: string
+): Promise<{ 
+  added: number; 
+  skipped: number; 
+  invalidScreenIds?: string[];
+}> {
   if (screenIds.length === 0) {
     return { added: 0, skipped: 0 };
+  }
+
+  const { validScreenIds, invalidScreenIds } = await validateScreensForGroup(
+    publisherOrgId,
+    screenIds
+  );
+
+  if (invalidScreenIds.length > 0) {
+    return {
+      added: 0,
+      skipped: 0,
+      invalidScreenIds,
+    };
   }
 
   const existing = await db
@@ -411,12 +500,12 @@ export async function addGroupMembers(
     .where(
       and(
         eq(screenGroupMemberships.groupId, groupId),
-        inArray(screenGroupMemberships.screenId, screenIds)
+        inArray(screenGroupMemberships.screenId, validScreenIds)
       )
     );
 
   const existingIds = new Set(existing.map((e) => e.screenId));
-  const newIds = screenIds.filter((id) => !existingIds.has(id));
+  const newIds = validScreenIds.filter((id) => !existingIds.has(id));
 
   if (newIds.length > 0) {
     await db.insert(screenGroupMemberships).values(
@@ -667,4 +756,130 @@ export async function getReportByScreenGroup(
     plays: stats.plays,
     uniqueScreens: stats.screens.size,
   }));
+}
+
+export interface TargetingPreviewWarning {
+  type: "offline" | "archived" | "mixed_resolution" | "low_screen_count";
+  message: string;
+  screenIds?: string[];
+  count?: number;
+}
+
+export interface TargetingPreview {
+  totalScreens: number;
+  onlineScreens: number;
+  offlineScreens: number;
+  warnings: TargetingPreviewWarning[];
+  regions: Record<string, number>;
+  resolutions: Record<string, number>;
+}
+
+export async function getTargetingPreview(
+  groupIds: string[]
+): Promise<TargetingPreview> {
+  if (groupIds.length === 0) {
+    return {
+      totalScreens: 0,
+      onlineScreens: 0,
+      offlineScreens: 0,
+      warnings: [],
+      regions: {},
+      resolutions: {},
+    };
+  }
+
+  const twoMinutesAgo = new Date(Date.now() - 2 * 60 * 1000);
+
+  const members = await db
+    .select({
+      screenId: screens.id,
+      regionCode: screens.regionCode,
+      resolutionWidth: screens.resolutionWidth,
+      resolutionHeight: screens.resolutionHeight,
+      status: screens.status,
+      lastHeartbeat: sql<string | null>`(
+        SELECT h.created_at 
+        FROM ${heartbeats} h 
+        WHERE h.screen_id = ${screens.id} 
+        ORDER BY h.created_at DESC 
+        LIMIT 1
+      )`.as("last_heartbeat"),
+    })
+    .from(screenGroupMemberships)
+    .innerJoin(screens, eq(screenGroupMemberships.screenId, screens.id))
+    .innerJoin(screenGroups, eq(screenGroupMemberships.groupId, screenGroups.id))
+    .where(
+      and(
+        inArray(screenGroupMemberships.groupId, groupIds),
+        eq(screenGroups.isArchived, false)
+      )
+    );
+
+  const uniqueScreensMap = new Map<
+    string,
+    (typeof members)[0]
+  >();
+  for (const m of members) {
+    uniqueScreensMap.set(m.screenId, m);
+  }
+
+  const uniqueMembers = Array.from(uniqueScreensMap.values());
+
+  let onlineCount = 0;
+  let offlineCount = 0;
+  const regions: Record<string, number> = {};
+  const resolutions: Record<string, number> = {};
+  const offlineScreenIds: string[] = [];
+
+  for (const m of uniqueMembers) {
+    const lastHb = m.lastHeartbeat ? new Date(m.lastHeartbeat) : null;
+
+    if (lastHb && lastHb > twoMinutesAgo) {
+      onlineCount++;
+    } else {
+      offlineCount++;
+      offlineScreenIds.push(m.screenId);
+    }
+
+    regions[m.regionCode] = (regions[m.regionCode] || 0) + 1;
+
+    const resKey = `${m.resolutionWidth}x${m.resolutionHeight}`;
+    resolutions[resKey] = (resolutions[resKey] || 0) + 1;
+  }
+
+  const warnings: TargetingPreviewWarning[] = [];
+
+  if (offlineCount > 0) {
+    const offlinePercent = Math.round((offlineCount / uniqueMembers.length) * 100);
+    warnings.push({
+      type: "offline",
+      message: `${offlineCount} screen(s) (${offlinePercent}%) are currently offline`,
+      screenIds: offlineScreenIds.slice(0, 10),
+      count: offlineCount,
+    });
+  }
+
+  if (uniqueMembers.length < 5) {
+    warnings.push({
+      type: "low_screen_count",
+      message: `Only ${uniqueMembers.length} screen(s) will receive this campaign`,
+      count: uniqueMembers.length,
+    });
+  }
+
+  if (Object.keys(resolutions).length > 3) {
+    warnings.push({
+      type: "mixed_resolution",
+      message: `${Object.keys(resolutions).length} different resolutions detected, which may affect creative display`,
+    });
+  }
+
+  return {
+    totalScreens: uniqueMembers.length,
+    onlineScreens: onlineCount,
+    offlineScreens: offlineCount,
+    warnings,
+    regions,
+    resolutions,
+  };
 }

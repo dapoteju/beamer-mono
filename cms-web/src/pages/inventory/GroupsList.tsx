@@ -14,18 +14,18 @@ export default function GroupsList() {
   const navigate = useNavigate();
   const { user } = useAuthStore();
   const [groups, setGroups] = useState<ScreenGroup[]>([]);
-  const [organisations, setOrganisations] = useState<Organisation[]>([]);
+  const [publishers, setPublishers] = useState<Organisation[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const [orgFilter, setOrgFilter] = useState<string>("");
+  const [publisherFilter, setPublisherFilter] = useState<string>("");
   const [searchQuery, setSearchQuery] = useState("");
   const [showArchived, setShowArchived] = useState(false);
 
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [newGroupName, setNewGroupName] = useState("");
   const [newGroupDescription, setNewGroupDescription] = useState("");
-  const [newGroupOrgId, setNewGroupOrgId] = useState("");
+  const [newGroupPublisherId, setNewGroupPublisherId] = useState("");
   const [createLoading, setCreateLoading] = useState(false);
   const [createError, setCreateError] = useState<string | null>(null);
 
@@ -33,7 +33,7 @@ export default function GroupsList() {
 
   useEffect(() => {
     loadData();
-  }, [orgFilter, showArchived]);
+  }, [publisherFilter, showArchived]);
 
   async function loadData() {
     try {
@@ -42,7 +42,7 @@ export default function GroupsList() {
 
       const [groupsRes, orgsData] = await Promise.all([
         fetchScreenGroups({
-          org_id: orgFilter || undefined,
+          publisher_org_id: publisherFilter || undefined,
           archived: showArchived,
         }),
         isInternal ? fetchOrganisations() : Promise.resolve([]),
@@ -50,7 +50,8 @@ export default function GroupsList() {
 
       setGroups(groupsRes.items);
       if (isInternal) {
-        setOrganisations(orgsData);
+        const publisherOrgs = orgsData.filter((org) => org.type === "publisher");
+        setPublishers(publisherOrgs);
       }
     } catch (err: any) {
       setError(err.message || "Failed to load data");
@@ -65,7 +66,7 @@ export default function GroupsList() {
       return (
         g.name.toLowerCase().includes(q) ||
         g.description?.toLowerCase().includes(q) ||
-        g.orgName.toLowerCase().includes(q)
+        g.publisherName.toLowerCase().includes(q)
       );
     }
     return true;
@@ -81,9 +82,9 @@ export default function GroupsList() {
       return;
     }
 
-    const targetOrgId = isInternal ? newGroupOrgId : user?.orgId;
-    if (!targetOrgId) {
-      setCreateError("Organisation is required");
+    const targetPublisherId = isInternal ? newGroupPublisherId : user?.orgId;
+    if (!targetPublisherId) {
+      setCreateError("Publisher is required");
       return;
     }
 
@@ -92,7 +93,7 @@ export default function GroupsList() {
       setCreateError(null);
 
       const created = await createScreenGroup({
-        org_id: targetOrgId,
+        publisher_org_id: targetPublisherId,
         name: newGroupName.trim(),
         description: newGroupDescription.trim() || undefined,
       });
@@ -100,7 +101,7 @@ export default function GroupsList() {
       setShowCreateModal(false);
       setNewGroupName("");
       setNewGroupDescription("");
-      setNewGroupOrgId("");
+      setNewGroupPublisherId("");
 
       navigate(`/inventory/groups/${created.id}`);
     } catch (err: any) {
@@ -114,7 +115,7 @@ export default function GroupsList() {
     const data = filteredGroups.map((g) => ({
       id: g.id,
       name: g.name,
-      organisation: g.orgName,
+      publisher: g.publisherName,
       screen_count: g.screenCount,
       status: g.isArchived ? "Archived" : "Active",
       updated_at: new Date(g.updatedAt).toISOString(),
@@ -173,14 +174,14 @@ export default function GroupsList() {
         <div className="p-4 border-b border-zinc-200 flex flex-wrap gap-4">
           {isInternal && (
             <select
-              value={orgFilter}
-              onChange={(e) => setOrgFilter(e.target.value)}
+              value={publisherFilter}
+              onChange={(e) => setPublisherFilter(e.target.value)}
               className="px-3 py-2 border border-zinc-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
             >
-              <option value="">All Organisations</option>
-              {organisations.map((org) => (
-                <option key={org.id} value={org.id}>
-                  {org.name}
+              <option value="">All Publishers</option>
+              {publishers.map((pub) => (
+                <option key={pub.id} value={pub.id}>
+                  {pub.name}
                 </option>
               ))}
             </select>
@@ -214,7 +215,7 @@ export default function GroupsList() {
                 </th>
                 {isInternal && (
                   <th className="px-4 py-3 text-left text-xs font-medium text-zinc-500 uppercase">
-                    Organisation
+                    Publisher
                   </th>
                 )}
                 <th className="px-4 py-3 text-center text-xs font-medium text-zinc-500 uppercase">
@@ -256,7 +257,7 @@ export default function GroupsList() {
                       )}
                     </td>
                     {isInternal && (
-                      <td className="px-4 py-3 text-zinc-600">{group.orgName}</td>
+                      <td className="px-4 py-3 text-zinc-600">{group.publisherName}</td>
                     )}
                     <td className="px-4 py-3 text-center">
                       <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-zinc-100 text-zinc-700">
@@ -330,17 +331,17 @@ export default function GroupsList() {
               {isInternal && (
                 <div>
                   <label className="block text-sm font-medium text-zinc-700 mb-1">
-                    Organisation *
+                    Publisher *
                   </label>
                   <select
-                    value={newGroupOrgId}
-                    onChange={(e) => setNewGroupOrgId(e.target.value)}
+                    value={newGroupPublisherId}
+                    onChange={(e) => setNewGroupPublisherId(e.target.value)}
                     className="w-full px-3 py-2 border border-zinc-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                   >
-                    <option value="">Select organisation</option>
-                    {organisations.map((org) => (
-                      <option key={org.id} value={org.id}>
-                        {org.name}
+                    <option value="">Select publisher</option>
+                    {publishers.map((pub) => (
+                      <option key={pub.id} value={pub.id}>
+                        {pub.name}
                       </option>
                     ))}
                   </select>
