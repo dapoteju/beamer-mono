@@ -3,6 +3,10 @@ import { queuePlayback } from "./telemetryService";
 import { getLastLocation } from "./gpsService";
 import { isAssetValid } from "./assetCache";
 
+function isNodeEnv() {
+  return typeof window === "undefined";
+}
+
 export async function startPlaybackLoop(
   playlist: Playlist,
   onPlay: (creative: Creative) => void
@@ -21,9 +25,11 @@ export async function startPlaybackLoop(
 
     for (const creative of playlist.playlist) {
       try {
-        if (!isAssetValid(creative.local_file_path)) {
+        const runningInNode = isNodeEnv();
+
+        if (runningInNode && !isAssetValid(creative.local_file_path)) {
           console.warn(
-            `Skipping creative ${creative.creative_id} due to invalid or missing asset`
+            `Skipping creative ${creative.creative_id} due to invalid or missing local asset`
           );
           queuePlayback({
             creative_id: creative.creative_id,
@@ -36,6 +42,8 @@ export async function startPlaybackLoop(
           continue;
         }
 
+        // In Electron/browser we allow playback even without local_file_path,
+        // because renderCreative uses creative.local_file_path || creative.file_url
         onPlay(creative);
         playedAny = true;
 
@@ -70,7 +78,10 @@ export async function startPlaybackLoop(
     }
 
     if (!playedAny) {
-      console.warn("No valid creatives to play, waiting before retry...");
+      console.warn(
+        "No valid creatives to play in this cycle. Playlist length:",
+        playlist.playlist.length
+      );
       await new Promise((res) => setTimeout(res, 10000));
     }
   }
