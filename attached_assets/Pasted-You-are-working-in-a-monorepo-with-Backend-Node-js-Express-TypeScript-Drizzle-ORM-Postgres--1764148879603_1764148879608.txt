@@ -1,0 +1,383 @@
+You are working in a monorepo with:
+
+Backend: Node.js + Express + TypeScript, Drizzle ORM (Postgres), JWT session via HTTP-only cookies.
+
+Frontend: React (TypeScript), Tailwind + shadcn/ui, React Query, React Hook Form, Wouter routing, Vite.
+
+Existing concepts: organisations, screens, campaigns, flights, creatives, approvals, targeting UI (TargetingDetails), auth middleware, activity log utility, exposure reporting.
+
+Goal
+
+Add Screen Groups to the CMS so users can create groups, add/remove screens, target groups in flights, and see reporting by group.
+
+1) Database (Drizzle) — schema + migrations + seed
+
+Create two tables:
+
+screen_groups
+
+id (uuid pk)
+
+org_id (uuid fk → organisations.id, cascade on delete)
+
+name (text, unique per org)
+
+description (text, nullable)
+
+is_archived (boolean, default false)
+
+created_at (timestamptz, default now)
+
+updated_at (timestamptz, default now)
+
+screen_group_memberships
+
+group_id (uuid fk → screen_groups.id, cascade on delete)
+
+screen_id (uuid fk → screens.id, cascade on delete)
+
+added_by_user_id (uuid fk → users.id, nullable)
+
+added_at (timestamptz, default now)
+
+PK = (group_id, screen_id)
+
+Files:
+
+apps/api/src/db/schema/screenGroups.ts — Drizzle models & relations.
+
+apps/api/drizzle/XXXXXXXX_add_screen_groups.sql — SQL migration (or use programmatic migration).
+
+Add indices:
+
+unique (org_id, lower(name)) on screen_groups
+
+index on screen_group_memberships.screen_id
+
+index on screen_group_memberships.group_id
+
+Seed (optional):
+
+apps/api/src/db/seeds/screenGroups.seed.ts
+
+For each organisation with ≥5 screens, create a demo group “All Screens” and add first 5 screens.
+
+Acceptance:
+
+Migration runs without error.
+
+Selecting from both tables works.
+
+Foreign keys enforced.
+
+2) Backend API — routes, handlers, validation, auth
+
+Base path: /api/screen-groups
+
+Endpoints:
+
+GET /api/screen-groups?org_id=&q=&archived=
+
+Filters by org_id (required unless beamer_internal).
+
+Optional search q on name/description (ILIKE).
+
+Optional archived=true|false (default false).
+
+Returns: { items: [...], count }.
+
+POST /api/screen-groups
+
+Body: { org_id, name, description? }
+
+AuthZ: user must belong to the org or be beamer_internal.
+
+Enforce uniqueness (org_id, lower(name)).
+
+Audit log: “created screen group {name}”.
+
+GET /api/screen-groups/:id
+
+Returns group details + member counts.
+
+PATCH /api/screen-groups/:id
+
+Body: { name?, description?, is_archived? }
+
+Cannot rename to a duplicate within same org.
+
+Audit log: “updated screen group {before} → {after}”.
+
+DELETE /api/screen-groups/:id
+
+Soft-delete: set is_archived=true. (Keep endpoint for hard delete behind ?force=true for internal only.)
+
+If any active flight targets this group, respond 409 with message to remove targeting first.
+
+Audit log.
+
+Memberships:
+6) GET /api/screen-groups/:id/members?status=&city=&region=&q=&page=&page_size=
+
+Returns paginated screens with useful fields (name, status online/offline, city, region, resolution, lastSeenAt).
+
+POST /api/screen-groups/:id/members
+
+Body: { screen_ids: string[] }
+
+Upsert all; ignore existing pairs.
+
+Audit log: “added {n} screens to group {name}”.
+
+DELETE /api/screen-groups/:id/members
+
+Body: { screen_ids: string[] }
+
+Remove those memberships.
+
+Audit log.
+
+POST /api/screen-groups/:id/members/upload-csv
+
+Accept CSV with header screen_id or screen_name.
+
+Resolve names to IDs (org scoped).
+
+Return summary { added, skipped, not_found }.
+
+Files:
+
+apps/api/src/routes/screenGroups.ts (Express Router)
+
+apps/api/src/controllers/screenGroupsController.ts
+
+apps/api/src/validators/screenGroups.validator.ts (zod schema)
+
+Update global router index to mount /api/screen-groups
+
+Reuse requireAuth, requireOrgAccess, isBeamerInternal
+
+Reuse activityLogger
+
+Acceptance:
+
+All endpoints respect org boundaries.
+
+401/403 returned appropriately.
+
+409 on delete when targeted by active flights.
+
+3) Decision Engine integration (read-only for now)
+
+Wherever we compute eligible screens for flights (server-side), ensure:
+
+Group-based targeting resolves to the union of member screens.
+
+Deduplicate if a screen appears from both direct selection and groups.
+
+Resolution/approval filters still apply after resolving groups.
+
+Expose a count endpoint used by the editor:
+POST /api/flights/targeting/preview (already exists or add) accepts { region?, city?, screen_ids?, group_ids?, time_windows? } and returns { eligible_screen_count, warnings: [...] }.
+
+Warnings to include for group picks:
+
+“Group contains mixed resolutions; X% of members don’t match creative size.”
+
+“Selected groups overlap: N screens duplicated.”
+
+4) Frontend — Inventory → Groups section
+
+New routes:
+
+/inventory/groups (list)
+
+/inventory/groups/:id (detail)
+
+Mount under Inventory nav.
+
+Files:
+
+apps/cms-web/src/pages/inventory/GroupsList.tsx
+
+apps/cms-web/src/pages/inventory/GroupDetail.tsx
+
+apps/cms-web/src/components/groups/GroupFormDialog.tsx (create/rename)
+
+apps/cms-web/src/components/groups/MembershipTable.tsx
+
+apps/cms-web/src/components/groups/UploadCsvDialog.tsx
+
+apps/cms-web/src/api/screenGroups.ts (React Query hooks)
+
+Groups List:
+
+Columns: Name, Organisation, Screen Count, Updated, Status (Active/Archived).
+
+Filters: Org (select), search (q), archived toggle.
+
+Actions: New Group, Export CSV (name,id,org,screen_count).
+
+Group Detail:
+
+Header: name, description, org; “Rename”, “Archive/Unarchive”, “Delete (internal)”.
+
+Tabs:
+
+Members — virtualized table (name, status chip, city, region, resolution, lastSeenAt)
+
+Multi-select add/remove via modal search.
+
+Upload CSV button; download current membership CSV.
+
+Inline indicator: “This screen is in N groups” (tooltip shows names).
+
+Health — small cards: online/offline counts, lastSeen range.
+
+Flights — read-only: flights/campaigns targeting this group with links.
+
+UI Components:
+
+Use shadcn Dialog, Button, Card, Badge, Table.
+
+Reuse chip styles from TargetingDetails for consistency (introduce “Group” chip style).
+
+Acceptance:
+
+Create → appears in list.
+
+Rename, archive, delete behave with confirmations and toasts.
+
+Add/remove members works; CSV import reports results.
+
+5) Frontend — Targeting in Campaign/Flight editors
+
+Files:
+
+apps/cms-web/src/components/targeting/TargetingPanel.tsx
+
+apps/cms-web/src/components/targeting/GroupPicker.tsx
+
+Add Groups as a selectable facet alongside Regions/Cities/Time Windows:
+
+Searchable multi-select for groups (org scoped).
+
+Show count pill “Eligible screens: N” pulling from POST /api/flights/targeting/preview.
+
+Show non-blocking warnings returned by preview (overlaps, resolution mix).
+
+Tooltip if overlapping groups detected: “42 duplicated screens across selections”.
+
+Acceptance:
+
+Selecting groups updates preview counts.
+
+Saving a flight persists selected group_ids.
+
+6) Reporting — “By Screen Group”
+
+Files:
+
+API: GET /api/reports/campaigns/:id/by-screen-group
+
+FE: apps/cms-web/src/pages/reports/CampaignReport.tsx — add a “By Group” table under the Exposure tab.
+
+Return rows:
+
+group_name, impressions, plays, unique_screens, exposure_locations.
+
+Acceptance:
+
+Table renders with pagination and CSV export.
+
+7) Activity Logs
+
+On create/update/archive/delete groups and add/remove memberships, write logs using existing activity logger with:
+
+actor user id
+
+org id
+
+entity type screen_group / screen_group_membership
+
+payload diff
+
+8) Permissions
+
+Non-internal users: can only CRUD groups where org_id is in their memberships.
+
+Internal users: can view all, hard delete, and bypass org filter when org_id unspecified (read-only list should still require explicit org filter for non-internal).
+
+Add backend tests to assert 403 on cross-org access.
+
+9) Tests
+
+Backend (Vitest/Jest):
+
+apps/api/tests/screenGroups.spec.ts
+
+create/read/update/archive/delete
+
+unique name enforcement
+
+membership add/remove and pagination
+
+delete blocked by active flight targeting
+
+org boundary checks
+
+Frontend (RTL + Vitest):
+
+GroupsList renders, filters, create flow.
+
+GroupDetail membership add/remove and CSV upload flow.
+
+TargetingPanel shows group chips and preview count; overlap warning appears.
+
+10) DX & Commands
+
+Add API client functions under apps/cms-web/src/api/screenGroups.ts:
+
+useScreenGroupsList, useCreateGroup, useUpdateGroup, useArchiveGroup, useDeleteGroup
+
+useGroupDetail, useGroupMembers, useAddMembers, useRemoveMembers, useUploadCsv
+
+Ensure types shared via a small @beamer/types package or local types.ts.
+
+Run:
+
+pnpm db:migrate (or project’s migration command)
+
+pnpm --filter @beamer/api dev
+
+pnpm --filter @beamer/cms-web dev
+
+11) Edge Cases & UX Rules
+
+Prevent renaming to blank or >100 chars.
+
+On archive: hide by default in lists; allow “Show archived”.
+
+CSV import: tolerate whitespace, case-insensitive headers; reject >10k rows with friendly error.
+
+Group delete:
+
+If force=true and user is internal, perform hard delete (and memberships), otherwise soft delete only.
+
+Show “Region mix” badge on Group Detail if members span multiple regions; hover shows counts per region.
+
+In Members table, warn once per page if >30% members have a different resolution than the currently selected creative size in the flight editor (contextual message routed from preview when available).
+
+12) Definition of Done (must pass)
+
+CRUD groups, manage memberships (UI + API) with org-scoped permissions.
+
+Groups appear as a targeting facet in Flight editor with real-time eligible count and warnings.
+
+Reporting by Screen Group available on Campaign reports.
+
+All new endpoints tested; FE interactions covered; seeds working.
+
+No console errors; typecheck clean.
+
+Deliverables: All files created/modified as listed, migrations applied, tests passing, and a short README update under docs/cms/screen-groups.md summarising usage.
