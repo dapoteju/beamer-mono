@@ -42,7 +42,40 @@ export function loadJSON(path: string): any | null {
 }
 
 export function loadBeamerConfig(): RawBeamerConfig {
-  const config = loadJSON("beamer.config.json") as RawBeamerConfig | null;
+  let config: RawBeamerConfig | null = null;
+  let resolvedPath: string | null = null;
+
+  if (canUseFileSystem()) {
+    const fs = require("fs");
+    const path = require("path");
+
+    const candidatePaths = [
+      path.join(process.cwd(), "beamer.config.json"),
+      path.join(__dirname, "beamer.config.json"),
+      path.join(__dirname, "..", "beamer.config.json"),
+    ];
+
+    for (const candidatePath of candidatePaths) {
+      if (fs.existsSync(candidatePath)) {
+        resolvedPath = candidatePath;
+        try {
+          config = JSON.parse(fs.readFileSync(candidatePath, "utf-8"));
+        } catch (err) {
+          throw new Error(`Failed to parse beamer.config.json at ${candidatePath}: ${err}`);
+        }
+        break;
+      }
+    }
+
+    if (resolvedPath && config) {
+      console.log("Loaded beamer.config.json from:", resolvedPath, config);
+    }
+  } else {
+    config = loadJSON("beamer.config.json") as RawBeamerConfig | null;
+    if (config) {
+      console.log("Loaded beamer.config.json from localStorage:", config);
+    }
+  }
 
   if (!config) {
     throw new Error(

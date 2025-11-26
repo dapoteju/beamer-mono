@@ -34,8 +34,8 @@ export async function registerPlayer(beamerConfig: RawBeamerConfig): Promise<Pla
   const json = await res.json();
 
   if (json.status !== "success") {
-    console.error("Failed to register player:", json);
-    throw new Error(json.message || "Failed to register player");
+    console.error("Failed to register player. HTTP status:", res.status, "response:", json);
+    throw new Error(json.message || `Failed to register player (HTTP ${res.status})`);
   }
 
   const data = json.data;

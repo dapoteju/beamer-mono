@@ -64,7 +64,33 @@
         }
       }
 
-      initPlayer(renderCreative);
+      function showError(err) {
+        const root = document.getElementById("root");
+        const message =
+          (err && err.message) ||
+          (typeof err === "string" ? err : "Unknown player error");
+
+        console.error("Beamer player failed to start:", err);
+
+        root.innerHTML = `
+          <div style="padding: 24px; font-family: system-ui; color: #ff8080;">
+            <div style="font-size: 20px; font-weight: bold; margin-bottom: 8px;">
+              Player Error
+            </div>
+            <div style="font-size: 14px;">
+              ${message}
+            </div>
+          </div>
+        `;
+      }
+
+      (async () => {
+        try {
+          await initPlayer(renderCreative);
+        } catch (err) {
+          showError(err);
+        }
+      })();
     </script>
 
   </body>
