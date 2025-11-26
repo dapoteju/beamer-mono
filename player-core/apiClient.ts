@@ -1,10 +1,22 @@
 import { PlayerConfig, Playlist, PlaybackEvent, HeartbeatEvent } from "./types";
 import { RawBeamerConfig } from "./storage";
 
-let BASE_URL = "https://beamer-api.replit.app/api/player";
+let BASE_URL = "";
+
+function ensureBaseUrl() {
+  if (!BASE_URL) {
+    throw new Error("Beamer API BASE_URL is not set. loadBeamerConfig() or setApiBaseUrl() did not run.");
+  }
+}
 
 export function setApiBaseUrl(url: string) {
-  BASE_URL = url.replace(/\/+$/, "") + "/player";
+  if (!url || typeof url !== "string") {
+    throw new Error("Invalid api_base_url. Check beamer.config.json.api_base_url");
+  }
+
+  const normalized = url.replace(/\/+$/, "");
+  BASE_URL = `${normalized}/player`;
+  console.log("Beamer API base URL set to:", BASE_URL);
 }
 
 function authHeader(auth_token: string) {
@@ -14,6 +26,8 @@ function authHeader(auth_token: string) {
 }
 
 export async function registerPlayer(beamerConfig: RawBeamerConfig): Promise<PlayerConfig> {
+  ensureBaseUrl();
+
   const { serial_number, screen_id, provisioning_code } = beamerConfig;
 
   const body: Record<string, string> = {
@@ -34,7 +48,7 @@ export async function registerPlayer(beamerConfig: RawBeamerConfig): Promise<Pla
   const json = await res.json();
 
   if (json.status !== "success") {
-    console.error("Failed to register player. HTTP status:", res.status, "response:", json);
+    console.error("Request failed. BASE_URL:", BASE_URL, "HTTP:", res.status, "response:", json);
     throw new Error(json.message || `Failed to register player (HTTP ${res.status})`);
   }
 
@@ -56,6 +70,8 @@ export async function fetchPlaylist(
   auth_token: string,
   config_hash?: string
 ): Promise<Playlist | null> {
+  ensureBaseUrl();
+
   const url = config_hash
     ? `${BASE_URL}/playlist?config_hash=${config_hash}`
     : `${BASE_URL}/playlist`;
@@ -74,19 +90,21 @@ export async function fetchPlaylist(
     const json = await res.json();
 
     if (json.status !== "success") {
-      console.error("Failed to fetch playlist:", json);
+      console.error("Request failed. BASE_URL:", BASE_URL, "HTTP:", res.status, "response:", json);
       return null;
     }
 
     return json.data as Playlist;
   } catch (err) {
-    console.error("Playlist fetch failed (probably offline):", err);
+    console.error("Playlist fetch failed (probably offline). BASE_URL:", BASE_URL, "error:", err);
     return null;
   }
 }
 
 
 export async function sendPlaybackEvent(auth_token: string, event: PlaybackEvent) {
+  ensureBaseUrl();
+
   console.log("Sending playback event:", event);
 
   try {
@@ -109,10 +127,10 @@ export async function sendPlaybackEvent(auth_token: string, event: PlaybackEvent
     }
 
     if (!res.ok || (json && json.status !== "success")) {
-      console.error("Playback event error:", json || text);
+      console.error("Request failed. BASE_URL:", BASE_URL, "HTTP:", res.status, "response:", json || text);
     }
   } catch (err) {
-    console.error("Playback event network error:", err);
+    console.error("Playback event network error. BASE_URL:", BASE_URL, "error:", err);
   }
 }
 
@@ -121,6 +139,8 @@ export async function sendHeartbeat(
   auth_token: string,
   hb: HeartbeatEvent
 ) {
+  ensureBaseUrl();
+
   console.log("Sending heartbeat:", hb);
 
   try {
@@ -143,9 +163,9 @@ export async function sendHeartbeat(
     }
 
     if (!res.ok || (json && json.status !== "success")) {
-      console.error("Heartbeat error:", json || text);
+      console.error("Request failed. BASE_URL:", BASE_URL, "HTTP:", res.status, "response:", json || text);
     }
   } catch (err) {
-    console.error("Heartbeat network error:", err);
+    console.error("Heartbeat network error. BASE_URL:", BASE_URL, "error:", err);
   }
 }

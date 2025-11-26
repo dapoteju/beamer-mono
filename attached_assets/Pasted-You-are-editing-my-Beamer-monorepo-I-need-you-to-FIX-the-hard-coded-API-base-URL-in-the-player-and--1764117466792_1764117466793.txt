@@ -1,0 +1,97 @@
+You are editing my Beamer monorepo.
+I need you to FIX the hard-coded API base URL in the player and make the player always use the URL from beamer.config.json, never the default Replit URL.
+
+Please implement the following EXACT changes in player-core/apiClient.ts and player-core/index.ts:
+
+🔧 1. Remove the hard-coded BASE_URL
+
+Replace this line:
+
+let BASE_URL = "https://beamer-api.replit.app/api/player";
+
+
+With:
+
+let BASE_URL = "";
+
+🔧 2. Rewrite setApiBaseUrl() so it's strict and logs clearly
+
+Replace the existing function with:
+
+export function setApiBaseUrl(url: string) {
+  if (!url || typeof url !== "string") {
+    throw new Error("Invalid api_base_url. Check beamer.config.json.api_base_url");
+  }
+
+  const normalized = url.replace(/\/+$/, "");
+  BASE_URL = `${normalized}/player`;
+  console.log("Beamer API base URL set to:", BASE_URL);
+}
+
+🔧 3. Add ensureBaseUrl() and call it before EVERY network request
+
+Add this helper at the top of the file:
+
+function ensureBaseUrl() {
+  if (!BASE_URL) {
+    throw new Error("Beamer API BASE_URL is not set. loadBeamerConfig() or setApiBaseUrl() did not run.");
+  }
+}
+
+
+Then add ensureBaseUrl(); as the FIRST line inside each exported function that makes an API call:
+
+registerPlayer
+
+fetchPlaylist
+
+trackPlayback
+
+sendHeartbeatEvents
+
+sendPlaybackEvents
+
+Example for registerPlayer:
+
+export async function registerPlayer(beamerConfig: RawBeamerConfig): Promise<PlayerConfig> {
+  ensureBaseUrl();
+  ...
+}
+
+
+Also update ALL error logs when fetch fails to include the BASE_URL:
+
+console.error("Request failed. BASE_URL:", BASE_URL, "HTTP:", res.status, "response:", json);
+
+🔧 4. Log the API URL inside initPlayer()
+
+In player-core/index.ts, right after:
+
+setApiBaseUrl(beamerConfig.api_base_url);
+
+
+add:
+
+console.log("Loaded API base URL from config:", beamerConfig.api_base_url);
+
+🔧 5. Rebuild the player-core dist
+
+After making these edits, run:
+
+cd player-core
+npm install
+npm run build
+
+✅ Expected Results
+
+The player will never again use the hard-coded Replit URL.
+
+If the config missing or wrong, the player will now show a visible error on screen.
+
+If the base URL is missing, EVERY API call will throw "BASE_URL is not set".
+
+If the screen ID is invalid, you’ll now see “Screen not found” immediately.
+
+If config is correct, player.json will be created and playback will start normally.
+
+Please implement EXACTLY this.

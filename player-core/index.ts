@@ -11,6 +11,7 @@ async function initPlayer(onPlay: any) {
   console.log("Loaded beamer.config.json:", beamerConfig);
 
   setApiBaseUrl(beamerConfig.api_base_url);
+  console.log("Loaded API base URL from config:", beamerConfig.api_base_url);
 
   let config = loadJSON("player.json");
 
