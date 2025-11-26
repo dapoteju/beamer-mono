@@ -1047,3 +1047,65 @@ export async function getActivePlayerForScreen(screenId: string): Promise<{ id: 
 
   return player || null;
 }
+
+export interface ScreenGroupMembership {
+  groupId: string;
+  groupName: string;
+  publisherOrgId: string;
+  publisherName: string;
+  description: string | null;
+  isArchived: boolean;
+  screenCount: number;
+  addedAt: Date;
+  addedByUserId: string | null;
+  addedByUserName: string | null;
+}
+
+export async function getScreenGroups(screenId: string): Promise<{
+  groups: ScreenGroupMembership[];
+  totalGroups: number;
+}> {
+  const { screenGroups, screenGroupMemberships, users } = await import("../../db/schema");
+  
+  const memberships = await db
+    .select({
+      groupId: screenGroups.id,
+      groupName: screenGroups.name,
+      publisherOrgId: screenGroups.orgId,
+      publisherName: organisations.name,
+      description: screenGroups.description,
+      isArchived: screenGroups.isArchived,
+      addedAt: screenGroupMemberships.addedAt,
+      addedByUserId: screenGroupMemberships.addedByUserId,
+      addedByUserName: users.fullName,
+      screenCount: sql<number>`(
+        SELECT COUNT(*)::int 
+        FROM ${screenGroupMemberships} sgm2
+        WHERE sgm2.group_id = ${screenGroups.id}
+      )`,
+    })
+    .from(screenGroupMemberships)
+    .innerJoin(screenGroups, eq(screenGroupMemberships.groupId, screenGroups.id))
+    .leftJoin(organisations, eq(screenGroups.orgId, organisations.id))
+    .leftJoin(users, eq(screenGroupMemberships.addedByUserId, users.id))
+    .where(eq(screenGroupMemberships.screenId, screenId))
+    .orderBy(desc(screenGroupMemberships.addedAt));
+
+  const groups: ScreenGroupMembership[] = memberships.map(m => ({
+    groupId: m.groupId,
+    groupName: m.groupName,
+    publisherOrgId: m.publisherOrgId,
+    publisherName: m.publisherName || "",
+    description: m.description,
+    isArchived: m.isArchived,
+    screenCount: m.screenCount,
+    addedAt: m.addedAt,
+    addedByUserId: m.addedByUserId,
+    addedByUserName: m.addedByUserName,
+  }));
+
+  return {
+    groups,
+    totalGroups: groups.length,
+  };
+}

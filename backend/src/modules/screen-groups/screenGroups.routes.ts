@@ -1,6 +1,15 @@
 import { Router, Response, NextFunction } from "express";
 import { requireAuth, AuthRequest } from "../../middleware/auth";
 import {
+  requirePublisherAccess,
+  requirePublisherModifyAccess,
+  GroupAccessRequest,
+  isBeamerInternal,
+  canModifyGroup,
+  getGroupPublisherOrgId,
+  validateGroupIdsForPublisher,
+} from "../../middleware/permissions";
+import {
   listScreenGroups,
   getScreenGroup,
   createScreenGroup,
@@ -21,34 +30,6 @@ import { screenGroups, organisations } from "../../db/schema";
 import { eq } from "drizzle-orm";
 
 export const screenGroupsRouter = Router();
-
-function isBeamerInternal(req: AuthRequest): boolean {
-  return req.user?.orgType === "beamer_internal";
-}
-
-function canAccessGroup(req: AuthRequest, groupPublisherOrgId: string): boolean {
-  if (!req.user) return false;
-  if (isBeamerInternal(req)) return true;
-  return req.user.orgId === groupPublisherOrgId;
-}
-
-function canModifyGroup(req: AuthRequest, groupPublisherOrgId: string): boolean {
-  if (!req.user) return false;
-  if (isBeamerInternal(req)) return true;
-  if (req.user.orgId === groupPublisherOrgId) {
-    return req.user.role === "admin" || req.user.role === "ops";
-  }
-  return false;
-}
-
-async function getGroupPublisherOrgId(groupId: string): Promise<string | null> {
-  const [group] = await db
-    .select({ publisherOrgId: screenGroups.orgId })
-    .from(screenGroups)
-    .where(eq(screenGroups.id, groupId))
-    .limit(1);
-  return group?.publisherOrgId || null;
-}
 
 screenGroupsRouter.get(
   "/",
@@ -143,17 +124,14 @@ screenGroupsRouter.post(
 screenGroupsRouter.get(
   "/:id",
   requireAuth,
-  async (req: AuthRequest, res: Response, next: NextFunction) => {
+  requirePublisherAccess,
+  async (req: GroupAccessRequest, res: Response, next: NextFunction) => {
     try {
       const groupId = req.params.id;
       const group = await getScreenGroup(groupId);
 
       if (!group) {
         return res.status(404).json({ error: "Screen group not found" });
-      }
-
-      if (!canAccessGroup(req, group.publisherOrgId)) {
-        return res.status(403).json({ error: "Forbidden" });
       }
 
       res.json({ status: "success", data: group });
@@ -166,19 +144,11 @@ screenGroupsRouter.get(
 screenGroupsRouter.patch(
   "/:id",
   requireAuth,
-  async (req: AuthRequest, res: Response, next: NextFunction) => {
+  requirePublisherModifyAccess,
+  async (req: GroupAccessRequest, res: Response, next: NextFunction) => {
     try {
       const groupId = req.params.id;
       const { name, description, is_archived } = req.body;
-
-      const publisherOrgId = await getGroupPublisherOrgId(groupId);
-      if (!publisherOrgId) {
-        return res.status(404).json({ error: "Screen group not found" });
-      }
-
-      if (!canModifyGroup(req, publisherOrgId)) {
-        return res.status(403).json({ error: "Forbidden" });
-      }
 
       if (name !== undefined) {
         if (typeof name !== "string" || name.trim().length === 0) {
@@ -215,19 +185,11 @@ screenGroupsRouter.patch(
 screenGroupsRouter.delete(
   "/:id",
   requireAuth,
-  async (req: AuthRequest, res: Response, next: NextFunction) => {
+  requirePublisherModifyAccess,
+  async (req: GroupAccessRequest, res: Response, next: NextFunction) => {
     try {
       const groupId = req.params.id;
       const force = req.query.force === "true";
-
-      const publisherOrgId = await getGroupPublisherOrgId(groupId);
-      if (!publisherOrgId) {
-        return res.status(404).json({ error: "Screen group not found" });
-      }
-
-      if (!canModifyGroup(req, publisherOrgId)) {
-        return res.status(403).json({ error: "Forbidden" });
-      }
 
       if (force && !isBeamerInternal(req)) {
         return res.status(403).json({ 
@@ -253,18 +215,10 @@ screenGroupsRouter.delete(
 screenGroupsRouter.get(
   "/:id/members",
   requireAuth,
-  async (req: AuthRequest, res: Response, next: NextFunction) => {
+  requirePublisherAccess,
+  async (req: GroupAccessRequest, res: Response, next: NextFunction) => {
     try {
       const groupId = req.params.id;
-
-      const publisherOrgId = await getGroupPublisherOrgId(groupId);
-      if (!publisherOrgId) {
-        return res.status(404).json({ error: "Screen group not found" });
-      }
-
-      if (!canAccessGroup(req, publisherOrgId)) {
-        return res.status(403).json({ error: "Forbidden" });
-      }
 
       const status = req.query.status as string | undefined;
       const city = req.query.city as string | undefined;
@@ -301,7 +255,8 @@ screenGroupsRouter.get(
 screenGroupsRouter.post(
   "/:id/members",
   requireAuth,
-  async (req: AuthRequest, res: Response, next: NextFunction) => {
+  requirePublisherModifyAccess,
+  async (req: GroupAccessRequest, res: Response, next: NextFunction) => {
     try {
       const groupId = req.params.id;
       const { screen_ids } = req.body;
@@ -310,14 +265,7 @@ screenGroupsRouter.post(
         return res.status(400).json({ error: "screen_ids array is required" });
       }
 
-      const publisherOrgId = await getGroupPublisherOrgId(groupId);
-      if (!publisherOrgId) {
-        return res.status(404).json({ error: "Screen group not found" });
-      }
-
-      if (!canModifyGroup(req, publisherOrgId)) {
-        return res.status(403).json({ error: "Forbidden" });
-      }
+      const publisherOrgId = req.groupPublisherOrgId!;
 
       const result = await addGroupMembers(
         groupId,
@@ -348,22 +296,14 @@ screenGroupsRouter.post(
 screenGroupsRouter.delete(
   "/:id/members",
   requireAuth,
-  async (req: AuthRequest, res: Response, next: NextFunction) => {
+  requirePublisherModifyAccess,
+  async (req: GroupAccessRequest, res: Response, next: NextFunction) => {
     try {
       const groupId = req.params.id;
       const { screen_ids } = req.body;
 
       if (!Array.isArray(screen_ids) || screen_ids.length === 0) {
         return res.status(400).json({ error: "screen_ids array is required" });
-      }
-
-      const publisherOrgId = await getGroupPublisherOrgId(groupId);
-      if (!publisherOrgId) {
-        return res.status(404).json({ error: "Screen group not found" });
-      }
-
-      if (!canModifyGroup(req, publisherOrgId)) {
-        return res.status(403).json({ error: "Forbidden" });
       }
 
       const result = await removeGroupMembers(groupId, screen_ids);
@@ -382,7 +322,8 @@ screenGroupsRouter.delete(
 screenGroupsRouter.post(
   "/:id/members/upload-csv",
   requireAuth,
-  async (req: AuthRequest, res: Response, next: NextFunction) => {
+  requirePublisherModifyAccess,
+  async (req: GroupAccessRequest, res: Response, next: NextFunction) => {
     try {
       const groupId = req.params.id;
       const { csv_data } = req.body;
@@ -391,14 +332,7 @@ screenGroupsRouter.post(
         return res.status(400).json({ error: "csv_data is required" });
       }
 
-      const publisherOrgId = await getGroupPublisherOrgId(groupId);
-      if (!publisherOrgId) {
-        return res.status(404).json({ error: "Screen group not found" });
-      }
-
-      if (!canModifyGroup(req, publisherOrgId)) {
-        return res.status(403).json({ error: "Forbidden" });
-      }
+      const publisherOrgId = req.groupPublisherOrgId!;
 
       const lines = csv_data.trim().split("\n");
       if (lines.length < 2) {
@@ -470,19 +404,10 @@ screenGroupsRouter.post(
 screenGroupsRouter.get(
   "/:id/flights",
   requireAuth,
-  async (req: AuthRequest, res: Response, next: NextFunction) => {
+  requirePublisherAccess,
+  async (req: GroupAccessRequest, res: Response, next: NextFunction) => {
     try {
       const groupId = req.params.id;
-
-      const publisherOrgId = await getGroupPublisherOrgId(groupId);
-      if (!publisherOrgId) {
-        return res.status(404).json({ error: "Screen group not found" });
-      }
-
-      if (!canAccessGroup(req, publisherOrgId)) {
-        return res.status(403).json({ error: "Forbidden" });
-      }
-
       const flights = await getGroupsTargetingFlights(groupId);
 
       res.json({ status: "success", data: flights });
@@ -495,19 +420,10 @@ screenGroupsRouter.get(
 screenGroupsRouter.get(
   "/:id/health",
   requireAuth,
-  async (req: AuthRequest, res: Response, next: NextFunction) => {
+  requirePublisherAccess,
+  async (req: GroupAccessRequest, res: Response, next: NextFunction) => {
     try {
       const groupId = req.params.id;
-
-      const publisherOrgId = await getGroupPublisherOrgId(groupId);
-      if (!publisherOrgId) {
-        return res.status(404).json({ error: "Screen group not found" });
-      }
-
-      if (!canAccessGroup(req, publisherOrgId)) {
-        return res.status(403).json({ error: "Forbidden" });
-      }
-
       const health = await getGroupHealth(groupId);
 
       res.json({ status: "success", data: health });
@@ -526,6 +442,14 @@ screenGroupsRouter.post(
 
       if (!Array.isArray(group_ids)) {
         return res.status(400).json({ error: "group_ids array is required" });
+      }
+
+      const validation = await validateGroupIdsForPublisher(group_ids, req);
+      if (!validation.valid) {
+        return res.status(403).json({ 
+          error: validation.error,
+          invalid_group_ids: validation.invalidGroupIds 
+        });
       }
 
       const preview = await getTargetingPreview(group_ids);

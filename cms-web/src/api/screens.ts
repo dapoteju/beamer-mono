@@ -370,3 +370,28 @@ export async function disconnectPlayer(screenId: string): Promise<DisconnectPlay
   );
   return response.data;
 }
+
+export interface ScreenGroupMembership {
+  id: string;
+  name: string;
+  publisherOrgId: string;
+  publisherName: string;
+  description: string | null;
+  isArchived: boolean;
+  screenCount: number;
+  addedAt: string;
+  addedByUserId: string | null;
+  addedByUserName: string | null;
+}
+
+export interface ScreenGroupsResponse {
+  groups: ScreenGroupMembership[];
+  totalGroups: number;
+}
+
+export async function fetchScreenGroups(screenId: string): Promise<ScreenGroupsResponse> {
+  const response = await apiClient.get<{ status: string; data: ScreenGroupsResponse }>(
+    `/screens/${screenId}/groups`
+  );
+  return response.data.data;
+}

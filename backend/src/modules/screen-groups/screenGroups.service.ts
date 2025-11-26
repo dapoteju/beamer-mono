@@ -759,16 +759,18 @@ export async function getReportByScreenGroup(
 }
 
 export interface TargetingPreviewWarning {
-  type: "offline" | "archived" | "mixed_resolution" | "low_screen_count";
+  type: "offline" | "archived" | "mixed_resolution" | "low_screen_count" | "overlap";
   message: string;
   screenIds?: string[];
   count?: number;
 }
 
 export interface TargetingPreview {
+  eligible_screen_count: number;
   totalScreens: number;
   onlineScreens: number;
   offlineScreens: number;
+  overlapCount: number;
   warnings: TargetingPreviewWarning[];
   regions: Record<string, number>;
   resolutions: Record<string, number>;
@@ -779,9 +781,11 @@ export async function getTargetingPreview(
 ): Promise<TargetingPreview> {
   if (groupIds.length === 0) {
     return {
+      eligible_screen_count: 0,
       totalScreens: 0,
       onlineScreens: 0,
       offlineScreens: 0,
+      overlapCount: 0,
       warnings: [],
       regions: {},
       resolutions: {},
@@ -793,6 +797,7 @@ export async function getTargetingPreview(
   const members = await db
     .select({
       screenId: screens.id,
+      groupId: screenGroupMemberships.groupId,
       regionCode: screens.regionCode,
       resolutionWidth: screens.resolutionWidth,
       resolutionHeight: screens.resolutionHeight,
@@ -814,6 +819,21 @@ export async function getTargetingPreview(
         eq(screenGroups.isArchived, false)
       )
     );
+
+  const screenOccurrences = new Map<string, Set<string>>();
+  for (const m of members) {
+    if (!screenOccurrences.has(m.screenId)) {
+      screenOccurrences.set(m.screenId, new Set());
+    }
+    screenOccurrences.get(m.screenId)!.add(m.groupId);
+  }
+
+  const duplicateScreenIds: string[] = [];
+  for (const [screenId, groupSet] of screenOccurrences) {
+    if (groupSet.size > 1) {
+      duplicateScreenIds.push(screenId);
+    }
+  }
 
   const uniqueScreensMap = new Map<
     string,
@@ -849,20 +869,31 @@ export async function getTargetingPreview(
 
   const warnings: TargetingPreviewWarning[] = [];
 
+  if (duplicateScreenIds.length > 0) {
+    warnings.push({
+      type: "overlap",
+      message: `Overlap detected: ${duplicateScreenIds.length} screen${duplicateScreenIds.length > 1 ? 's' : ''} appear in multiple selected groups.`,
+      screenIds: duplicateScreenIds.slice(0, 10),
+      count: duplicateScreenIds.length,
+    });
+  }
+
   if (offlineCount > 0) {
-    const offlinePercent = Math.round((offlineCount / uniqueMembers.length) * 100);
+    const offlinePercent = uniqueMembers.length > 0 
+      ? Math.round((offlineCount / uniqueMembers.length) * 100) 
+      : 0;
     warnings.push({
       type: "offline",
-      message: `${offlineCount} screen(s) (${offlinePercent}%) are currently offline`,
+      message: `${offlineCount} screen${offlineCount > 1 ? 's are' : ' is'} currently offline.`,
       screenIds: offlineScreenIds.slice(0, 10),
       count: offlineCount,
     });
   }
 
-  if (uniqueMembers.length < 5) {
+  if (uniqueMembers.length > 0 && uniqueMembers.length < 5) {
     warnings.push({
       type: "low_screen_count",
-      message: `Only ${uniqueMembers.length} screen(s) will receive this campaign`,
+      message: `Only ${uniqueMembers.length} screen${uniqueMembers.length > 1 ? 's' : ''} will receive this campaign.`,
       count: uniqueMembers.length,
     });
   }
@@ -870,14 +901,16 @@ export async function getTargetingPreview(
   if (Object.keys(resolutions).length > 3) {
     warnings.push({
       type: "mixed_resolution",
-      message: `${Object.keys(resolutions).length} different resolutions detected, which may affect creative display`,
+      message: `Mixed resolutions: ${Object.keys(resolutions).length} different resolutions detected, which may affect creative display.`,
     });
   }
 
   return {
+    eligible_screen_count: uniqueMembers.length,
     totalScreens: uniqueMembers.length,
     onlineScreens: onlineCount,
     offlineScreens: offlineCount,
+    overlapCount: duplicateScreenIds.length,
     warnings,
     regions,
     resolutions,

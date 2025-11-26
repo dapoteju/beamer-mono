@@ -192,3 +192,28 @@ export async function fetchGroupHealth(groupId: string): Promise<GroupHealth> {
   const response = await apiClient.get(`/screen-groups/${groupId}/health`);
   return response.data.data;
 }
+
+export interface TargetingPreviewWarning {
+  type: "offline" | "archived" | "mixed_resolution" | "low_screen_count" | "overlap";
+  message: string;
+  screenIds?: string[];
+  count?: number;
+}
+
+export interface TargetingPreview {
+  eligible_screen_count: number;
+  totalScreens: number;
+  onlineScreens: number;
+  offlineScreens: number;
+  overlapCount: number;
+  warnings: TargetingPreviewWarning[];
+  regions: Record<string, number>;
+  resolutions: Record<string, number>;
+}
+
+export async function fetchTargetingPreview(groupIds: string[]): Promise<TargetingPreview> {
+  const response = await apiClient.post(`/screen-groups/targeting-preview`, {
+    group_ids: groupIds,
+  });
+  return response.data.data;
+}

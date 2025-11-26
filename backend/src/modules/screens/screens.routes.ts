@@ -22,6 +22,7 @@ import {
   getPlaylistPreview,
   getLastPlayEvents,
   disconnectPlayerFromScreen,
+  getScreenGroups,
 } from "./screens.service";
 import { requireAuth, AuthRequest } from "../../middleware/auth";
 import { db } from "../../db/client";
@@ -700,6 +701,55 @@ screensRouter.post("/:id/disconnect-player", requireAuth, async (req: AuthReques
         message: err.message,
       });
     }
+    next(err);
+  }
+});
+
+// GET /api/screens/:id/groups - Get all groups this screen belongs to
+screensRouter.get("/:id/groups", requireAuth, async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    if (!canAccessScreens(req)) {
+      return res.status(403).json({ error: "Forbidden" });
+    }
+
+    const screenId = req.params.id;
+    const basicScreen = await getScreen(screenId);
+
+    if (!basicScreen) {
+      return res.status(404).json({ 
+        status: "error", 
+        message: "Screen not found" 
+      });
+    }
+
+    if (!canAccessScreen(req, basicScreen.publisherOrgId)) {
+      return res.status(403).json({ 
+        status: "error", 
+        message: "Forbidden: cross-publisher access denied" 
+      });
+    }
+
+    const result = await getScreenGroups(screenId);
+
+    res.json({
+      status: "success",
+      data: {
+        groups: result.groups.map(g => ({
+          id: g.groupId,
+          name: g.groupName,
+          publisherOrgId: g.publisherOrgId,
+          publisherName: g.publisherName,
+          description: g.description,
+          isArchived: g.isArchived,
+          screenCount: g.screenCount,
+          addedAt: g.addedAt.toISOString(),
+          addedByUserId: g.addedByUserId,
+          addedByUserName: g.addedByUserName,
+        })),
+        totalGroups: result.totalGroups,
+      },
+    });
+  } catch (err) {
     next(err);
   }
 });

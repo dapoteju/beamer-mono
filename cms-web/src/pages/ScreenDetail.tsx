@@ -17,6 +17,7 @@ import type {
 import { ScreenFormModal } from "../components/ScreenFormModal";
 import { ScreenPlaylistTab } from "../components/ScreenPlaylistTab";
 import { ScreenLastPlayedTab } from "../components/ScreenLastPlayedTab";
+import { ScreenGroupsTab } from "../components/ScreenGroupsTab";
 import { useAuthStore } from "../store/authStore";
 import "leaflet/dist/leaflet.css";
 
@@ -33,7 +34,7 @@ export default function ScreenDetail() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const [activeTab, setActiveTab] = useState<"overview" | "playlist" | "last-played" | "play-events" | "heartbeats" | "movement">(
+  const [activeTab, setActiveTab] = useState<"overview" | "playlist" | "last-played" | "play-events" | "heartbeats" | "movement" | "groups">(
     "overview"
   );
   const [timeRange, setTimeRange] = useState("24h");
@@ -425,6 +426,16 @@ export default function ScreenDetail() {
                   Movement
                 </button>
               )}
+              <button
+                onClick={() => setActiveTab("groups")}
+                className={`py-4 px-1 border-b-2 font-medium text-sm ${
+                  activeTab === "groups"
+                    ? "border-blue-500 text-blue-600"
+                    : "border-transparent text-zinc-500 hover:text-zinc-700 hover:border-zinc-300"
+                }`}
+              >
+                Groups
+              </button>
             </nav>
 
             {(activeTab === "play-events" || activeTab === "heartbeats" || activeTab === "movement") && (
@@ -804,6 +815,13 @@ export default function ScreenDetail() {
                 </div>
               )}
             </div>
+          )}
+
+          {activeTab === "groups" && (
+            <ScreenGroupsTab 
+              screenId={screen.id} 
+              publisherOrgId={screen.publisherOrgId} 
+            />
           )}
         </div>
       </div>
