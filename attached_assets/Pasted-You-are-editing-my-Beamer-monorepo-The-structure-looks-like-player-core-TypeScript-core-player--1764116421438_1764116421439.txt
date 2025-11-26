@@ -1,0 +1,131 @@
+You are editing my Beamer monorepo. The structure looks like:
+
+player-core/ (TypeScript core player logic)
+
+player-electron/ (Electron shell that loads ../player-core/dist/index.js)
+
+I have a bug where, on my device, the Electron player UI stays stuck on the text "Starting player..." and no player.json file is created.
+
+I’ve already set up beamer.config.json, but if there is any error during config loading or registration, it fails silently in the renderer and I never see the error.
+
+Please make the following changes to improve robustness and make the player actually show meaningful errors:
+
+1. Improve loadBeamerConfig so it can find the config file robustly
+
+In player-core/storage.ts:
+
+Change loadBeamerConfig so that instead of only calling loadJSON("beamer.config.json") (which uses the current working directory), it tries multiple locations when running in Node / Electron:
+
+process.cwd()/beamer.config.json
+
+__dirname + "/beamer.config.json"
+
+path.join(__dirname, "..", "beamer.config.json") (to support running from dist/)
+
+Use fs.existsSync to check each candidate path in order and load the first one found.
+
+Keep the browser/localStorage behaviour unchanged.
+
+If none of the candidate files exist, throw the same error as before:
+"Missing beamer.config.json. Please create it in the working directory with api_base_url, serial_number, and screen_id."
+
+Still validate that api_base_url, serial_number, and screen_id are present exactly as before.
+
+Add a console.log that prints which path was actually used to load the config, to help debugging, e.g.:
+
+console.log("Loaded beamer.config.json from:", resolvedPath, config);
+
+2. Surface init errors in the Electron UI instead of hanging on "Starting player..."
+
+In player-electron/index.html:
+
+Currently, near the bottom you have:
+
+<div id="root">Starting player...</div>
+
+<script>
+  const { initPlayer } = require("../player-core/dist/index.js");
+
+  function renderCreative(creative) {
+    ...
+  }
+
+  initPlayer(renderCreative);
+</script>
+
+
+Change this so that initPlayer is called inside an async IIFE with proper try/catch, and if there is any error, the UI changes from "Starting player..." to a visible error message.
+
+Example of the desired pattern:
+
+<script>
+  const { initPlayer } = require("../player-core/dist/index.js");
+
+  function renderCreative(creative) {
+    // existing render logic unchanged
+  }
+
+  function showError(err) {
+    const root = document.getElementById("root");
+    const message =
+      (err && err.message) ||
+      (typeof err === "string" ? err : "Unknown player error");
+
+    console.error("Beamer player failed to start:", err);
+
+    root.innerHTML = `
+      <div style="padding: 24px; font-family: system-ui; color: #ff8080;">
+        <div style="font-size: 20px; font-weight: bold; margin-bottom: 8px;">
+          Player Error
+        </div>
+        <div style="font-size: 14px;">
+          ${message}
+        </div>
+      </div>
+    `;
+  }
+
+  (async () => {
+    try {
+      await initPlayer(renderCreative);
+    } catch (err) {
+      showError(err);
+    }
+  })();
+</script>
+
+
+Keep the existing creative rendering logic; only wrap the initPlayer call and add the showError function.
+
+3. Make registration errors very explicit in logs (optional but helpful)
+
+In player-core/apiClient.ts:
+
+In registerPlayer, you already log when json.status !== "success". Enhance that log to also include res.status and body so that if the backend says "Screen not found" it’s obvious in the console.
+
+Concretely, right before throwing the error, log something like:
+
+console.error("Failed to register player. HTTP status:", res.status, "response:", json);
+
+
+Make sure the thrown Error uses the backend message if available:
+
+throw new Error(json.message || `Failed to register player (HTTP ${res.status})`);
+
+4. Rebuild and run
+
+After making these changes, please:
+
+Run cd player-core && npm install && npm run build to regenerate dist/index.js.
+
+Then run cd ../player-electron && npm install && npm start.
+
+The expected behaviour after this change:
+
+If beamer.config.json cannot be found or is invalid, the screen should no longer stay on "Starting player..." but instead show a clear error message like "Missing beamer.config.json..." or "Invalid beamer.config.json...".
+
+If screen_id does not exist in the backend screens table, the player should show an error like "Screen not found" instead of silently hanging.
+
+When everything is configured correctly and the backend is reachable, player.json should be created in the working directory and the playlist should start, replacing "Starting player..." with the "Now Playing" UI.
+
+Please implement all of the above changes.
