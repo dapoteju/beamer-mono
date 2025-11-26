@@ -129,7 +129,7 @@ export async function listScreensWithPlayerInfo(filters?: {
     })
     .from(screens)
     .leftJoin(organisations, eq(screens.publisherOrgId, organisations.id))
-    .leftJoin(players, eq(players.screenId, screens.id))
+    .leftJoin(players, and(eq(players.screenId, screens.id), eq(players.isActive, true)))
     .leftJoin(vehicles, eq(screens.vehicleId, vehicles.id))
     .leftJoin(publisherProfiles, eq(screens.publisherId, publisherProfiles.id));
 
@@ -234,7 +234,7 @@ export async function getScreenDetail(screenId: string) {
       configHash: players.configHash,
     })
     .from(players)
-    .where(eq(players.screenId, screenId))
+    .where(and(eq(players.screenId, screenId), eq(players.isActive, true)))
     .limit(1);
 
   let lastHeartbeatAt: Date | null = null;
@@ -990,4 +990,60 @@ export async function getLastPlayEvents(screenId: string, limit: number = 20): P
     lat: e.lat ? parseFloat(e.lat as string) : null,
     lng: e.lng ? parseFloat(e.lng as string) : null,
   }));
+}
+
+export interface DisconnectPlayerResult {
+  screen_id: string;
+  player_id: string;
+}
+
+export async function disconnectPlayerFromScreen(screenId: string): Promise<DisconnectPlayerResult> {
+  const [activePlayer] = await db
+    .select({
+      id: players.id,
+      isActive: players.isActive,
+    })
+    .from(players)
+    .where(and(
+      eq(players.screenId, screenId),
+      eq(players.isActive, true)
+    ))
+    .limit(1);
+
+  if (!activePlayer) {
+    throw new Error("No active player linked to this screen");
+  }
+
+  await db
+    .update(players)
+    .set({
+      isActive: false,
+      revokedAt: new Date(),
+    })
+    .where(eq(players.id, activePlayer.id));
+
+  await db
+    .update(screens)
+    .set({
+      lastSeenAt: null,
+    })
+    .where(eq(screens.id, screenId));
+
+  return {
+    screen_id: screenId,
+    player_id: activePlayer.id,
+  };
+}
+
+export async function getActivePlayerForScreen(screenId: string): Promise<{ id: string } | null> {
+  const [player] = await db
+    .select({ id: players.id })
+    .from(players)
+    .where(and(
+      eq(players.screenId, screenId),
+      eq(players.isActive, true)
+    ))
+    .limit(1);
+
+  return player || null;
 }

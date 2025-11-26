@@ -354,3 +354,19 @@ export async function fetchScreenLastPlay(screenId: string, limit: number = 20):
   );
   return response.data.data;
 }
+
+export interface DisconnectPlayerResponse {
+  status: string;
+  message: string;
+  data: {
+    screen_id: string;
+    player_id: string;
+  };
+}
+
+export async function disconnectPlayer(screenId: string): Promise<DisconnectPlayerResponse> {
+  const response = await apiClient.post<DisconnectPlayerResponse>(
+    `/screens/${screenId}/disconnect-player`
+  );
+  return response.data;
+}

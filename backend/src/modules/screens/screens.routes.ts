@@ -21,6 +21,7 @@ import {
   getScreenLocationHistory,
   getPlaylistPreview,
   getLastPlayEvents,
+  disconnectPlayerFromScreen,
 } from "./screens.service";
 import { requireAuth, AuthRequest } from "../../middleware/auth";
 import { db } from "../../db/client";
@@ -658,6 +659,47 @@ screensRouter.get("/:id/last-play", requireAuth, async (req: AuthRequest, res: R
 
     res.json({ status: "success", data: lastPlays });
   } catch (err) {
+    next(err);
+  }
+});
+
+// POST /api/screens/:id/disconnect-player - Disconnect player from screen (beamer_internal only)
+screensRouter.post("/:id/disconnect-player", requireAuth, async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    if (!req.user || req.user.orgType !== "beamer_internal") {
+      return res.status(403).json({ 
+        status: "error", 
+        message: "Forbidden. Only internal users can disconnect players." 
+      });
+    }
+
+    const screenId = req.params.id;
+    const basicScreen = await getScreen(screenId);
+
+    if (!basicScreen) {
+      return res.status(404).json({ 
+        status: "error", 
+        message: "Screen not found" 
+      });
+    }
+
+    const result = await disconnectPlayerFromScreen(screenId);
+
+    res.json({
+      status: "success",
+      message: "Player disconnected from screen",
+      data: {
+        screen_id: result.screen_id,
+        player_id: result.player_id,
+      },
+    });
+  } catch (err: any) {
+    if (err.message === "No active player linked to this screen") {
+      return res.status(400).json({
+        status: "error",
+        message: err.message,
+      });
+    }
     next(err);
   }
 });

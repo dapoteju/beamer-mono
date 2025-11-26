@@ -105,8 +105,9 @@ export class PlayerService {
 
   /**
    * Validate player auth token and return player info.
+   * Returns null if player is inactive/disconnected.
    */
-  async validateAuthToken(playerId: string, authToken: string): Promise<{ screen_id: string } | null> {
+  async validateAuthToken(playerId: string, authToken: string): Promise<{ screen_id: string; is_active: boolean } | null> {
     const player = await db.query.players.findFirst({
       where: eq(players.id, playerId),
     });
@@ -115,12 +116,16 @@ export class PlayerService {
       return null;
     }
 
+    if (!player.isActive) {
+      return { screen_id: player.screenId, is_active: false };
+    }
+
     await db
       .update(players)
       .set({ lastSeenAt: new Date() })
       .where(eq(players.id, playerId));
 
-    return { screen_id: player.screenId };
+    return { screen_id: player.screenId, is_active: true };
   }
 
   /**

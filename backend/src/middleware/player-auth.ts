@@ -45,6 +45,13 @@ export async function authenticatePlayer(
       });
     }
 
+    if (!playerInfo.is_active) {
+      return res.status(401).json({
+        status: "error",
+        message: "Player is disconnected or inactive. Please re-register this device.",
+      });
+    }
+
     req.player = {
       player_id: playerId,
       screen_id: playerInfo.screen_id,

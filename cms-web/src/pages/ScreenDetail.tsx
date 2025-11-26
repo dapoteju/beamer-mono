@@ -6,6 +6,7 @@ import {
   fetchScreenHeartbeats,
   fetchScreenPlayEvents,
   fetchScreenLocationHistory,
+  disconnectPlayer,
 } from "../api/screens";
 import type {
   ScreenDetail as ScreenDetailType,
@@ -38,6 +39,9 @@ export default function ScreenDetail() {
   const [timeRange, setTimeRange] = useState("24h");
   const [showEditModal, setShowEditModal] = useState(false);
   const [copiedId, setCopiedId] = useState(false);
+  const [showDisconnectModal, setShowDisconnectModal] = useState(false);
+  const [disconnecting, setDisconnecting] = useState(false);
+  const [toastMessage, setToastMessage] = useState<{ type: "success" | "error"; message: string } | null>(null);
 
   const copyScreenId = async () => {
     if (detail?.screen.id) {
@@ -112,6 +116,26 @@ export default function ScreenDetail() {
       setLocationHistory(history);
     } catch (err: any) {
       console.error("Failed to fetch location history:", err);
+    }
+  }
+
+  async function handleDisconnectPlayer() {
+    if (!id) return;
+
+    try {
+      setDisconnecting(true);
+      await disconnectPlayer(id);
+      setShowDisconnectModal(false);
+      setToastMessage({ type: "success", message: "Player disconnected successfully" });
+      await loadScreenDetail();
+      setTimeout(() => setToastMessage(null), 4000);
+    } catch (err: any) {
+      console.error("Failed to disconnect player:", err);
+      const errorMessage = err.response?.data?.message || "Failed to disconnect player. Please try again.";
+      setToastMessage({ type: "error", message: errorMessage });
+      setTimeout(() => setToastMessage(null), 4000);
+    } finally {
+      setDisconnecting(false);
     }
   }
 
@@ -300,9 +324,19 @@ export default function ScreenDetail() {
                   {formatRelativeTime(player.lastHeartbeatAt)}
                 </span>
               </div>
+              {user?.orgType === "beamer_internal" && (
+                <div className="pt-2 border-t border-zinc-100 mt-2">
+                  <button
+                    onClick={() => setShowDisconnectModal(true)}
+                    className="px-3 py-1.5 bg-red-50 text-red-600 text-sm rounded-md hover:bg-red-100 transition-colors border border-red-200"
+                  >
+                    Disconnect Player
+                  </button>
+                </div>
+              )}
             </div>
           ) : (
-            <p className="text-sm text-zinc-500">No player attached</p>
+            <p className="text-sm text-zinc-500">No player currently registered for this screen.</p>
           )}
         </div>
 
@@ -802,6 +836,69 @@ export default function ScreenDetail() {
             loadScreenDetail();
           }}
         />
+      )}
+
+      {/* Disconnect Player Confirmation Modal */}
+      {showDisconnectModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg shadow-xl max-w-md w-full mx-4 p-6">
+            <h2 className="text-lg font-semibold text-zinc-900 mb-2">
+              Disconnect Player from this Screen?
+            </h2>
+            <p className="text-sm text-zinc-600 mb-6">
+              This will revoke the current player's access and unlink it from this screen. 
+              The physical device will need to re-register before sending new heartbeats or playing campaigns.
+            </p>
+            <div className="flex justify-end gap-3">
+              <button
+                onClick={() => setShowDisconnectModal(false)}
+                disabled={disconnecting}
+                className="px-4 py-2 text-sm text-zinc-700 bg-zinc-100 rounded-md hover:bg-zinc-200 transition-colors disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleDisconnectPlayer}
+                disabled={disconnecting}
+                className="px-4 py-2 text-sm text-white bg-red-600 rounded-md hover:bg-red-700 transition-colors disabled:opacity-50 flex items-center gap-2"
+              >
+                {disconnecting ? (
+                  <>
+                    <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                    </svg>
+                    Disconnecting...
+                  </>
+                ) : (
+                  "Disconnect Player"
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Toast Notification */}
+      {toastMessage && (
+        <div className={`fixed bottom-4 right-4 z-50 px-4 py-3 rounded-lg shadow-lg ${
+          toastMessage.type === "success" 
+            ? "bg-green-50 border border-green-200 text-green-800" 
+            : "bg-red-50 border border-red-200 text-red-800"
+        }`}>
+          <div className="flex items-center gap-2">
+            {toastMessage.type === "success" ? (
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+              </svg>
+            ) : (
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            )}
+            <span className="text-sm font-medium">{toastMessage.message}</span>
+          </div>
+        </div>
       )}
     </div>
   );
