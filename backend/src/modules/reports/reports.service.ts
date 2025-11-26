@@ -12,7 +12,7 @@ import {
   publisherProfiles,
   organisations,
   screenLocationHistory,
-  screenGroupMembers,
+  screenGroupMemberships,
 } from "../../db/schema";
 import { eq, sql, and, desc, gte, lte, asc, inArray, or } from "drizzle-orm";
 
@@ -1055,9 +1055,9 @@ export async function getCampaignComplianceReport(
       let groupScreenIds = screenGroupCache.get(flight.targetId);
       if (!groupScreenIds) {
         const groupScreens = await db
-          .select({ screenId: screenGroupMembers.screenId })
-          .from(screenGroupMembers)
-          .where(eq(screenGroupMembers.groupId, flight.targetId));
+          .select({ screenId: screenGroupMemberships.screenId })
+          .from(screenGroupMemberships)
+          .where(eq(screenGroupMemberships.groupId, flight.targetId));
         
         groupScreenIds = new Set<string>();
         for (const gs of groupScreens) {

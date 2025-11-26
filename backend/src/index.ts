@@ -36,6 +36,7 @@ import { publishersRouter } from "./modules/publishers/publishers.routes";
 import { advertisersRouter } from "./modules/advertisers/advertisers.routes";
 import { uploadsRouter, UPLOADS_DIR } from "./modules/uploads/uploads.routes";
 import { dashboardRouter } from "./modules/dashboard/dashboard.routes";
+import { screenGroupsRouter } from "./modules/screen-groups/screenGroups.routes";
 
 import { notFoundHandler, errorHandler } from "./middleware/errorhandler";
 
@@ -71,6 +72,7 @@ app.use("/api/reports", reportsRouter);
 app.use("/api/publishers", publishersRouter);
 app.use("/api/advertisers", advertisersRouter);
 app.use("/api/dashboard", dashboardRouter);
+app.use("/api/screen-groups", screenGroupsRouter);
 
 const isProduction = process.env.NODE_ENV === "production";
 if (isProduction) {

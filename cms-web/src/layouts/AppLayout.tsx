@@ -18,6 +18,7 @@ const navItemsByOrgType: Record<string, NavItem[]> = {
     { to: "/dashboard", label: "Dashboard" },
     { to: "/campaigns", label: "Campaigns" },
     { to: "/screens", label: "Screens & Players" },
+    { to: "/inventory/groups", label: "Screen Groups" },
     { to: "/publishers", label: "Publishers" },
     { to: "/advertisers", label: "Advertisers" },
     { to: "/compliance", label: "Compliance" },
@@ -31,6 +32,7 @@ const navItemsByOrgType: Record<string, NavItem[]> = {
   publisher: [
     { to: "/dashboard", label: "Dashboard" },
     { to: "/screens", label: "Screens & Players" },
+    { to: "/inventory/groups", label: "Screen Groups" },
     { to: "/reporting", label: "Reporting" },
   ],
 };

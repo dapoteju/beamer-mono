@@ -10,6 +10,8 @@ import CampaignDetail from "../pages/CampaignDetail";
 import FlightDetail from "../pages/FlightDetail";
 import Screens from "../pages/Screens";
 import ScreenDetail from "../pages/ScreenDetail";
+import GroupsList from "../pages/inventory/GroupsList";
+import GroupDetail from "../pages/inventory/GroupDetail";
 import Organisations from "../pages/Organisations";
 import OrganisationDetail from "../pages/OrganisationDetail";
 import Publishers from "../pages/Publishers";
@@ -119,6 +121,22 @@ export const router = createBrowserRouter([
         element: (
           <OrgTypeGuard allowedOrgTypes={["beamer_internal", "publisher"]}>
             <InventoryMap />
+          </OrgTypeGuard>
+        ),
+      },
+      {
+        path: "inventory/groups",
+        element: (
+          <OrgTypeGuard allowedOrgTypes={["beamer_internal", "publisher"]}>
+            <GroupsList />
+          </OrgTypeGuard>
+        ),
+      },
+      {
+        path: "inventory/groups/:id",
+        element: (
+          <OrgTypeGuard allowedOrgTypes={["beamer_internal", "publisher"]}>
+            <GroupDetail />
           </OrgTypeGuard>
         ),
       },

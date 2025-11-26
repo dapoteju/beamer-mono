@@ -50,3 +50,18 @@ export function downloadCsv(filename: string, rows: (string | number | null | un
   // Clean up the URL object
   URL.revokeObjectURL(url);
 }
+
+/**
+ * Export array of objects to CSV file
+ */
+export function exportToCsv(data: Record<string, unknown>[], filename: string): void {
+  if (data.length === 0) return;
+  
+  const headers = Object.keys(data[0]);
+  const rows: (string | number | null | undefined)[][] = [
+    headers,
+    ...data.map(row => headers.map(h => row[h] as string | number | null | undefined))
+  ];
+  
+  downloadCsv(`${filename}.csv`, rows);
+}
