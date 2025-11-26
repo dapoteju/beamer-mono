@@ -1,0 +1,353 @@
+You’re working in a monorepo:
+
+Backend: Node.js + Express + TypeScript, Drizzle ORM (Postgres), JWT sessions via HTTP-only cookies.
+
+Frontend: React (TypeScript), Tailwind + shadcn/ui, React Query, React Hook Form, Wouter, Vite.
+
+Existing: organisations (with org_type), screens (each belongs to an org), campaigns, flights, creatives, approvals, targeting UI, activity logs, exposure reporting.
+
+Goal
+
+Implement Publisher-scoped Screen Groups (not organisation-scoped). A Screen Group belongs to exactly one publisher (the org that owns the screens). All group members must be screens owned by that same publisher. Groups are used in targeting and reporting. (Cross-publisher packaging—if present later—remains via internal-managed “Collections”, but not part of this task.)
+
+1) Database (Drizzle + SQL)
+
+Create/adjust tables:
+
+screen_groups
+
+id UUID PK
+
+publisher_org_id UUID NOT NULL REFERENCES organisations(id)
+
+name TEXT NOT NULL (unique per publisher_org_id, case-insensitive)
+
+description TEXT NULL
+
+is_archived BOOLEAN NOT NULL DEFAULT false
+
+created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+
+updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+
+Indexes/constraints:
+
+Unique index on (publisher_org_id, lower(name)).
+
+FK publisher_org_id must refer to an organisation with org_type='publisher' (enforce in service layer; add optional DB trigger if you prefer).
+
+screen_group_memberships
+
+group_id UUID NOT NULL REFERENCES screen_groups(id) ON DELETE CASCADE
+
+screen_id UUID NOT NULL REFERENCES screens(id) ON DELETE CASCADE
+
+added_by_user_id UUID NULL REFERENCES users(id)
+
+added_at TIMESTAMPTZ NOT NULL DEFAULT now()
+
+PRIMARY KEY (group_id, screen_id)
+
+Indexes on screen_id, group_id.
+
+Membership integrity rule (critical):
+When inserting/updating memberships, validate that screens.org_id === screen_groups.publisher_org_id. Reject the batch if any row violates this, and return which screen_ids failed.
+
+Files:
+
+apps/api/src/db/schema/screenGroups.ts (Drizzle schema + relations)
+
+Migration: apps/api/drizzle/XXXXXXXX_add_publisher_scoped_screen_groups.sql
+
+(Optional) Seed: apps/api/src/db/seeds/screenGroups.seed.ts
+
+For each publisher with ≥5 screens, create “All Screens” group and add first 5 screens.
+
+Acceptance:
+
+Migration runs clean.
+
+Unique per publisher enforced.
+
+Membership insert blocked if screens belong to a different org than the group’s publisher.
+
+2) Permissions Model
+
+Publisher users: CRUD groups where publisher_org_id is an org they belong to; manage memberships for their groups.
+
+Internal users (beamer_internal): full read/write across all publishers; can create groups for any publisher.
+
+Advertisers/Agencies: cannot create/edit groups; may view group names when tied to campaigns they can access (read-only), but cannot see/modify memberships. They can target groups only if your booking rules allow (default: no).
+
+All endpoints must check tenant boundaries.
+
+3) Backend API
+
+Base path: /api/screen-groups
+
+Validation: Use zod. Reuse requireAuth, requireOrgAccess, isBeamerInternal, and activity logger.
+
+GET /api/screen-groups?publisher_org_id=&q=&archived=
+
+publisher_org_id required for non-internal users; internal may omit to list all.
+
+Search q across name/description (ILIKE).
+
+archived=true|false (default false).
+
+Returns { items: [...], count }.
+
+POST /api/screen-groups
+
+Body: { publisher_org_id, name, description? }
+
+Ensure publisher_org_id refers to an org with org_type='publisher'.
+
+Unique (publisher_org_id, lower(name)).
+
+Activity log: “created screen group {name} for publisher {publisher_org_id}”.
+
+GET /api/screen-groups/:id
+
+Return group details + member count + publisher info.
+
+PATCH /api/screen-groups/:id
+
+Body: { name?, description?, is_archived? }
+
+Enforce unique name per publisher_org_id.
+
+Activity log with before/after diff.
+
+DELETE /api/screen-groups/:id
+
+Soft delete: set is_archived=true (hard delete behind ?force=true for internal only).
+
+If any active flight targets this group, return 409 with helpful message.
+
+Activity log.
+
+Memberships:
+6) GET /api/screen-groups/:id/members?status=&city=&region=&q=&page=&page_size=
+
+Paginated list of screens (fields: name, status online/offline, city, region, resolution, lastSeenAt).
+
+Verify requester has rights to this publisher.
+
+POST /api/screen-groups/:id/members
+
+Body: { screen_ids: string[] }
+
+Validate all screens belong to publisher_org_id; if any invalid, reject whole batch with { invalid_screen_ids: [...] }.
+
+Upsert others; ignore existing pairs.
+
+Activity log: “added {n} screens to group {name}”.
+
+DELETE /api/screen-groups/:id/members
+
+Body: { screen_ids: string[] }
+
+Remove memberships; activity log.
+
+POST /api/screen-groups/:id/members/upload-csv
+
+Accept CSV with header screen_id or screen_name (resolve within the same publisher scope).
+
+Return { added, skipped, not_found, invalid_publisher_screens }.
+
+Files:
+
+apps/api/src/routes/screenGroups.ts
+
+apps/api/src/controllers/screenGroupsController.ts
+
+apps/api/src/validators/screenGroups.validator.ts
+
+Mount router in the API index.
+
+Acceptance:
+
+Tenant boundaries enforced on every route.
+
+401/403/409 codes correct.
+
+Membership integrity enforced transactionally.
+
+4) Decision Engine Integration (read-only hook)
+
+When computing eligible screens for a flight:
+
+Accept group_ids (publisher-scoped).
+
+Resolve union of direct_screen_ids ∪ members(group_ids); dedupe.
+
+Apply existing filters after resolution: region, creative approval, resolution, time windows.
+
+Provide/extend the preview endpoint (if not present):
+POST /api/flights/targeting/preview → { eligible_screen_count, warnings: [...] }
+
+Warnings to emit when groups are selected:
+
+Overlap between selected groups (N duplicated screens)
+
+Resolution mix (≥X% of members won’t match current creative dimensions)
+
+5) Frontend – Inventory → Groups
+
+Routes:
+
+/inventory/groups (list)
+
+/inventory/groups/:id (detail)
+
+Files:
+
+apps/cms-web/src/pages/inventory/GroupsList.tsx
+
+apps/cms-web/src/pages/inventory/GroupDetail.tsx
+
+apps/cms-web/src/components/groups/GroupFormDialog.tsx
+
+apps/cms-web/src/components/groups/MembershipTable.tsx
+
+apps/cms-web/src/components/groups/UploadCsvDialog.tsx
+
+apps/cms-web/src/api/screenGroups.ts (React Query hooks)
+
+Copy/labels: Replace “Organisation” with “Publisher” everywhere in Groups UI.
+
+Groups List:
+
+Columns: Name, Publisher, Screen Count, Updated, Status (Active/Archived).
+
+Filters: Publisher (select of publisher orgs), search (q), archived toggle.
+
+Actions: New Group, Export CSV.
+
+Group Detail:
+
+Header: name, description, publisher; actions: Rename, Archive/Unarchive, Delete (internal force).
+
+Tabs:
+
+Members: virtualized table (name, status chip, city, region, resolution, lastSeenAt)
+
+Multi-select Add/Remove; CSV upload; CSV export (current membership).
+
+Inline note per screen: “In N groups” (hover for names).
+
+Health: online/offline counts, lastSeen range.
+
+Flights: read-only list of flights/campaigns that target this group.
+
+Add to group from Screens list:
+
+Multi-select screens → “Add to group…”
+
+Only groups belonging to the same publisher as the selected screens are selectable. If selection spans multiple publishers, show a friendly error and block.
+
+Acceptance:
+
+Create/rename/archive/delete groups (with toasts).
+
+Membership add/remove and CSV upload enforce publisher integrity with clear errors.
+
+6) Frontend – Targeting in Campaign/Flight Editors
+
+Add Groups picker (publisher-scoped) alongside Regions/Cities/Time Windows.
+
+The picker shows only groups for publishers the current user may target (internal sees all; publishers see theirs).
+
+Show “Eligible screens: N” using the preview endpoint.
+
+Show non-blocking warnings (overlaps, resolution mix).
+
+Persist group_ids on save.
+
+Files:
+
+apps/cms-web/src/components/targeting/TargetingPanel.tsx (extend)
+
+apps/cms-web/src/components/targeting/GroupPicker.tsx
+
+7) Reporting
+
+API: GET /api/reports/campaigns/:id/by-screen-group
+Return rows: group_name, publisher_name, impressions, plays, unique_screens, exposure_locations.
+
+FE: In Campaign Report (Exposure tab), add a “By Group” table with CSV export.
+
+Acceptance: table paginates and exports; totals reconcile with overall exposure metrics.
+
+8) Activity Logs
+
+Log all group CRUD and membership changes with actor, publisher_org_id, and diffs. Ensure logs appear in existing audit views.
+
+9) Tests
+
+Backend (Vitest/Jest):
+
+Create/read/update/archive/delete group under a publisher.
+
+Unique name per publisher enforced.
+
+Membership add/remove:
+
+Success when screens belong to the same publisher.
+
+Failure when any screen belongs to a different org (returns invalid_screen_ids).
+
+Delete blocked (409) if active flights target the group.
+
+Permission boundaries: publisher vs other publisher; advertiser cannot mutate; internal can.
+
+Frontend (RTL + Vitest):
+
+GroupsList renders, filters by publisher, create flow works.
+
+GroupDetail add/remove members; CSV upload reports results.
+
+TargetingPanel shows groups and preview count; overlap warning appears.
+
+10) DX & Commands
+
+API client hooks in apps/cms-web/src/api/screenGroups.ts:
+
+useScreenGroupsList, useCreateGroup, useUpdateGroup, useArchiveGroup, useDeleteGroup
+
+useGroupDetail, useGroupMembers, useAddMembers, useRemoveMembers, useUploadCsv
+
+Types shared via @beamer/types or local types.ts.
+
+Run:
+
+pnpm db:migrate
+
+pnpm --filter @beamer/api dev
+
+pnpm --filter @beamer/cms-web dev
+
+11) Edge Cases & Guardrails
+
+Disallow creating a group with a non-publisher org.
+
+When adding members, if input screens span multiple publishers, block and list offending IDs.
+
+On archive, hide by default; include “Show archived” toggle.
+
+CSV: tolerate whitespace; headers screen_id or screen_name; cap at 10k rows with friendly error.
+
+On publisher consolidation/migration, provide an admin script to remap publisher_org_id for groups and move screens in one transaction.
+
+12) Definition of Done
+
+Publisher-scoped groups fully working (CRUD, memberships, permissions).
+
+Targeting via group_ids integrated; preview counts & warnings shown.
+
+Reporting “By Group” available.
+
+Tests pass; typecheck clean; no console errors.
+
+Short doc docs/cms/screen-groups.md summarising usage and permission scope.
