@@ -1,0 +1,124 @@
+You are editing my Beamer monorepo.
+
+The player is successfully registering and fetching a playlist like:
+
+{
+  "screen_id": "...",
+  "playlist": [
+    {
+      "creative_id": "dummy_1",
+      "type": "video",
+      "file_url": "https://...mp4",
+      "duration_seconds": 7
+    }
+  ]
+}
+
+
+But in the Electron player window it stays stuck on “Starting player…”.
+
+player-core/playerEngine.ts currently does this:
+
+for (const creative of playlist.playlist) {
+  try {
+    if (!isAssetValid(creative.local_file_path)) {
+      console.warn("Skipping creative ...");
+      queuePlayback({ status: "skipped", ... });
+      continue;
+    }
+
+    onPlay(creative);
+    ...
+  }
+}
+
+
+In Electron, cachePlaylistAssets() is a no-op (because isNodeEnv() is false), so creative.local_file_path is always undefined.
+That makes isAssetValid(undefined) return false, so every creative is skipped and onPlay is never called, which leaves the UI stuck on “Starting player…”.
+
+I need you to fix this logic:
+
+In browser/Electron renderer environment, the player must be allowed to play directly from file_url even if local_file_path is missing.
+
+Only in Node environment (no window) should we enforce the local file check.
+
+1. Update playerEngine.ts
+
+In player-core/playerEngine.ts:
+
+At the top of the file, add a small helper:
+
+function isNodeEnv() {
+  return typeof window === "undefined";
+}
+
+
+In startPlaybackLoop, change the validation block from:
+
+if (!isAssetValid(creative.local_file_path)) {
+  console.warn(
+    `Skipping creative ${creative.creative_id} due to invalid or missing asset`
+  );
+  queuePlayback({ status: "skipped", ... });
+  continue;
+}
+
+
+To this logic:
+
+const runningInNode = isNodeEnv();
+
+if (runningInNode && !isAssetValid(creative.local_file_path)) {
+  console.warn(
+    `Skipping creative ${creative.creative_id} due to invalid or missing local asset`
+  );
+  queuePlayback({
+    creative_id: creative.creative_id,
+    screen_id: playlist.screen_id,
+    played_at: new Date().toISOString(),
+    duration_seconds: 0,
+    status: "skipped",
+    location: getLastLocation() || undefined,
+  });
+  continue;
+}
+
+// In Electron/browser we allow playback even without local_file_path,
+// because renderCreative uses creative.local_file_path || creative.file_url
+onPlay(creative);
+playedAny = true;
+
+
+Keep the rest of the function exactly as is (playback timings, queuePlayback for "success" and "error", etc.).
+
+2. (Optional but helpful) Log when no creatives can be played
+
+At the if (!playedAny) section at the end of the loop, enhance the log to:
+
+console.warn(
+  "No valid creatives to play in this cycle. Playlist length:",
+  playlist.playlist.length
+);
+
+3. Rebuild player-core
+
+After these changes, run:
+
+cd player-core
+npm install
+npm run build
+
+
+Then run the Electron app again:
+
+cd ../player-electron
+npm install
+npm start
+
+Expected behaviour
+
+In Electron, even if local_file_path is undefined, creatives from the playlist should now be passed to renderCreative, which already uses creative.local_file_path || creative.file_url as the video src.
+
+The player window should move past “Starting player…” and display the test video.
+
+In a pure Node environment, we still enforce local asset validity using isAssetValid.
