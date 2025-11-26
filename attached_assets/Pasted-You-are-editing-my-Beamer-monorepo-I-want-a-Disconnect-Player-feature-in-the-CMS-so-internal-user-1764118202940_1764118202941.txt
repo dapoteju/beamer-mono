@@ -1,0 +1,128 @@
+You are editing my Beamer monorepo. I want a “Disconnect Player” feature in the CMS so internal users can unlink a physical player from a screen without touching the database manually.
+
+1. Backend: add /api/screens/:id/disconnect-player
+
+In the backend (Node + Express + Drizzle):
+
+Add a new POST route:
+POST /api/screens/:id/disconnect-player
+
+Requirements:
+
+Must be authenticated and restricted to internal / admin users using the same auth/authorization checks we already use for other internal-only routes (e.g. compliance endpoints).
+
+Steps inside the handler:
+
+Read screenId from req.params.id.
+
+Look up the screen in the screens table.
+
+If not found → return 404 { status: "error", message: "Screen not found" }.
+
+Find any active player linked to this screen.
+
+Depending on current schema, this is likely either:
+
+players table with screen_id = screen.id and isActive = true (or similar), or
+
+screens.player_id pointing to a row in players.
+
+If there is no player linked:
+
+Return 400 { status: "error", message: "No active player linked to this screen" }.
+
+If a player exists:
+
+Mark the player as inactive / revoked. For example:
+
+set players.isActive = false (add this boolean if it doesn’t exist yet), and
+
+optionally set players.revokedAt = new Date() if that column exists or you want to add it.
+
+Clear the link from the screen:
+
+screens.playerId = null (or the correct column name),
+
+screens.lastSeenAt = null (if applicable).
+
+If you also store the auth token on the screen, clear that as well.
+
+Return:
+
+{
+  "status": "success",
+  "message": "Player disconnected from screen",
+  "data": {
+    "screen_id": "...",
+    "player_id": "..."   // the one that was disconnected
+  }
+}
+
+
+Also update the auth logic that validates player tokens (the middleware / service used by heartbeat and playback endpoints):
+
+If players.isActive === false (or equivalent), treat the token as invalid and respond with 401 / 403 and a clear message like "Player is disconnected or inactive".
+
+2. Frontend (CMS): “Disconnect Player” button on Screen detail page
+
+In cms-web:
+
+Locate the Screen detail page component (the one showing “Lekki-VI-Taxi-01”, Screen Info, Player Info, Play Stats).
+
+In the Player Info card:
+
+Add a “Disconnect Player” button.
+
+Only show this button for internal/admin users (use the same role check logic as other internal-only features like Compliance).
+
+When the button is clicked:
+
+Show a confirmation modal:
+
+Title: "Disconnect Player from this Screen?"
+
+Body text:
+
+"This will revoke the current player’s access and unlink it from this screen. The physical device will need to re-register before sending new heartbeats or playing campaigns."
+
+Buttons: [Cancel] [Disconnect Player]
+
+On confirm:
+
+Call the backend: POST /api/screens/:id/disconnect-player using the screen’s ID in the URL.
+
+Show loading state while request is in progress.
+
+On success:
+
+Update the UI state so that:
+
+The Player Info section no longer shows the Player ID, software version, or last heartbeat.
+
+Instead, show something like "No player currently registered for this screen."
+
+Optionally set the screen status to Offline (if not already).
+
+Show a success toast: "Player disconnected successfully".
+
+On error:
+
+Show an error toast with the backend message.
+
+3. Behaviour with the existing player app
+
+After this is implemented:
+
+When I click Disconnect Player for a screen, the existing Player ID on that screen should be revoked.
+
+Any heartbeat or playback events using the old auth token should be rejected due to isActive = false.
+
+When I start a fresh Beamer Player app with a valid beamer.config.json for that screen:
+
+/api/player/register should now be allowed to create a new player record and auth token.
+
+A new player.json will be created on the device.
+
+The new player should appear in the CMS under Player Info for that screen.
+
+Please implement all of the above: the backend route, player-token invalidation, and the CMS UI button + modal + UX.
