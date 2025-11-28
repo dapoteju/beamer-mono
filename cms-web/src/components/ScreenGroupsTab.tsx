@@ -39,14 +39,19 @@ export function ScreenGroupsTab({ screenId, publisherOrgId }: ScreenGroupsTabPro
     }
   }
 
+  const [availableGroupsError, setAvailableGroupsError] = useState<string | null>(null);
+
   async function loadAvailableGroups() {
     try {
       setLoadingAvailable(true);
+      setAvailableGroupsError(null);
       const data = await fetchAllGroups({ publisher_org_id: publisherOrgId, archived: false });
+      console.log("Fetched groups for publisher:", publisherOrgId, "result:", data);
       const existingGroupIds = new Set(groups.map(g => g.id));
       setAvailableGroups(data.items.filter(g => !existingGroupIds.has(g.id)));
     } catch (err: any) {
       console.error("Failed to fetch available groups:", err);
+      setAvailableGroupsError(err.response?.data?.error || err.message || "Failed to load groups");
     } finally {
       setLoadingAvailable(false);
     }
@@ -230,22 +235,33 @@ export function ScreenGroupsTab({ screenId, publisherOrgId }: ScreenGroupsTabPro
       )}
 
       {showAddModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg shadow-lg max-w-md w-full mx-4">
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-xl shadow-xl w-full max-w-md mx-4">
             <div className="px-6 py-4 border-b border-zinc-200">
-              <h3 className="text-lg font-semibold text-zinc-900">Add to Group</h3>
+              <h2 className="text-lg font-semibold">Add to Group</h2>
             </div>
-            <div className="px-6 py-4">
+            <div className="p-6">
               {loadingAvailable ? (
                 <div className="text-center py-4 text-zinc-500">Loading groups...</div>
+              ) : availableGroupsError ? (
+                <div className="p-4 bg-red-50 border border-red-200 rounded-lg">
+                  <p className="text-sm text-red-700">{availableGroupsError}</p>
+                </div>
               ) : availableGroups.length === 0 ? (
                 <div className="text-center py-4">
-                  <p className="text-zinc-500 text-sm">No available groups to add this screen to.</p>
+                  <p className="text-zinc-500 text-sm">
+                    {groups.length > 0 
+                      ? "This screen is already in all available groups."
+                      : "No groups available. Create a group first to add this screen."}
+                  </p>
                   <Link
                     to="/inventory/groups"
-                    className="mt-2 inline-block text-sm text-blue-600 hover:text-blue-700"
+                    className="mt-3 inline-flex items-center gap-1 text-sm text-blue-600 hover:text-blue-700"
                   >
-                    Create a new group
+                    Go to Groups
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                    </svg>
                   </Link>
                 </div>
               ) : (
@@ -256,7 +272,7 @@ export function ScreenGroupsTab({ screenId, publisherOrgId }: ScreenGroupsTabPro
                   <select
                     value={selectedGroupId}
                     onChange={(e) => setSelectedGroupId(e.target.value)}
-                    className="w-full px-3 py-2 border border-zinc-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="w-full px-3 py-2 border border-zinc-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                   >
                     <option value="">Choose a group...</option>
                     {availableGroups.map((group) => (
@@ -268,23 +284,25 @@ export function ScreenGroupsTab({ screenId, publisherOrgId }: ScreenGroupsTabPro
                 </div>
               )}
             </div>
-            <div className="px-6 py-4 bg-zinc-50 border-t border-zinc-200 flex justify-end gap-3">
+            <div className="px-6 py-4 border-t border-zinc-200 flex justify-end gap-2">
               <button
                 onClick={() => {
                   setShowAddModal(false);
                   setSelectedGroupId("");
                 }}
-                className="px-4 py-2 text-sm text-zinc-600 hover:text-zinc-800"
+                className="px-4 py-2 bg-white border border-zinc-200 text-zinc-700 rounded-lg hover:bg-zinc-50"
               >
                 Cancel
               </button>
-              <button
-                onClick={handleAddToGroup}
-                disabled={!selectedGroupId || addingToGroup}
-                className="px-4 py-2 text-sm bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                {addingToGroup ? "Adding..." : "Add to Group"}
-              </button>
+              {availableGroups.length > 0 && (
+                <button
+                  onClick={handleAddToGroup}
+                  disabled={!selectedGroupId || addingToGroup}
+                  className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {addingToGroup ? "Adding..." : "Add to Group"}
+                </button>
+              )}
             </div>
           </div>
         </div>
