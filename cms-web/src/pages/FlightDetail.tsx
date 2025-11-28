@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useParams, useNavigate } from "react-router-dom";
+import { useParams, useNavigate, Link } from "react-router-dom";
 import { useMutation } from "@tanstack/react-query";
 import {
   fetchFlightById,
@@ -9,6 +9,8 @@ import {
   type FlightStatus,
   type CampaignWithStats,
 } from "../api/campaigns";
+import { fetchScreenDetail, type ScreenDetail } from "../api/screens";
+import { fetchScreenGroup, type ScreenGroupDetail } from "../api/screenGroups";
 import { FlightFormModal } from "../components/FlightFormModal";
 import { FlightCreativesTab } from "../components/FlightCreativesTab";
 
@@ -20,6 +22,8 @@ export default function FlightDetail() {
   const [campaign, setCampaign] = useState<CampaignWithStats | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [targetScreen, setTargetScreen] = useState<ScreenDetail | null>(null);
+  const [targetGroup, setTargetGroup] = useState<ScreenGroupDetail | null>(null);
 
   const [activeTab, setActiveTab] = useState<"overview" | "creatives">("overview");
   const [showEditModal, setShowEditModal] = useState(false);
@@ -30,11 +34,30 @@ export default function FlightDetail() {
     try {
       setLoading(true);
       setError(null);
+      setTargetScreen(null);
+      setTargetGroup(null);
+      
       const flightData = await fetchFlightById(id);
       setFlight(flightData);
 
       const campaignData = await fetchCampaignDetail(flightData.campaignId);
       setCampaign(campaignData);
+
+      if (flightData.targetType === "screen" && flightData.targetId) {
+        try {
+          const screenData = await fetchScreenDetail(flightData.targetId);
+          setTargetScreen(screenData);
+        } catch (err) {
+          console.error("Failed to load target screen:", err);
+        }
+      } else if (flightData.targetType === "screen_group" && flightData.targetId) {
+        try {
+          const groupData = await fetchScreenGroup(flightData.targetId);
+          setTargetGroup(groupData);
+        } catch (err) {
+          console.error("Failed to load target group:", err);
+        }
+      }
     } catch (err: any) {
       console.error("Failed to fetch flight:", err);
       setError(
@@ -175,9 +198,25 @@ export default function FlightDetail() {
             </div>
           </div>
           <div className="bg-white border border-zinc-200 rounded-lg p-4">
-            <div className="text-xs font-medium text-zinc-500 uppercase">Target ID</div>
-            <div className="text-sm font-mono text-zinc-900 mt-1 truncate" title={flight.targetId}>
-              {flight.targetId}
+            <div className="text-xs font-medium text-zinc-500 uppercase">Target</div>
+            <div className="text-sm text-zinc-900 mt-1 truncate">
+              {flight.targetType === "screen" && targetScreen ? (
+                <Link 
+                  to={`/screens/${flight.targetId}`}
+                  className="text-blue-600 hover:text-blue-800 hover:underline"
+                >
+                  {targetScreen.screen.code} - {targetScreen.screen.name || targetScreen.screen.city}
+                </Link>
+              ) : flight.targetType === "screen_group" && targetGroup ? (
+                <Link 
+                  to={`/groups/${flight.targetId}`}
+                  className="text-blue-600 hover:text-blue-800 hover:underline"
+                >
+                  {targetGroup.name} ({targetGroup.screenCount} screens)
+                </Link>
+              ) : (
+                <span className="font-mono" title={flight.targetId}>{flight.targetId}</span>
+              )}
             </div>
           </div>
         </div>
@@ -247,9 +286,38 @@ export default function FlightDetail() {
               </dd>
             </div>
             <div className="flex">
-              <dt className="w-48 text-sm font-medium text-zinc-700">Target ID:</dt>
-              <dd className="text-sm text-zinc-900 font-mono">{flight.targetId}</dd>
+              <dt className="w-48 text-sm font-medium text-zinc-700">Target:</dt>
+              <dd className="text-sm text-zinc-900">
+                {flight.targetType === "screen" && targetScreen ? (
+                  <Link 
+                    to={`/screens/${flight.targetId}`}
+                    className="text-blue-600 hover:text-blue-800 hover:underline"
+                  >
+                    {targetScreen.screen.code} - {targetScreen.screen.name || targetScreen.screen.city}
+                  </Link>
+                ) : flight.targetType === "screen_group" && targetGroup ? (
+                  <div>
+                    <Link 
+                      to={`/groups/${flight.targetId}`}
+                      className="text-blue-600 hover:text-blue-800 hover:underline"
+                    >
+                      {targetGroup.name}
+                    </Link>
+                    <span className="text-zinc-500 ml-2">
+                      ({targetGroup.screenCount} screens, {targetGroup.onlineCount} online)
+                    </span>
+                  </div>
+                ) : (
+                  <span className="font-mono">{flight.targetId}</span>
+                )}
+              </dd>
             </div>
+            {flight.targetType === "screen_group" && targetGroup && (
+              <div className="flex">
+                <dt className="w-48 text-sm font-medium text-zinc-700">Publisher:</dt>
+                <dd className="text-sm text-zinc-900">{targetGroup.publisherName}</dd>
+              </div>
+            )}
           </dl>
         </div>
       )}
