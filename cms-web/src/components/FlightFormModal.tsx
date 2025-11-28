@@ -9,6 +9,7 @@ import {
   type FlightStatus,
 } from "../api/campaigns";
 import { fetchScreens, type Screen } from "../api/screens";
+import { fetchScreenGroups, type ScreenGroup } from "../api/screenGroups";
 
 interface FlightFormModalProps {
   campaignId: string;
@@ -38,9 +39,12 @@ export function FlightFormModal({
   const [loading, setLoading] = useState(false);
   const [screens, setScreens] = useState<Screen[]>([]);
   const [screensLoading, setScreensLoading] = useState(false);
+  const [screenGroups, setScreenGroups] = useState<ScreenGroup[]>([]);
+  const [groupsLoading, setGroupsLoading] = useState(false);
 
   useEffect(() => {
     loadScreens();
+    loadScreenGroups();
     if (flightId) {
       loadFlightData();
     }
@@ -55,6 +59,18 @@ export function FlightFormModal({
       console.error("Failed to load screens:", err);
     } finally {
       setScreensLoading(false);
+    }
+  }
+
+  async function loadScreenGroups() {
+    try {
+      setGroupsLoading(true);
+      const data = await fetchScreenGroups({ archived: false });
+      setScreenGroups(data.items);
+    } catch (err) {
+      console.error("Failed to load screen groups:", err);
+    } finally {
+      setGroupsLoading(false);
     }
   }
 
@@ -270,7 +286,7 @@ export function FlightFormModal({
 
             <div>
               <label className="block text-sm font-medium text-zinc-700 mb-1">
-                {formData.targetType === "screen" ? "Select Screen" : "Screen Group ID"}{" "}
+                {formData.targetType === "screen" ? "Select Screen" : "Select Screen Group"}{" "}
                 <span className="text-red-500">*</span>
               </label>
               {formData.targetType === "screen" ? (
@@ -294,17 +310,25 @@ export function FlightFormModal({
                   ))}
                 </select>
               ) : (
-                <input
-                  type="text"
+                <select
                   value={formData.targetId}
                   onChange={(e) =>
                     setFormData({ ...formData, targetId: e.target.value })
                   }
-                  className={`w-full px-3 py-2 border rounded-md text-sm font-mono focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+                  disabled={groupsLoading}
+                  className={`w-full px-3 py-2 border rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 ${
                     errors.targetId ? "border-red-500" : "border-zinc-300"
                   }`}
-                  placeholder="Enter screen group ID"
-                />
+                >
+                  <option value="">
+                    {groupsLoading ? "Loading screen groups..." : "Select a screen group"}
+                  </option>
+                  {screenGroups.map((group) => (
+                    <option key={group.id} value={group.id}>
+                      {group.name} ({group.screenCount} screens) - {group.publisherName}
+                    </option>
+                  ))}
+                </select>
               )}
               {errors.targetId && (
                 <p className="text-xs text-red-600 mt-1">{errors.targetId}</p>
