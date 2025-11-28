@@ -70,7 +70,7 @@ export async function requirePublisherAccess(
     }
 
     if (!isBeamerInternal(req) && user.orgId !== group.publisherOrgId) {
-      res.status(403).json({ message: "Forbidden: cross-publisher access denied" });
+      res.status(404).json({ message: "Group not found" });
       return;
     }
 
@@ -115,7 +115,7 @@ export async function requirePublisherModifyAccess(
     }
 
     if (!canModifyGroup(req, group.publisherOrgId)) {
-      res.status(403).json({ message: "Forbidden: cross-publisher access denied" });
+      res.status(404).json({ message: "Group not found" });
       return;
     }
 

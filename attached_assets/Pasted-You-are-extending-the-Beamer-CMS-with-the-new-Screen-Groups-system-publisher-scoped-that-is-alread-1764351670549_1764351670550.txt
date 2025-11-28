@@ -1,0 +1,189 @@
+You are extending the Beamer CMS with the new Screen Groups system (publisher-scoped) that is already implemented.
+
+Your tasks are to tighten access control, improve targeting-preview warnings, and update the UX to include a Groups tab on each Screen detail page.
+
+1️⃣ Access-control Hardening
+Goal
+
+Ensure strict tenancy enforcement so that a user cannot view or mutate groups outside their own publisher.
+
+Backend updates
+
+File: apps/api/src/middleware/permissions.ts (or equivalent)
+
+Add helper:
+
+export async function requirePublisherAccess(req, res, next) {
+  const user = req.user;
+  const groupId = req.params.id;
+  const group = await db.query.screen_groups.findFirst({ where: eq(screen_groups.id, groupId) });
+  if (!group) return res.status(404).json({ message: 'Group not found' });
+  if (!user.is_internal && user.org_id !== group.publisher_org_id)
+    return res.status(403).json({ message: 'Forbidden: cross-publisher access denied' });
+  next();
+}
+
+
+Apply this middleware to:
+
+GET /api/screen-groups/:id
+
+PATCH /api/screen-groups/:id
+
+DELETE /api/screen-groups/:id
+
+All membership routes
+
+Add backend tests verifying:
+
+A user from another publisher → 403
+
+Internal user → success
+
+2️⃣ Overlap-Detection & Targeting-Preview Warnings
+Endpoint
+
+POST /api/screen-groups/targeting-preview
+
+Enhance it to compute and return new warnings:
+
+{
+  eligible_screen_count: number;
+  warnings: string[];
+}
+
+
+Logic:
+
+const allScreens = new Set();
+const duplicates = new Set();
+
+for (const groupId of input.group_ids) {
+  const memberScreens = await getScreensForGroup(groupId);
+  for (const s of memberScreens) {
+    if (allScreens.has(s.id)) duplicates.add(s.id);
+    allScreens.add(s.id);
+  }
+}
+
+const overlapCount = duplicates.size;
+if (overlapCount > 0)
+  warnings.push(`Overlap detected: ${overlapCount} screens appear in multiple selected groups.`);
+
+const offlineCount = memberScreens.filter(s => s.status === 'offline').length;
+if (offlineCount > 0)
+  warnings.push(`${offlineCount} screens are currently offline.`);
+
+const mixedResCount = countScreensWithResolutionVariance(memberScreens);
+if (mixedResCount > 0)
+  warnings.push(`Mixed resolutions: ${mixedResCount} screens differ from creative spec.`);
+
+
+Return warnings array to the frontend.
+
+Add test:
+
+Two groups sharing same screen → preview returns “Overlap detected…” warning.
+
+3️⃣ Hybrid UX — Add “Groups” tab in Screen Detail
+Goal
+
+Keep the existing Inventory → Groups page for bulk ops, but also show each screen’s group memberships directly inside its detail view.
+
+Frontend changes
+
+Files
+
+apps/cms-web/src/pages/inventory/ScreenDetail.tsx
+
+apps/cms-web/src/components/screens/ScreenGroupsTab.tsx (new)
+
+Add a tab named “Groups”.
+
+Component features:
+
+List all groups this screen belongs to (GET /api/screens/:id/groups).
+
+Actions:
+
+“Add to group…” → opens existing GroupPickerModal.
+
+“Remove from group” → confirms removal.
+
+Show chip “In N groups”.
+
+Each row has a link to open the group detail page (/inventory/groups/:groupId).
+
+Backend:
+Add endpoint GET /api/screens/:id/groups returning { groups: [...] }
+(joins screen_group_memberships → screen_groups, includes publisher name).
+
+Acceptance:
+
+Tab visible on Screen detail.
+
+Add/Remove works and syncs with existing Groups page.
+
+4️⃣ Inline Targeting-Preview Warnings (Frontend)
+
+File: apps/cms-web/src/components/targeting/TargetingPanel.tsx
+
+When the API returns warnings, display them inline under the selected group chips using shadcn’s <Alert variant="warning"> component.
+
+Example:
+
+{preview.warnings?.map((msg) => (
+  <Alert key={msg} variant="warning" className="mt-2">
+    {msg}
+  </Alert>
+))}
+
+
+Acceptance:
+
+Mixed resolution / overlap / offline warnings appear instantly after selecting groups.
+
+5️⃣ Tests & QA
+Backend
+
+apps/api/tests/screenGroupsAccess.spec.ts
+
+cross-publisher access → 403
+
+valid publisher → success
+
+overlap detection returns expected warnings
+
+Frontend
+
+apps/cms-web/tests/ScreenGroupsTab.spec.tsx
+
+renders group list in Screen detail
+
+add/remove works and re-renders count
+
+apps/cms-web/tests/TargetingPanelWarnings.spec.tsx
+
+selecting groups triggers warning display
+
+6️⃣ Documentation
+
+Update docs/cms/screen-groups.md:
+
+Note: “A screen group is always tied to one publisher.”
+
+Describe overlap-warning logic in targeting preview.
+
+Add screenshot of the new Groups tab on Screen detail.
+
+✅ Definition of Done
+
+Backend denies all cross-publisher actions correctly (403).
+
+Targeting preview returns overlap, offline, and mixed-resolution warnings.
+
+Groups tab visible inside Screen detail with full CRUD of memberships.
+
+Frontend displays warnings inline under group selections.
+
+Tests pass; docs updated; typecheck clean.

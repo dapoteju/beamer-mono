@@ -49,6 +49,10 @@ The project is organized as a monorepo with distinct applications and libraries:
   - Targeting preview endpoint (`POST /api/screen-groups/targeting-preview`) with screen counts, online/offline status, and warnings
   - Campaign by-screen-group reporting (`GET /api/reports/campaigns/:id/by-screen-group`)
   - Frontend UI with "Publisher" labeling and publisher-only org filtering
+  - **Access Control Hardening**: `requirePublisherAccess` middleware enforces strict publisher organization boundaries on all group routes. Cross-publisher access returns 404 (security by obscurity). Beamer internal users have full access.
+  - **Overlap Detection**: Targeting preview detects screens appearing in multiple selected groups and generates warnings
+  - **Groups Tab on Screen Detail**: New "Groups" tab shows all groups containing a screen with links to group details (`GET /api/screens/:id/groups`)
+  - **Inline Targeting Warnings**: `TargetingPreviewWarnings` component displays real-time warnings (offline, low count, mixed resolution, overlap) when selecting groups
 
 ### System Design Choices
 - **Monorepo Architecture**: Centralized repository for all platform components.

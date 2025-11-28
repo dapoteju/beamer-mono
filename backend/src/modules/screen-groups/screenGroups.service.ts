@@ -171,7 +171,7 @@ export async function getScreenGroup(id: string): Promise<ScreenGroupDetail | nu
         SELECT MAX(h.timestamp) 
         FROM ${heartbeats} h 
         JOIN ${players} p ON h.player_id = p.id
-        WHERE p.screen_id = ${screenGroupMemberships.screenId}
+        WHERE p.screen_id = ${screenGroupMemberships}.screen_id
       )`,
     })
     .from(screenGroupMemberships)
