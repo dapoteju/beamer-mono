@@ -4,6 +4,17 @@ import { useMutation, useQuery } from "@tanstack/react-query";
 import { createCampaign, type CreateCampaignPayload } from "../api/campaigns";
 import { fetchAdvertisers } from "../api/advertisers";
 import { useAuthStore } from "../store/authStore";
+import TargetingEditor from "../components/TargetingEditor";
+
+interface TargetingData {
+  cities?: string[];
+  regions?: string[];
+  screen_groups?: string[];
+  time_window?: {
+    start_time?: string;
+    end_time?: string;
+  };
+}
 
 export default function CampaignNew() {
   const navigate = useNavigate();
@@ -19,8 +30,9 @@ export default function CampaignNew() {
     totalBudget: "",
     currency: "NGN",
     status: "draft" as const,
-    targetingJson: "",
   });
+  
+  const [targeting, setTargeting] = useState<TargetingData>({});
 
   const [errors, setErrors] = useState<Record<string, string>>({});
 
@@ -70,15 +82,11 @@ export default function CampaignNew() {
 
     if (!validate()) return;
 
-    let targetingJson: any = null;
-    if (formData.targetingJson.trim()) {
-      try {
-        targetingJson = JSON.parse(formData.targetingJson);
-      } catch (err) {
-        setErrors({ targetingJson: "Invalid JSON format" });
-        return;
-      }
-    }
+    const hasTargeting = 
+      (targeting.cities && targeting.cities.length > 0) ||
+      (targeting.regions && targeting.regions.length > 0) ||
+      (targeting.screen_groups && targeting.screen_groups.length > 0) ||
+      (targeting.time_window?.start_time || targeting.time_window?.end_time);
 
     const payload: CreateCampaignPayload = {
       advertiserOrgId: isInternal ? formData.advertiserOrgId : undefined,
@@ -89,7 +97,7 @@ export default function CampaignNew() {
       totalBudget: parseFloat(formData.totalBudget),
       currency: formData.currency,
       status: formData.status,
-      targetingJson: targetingJson || undefined,
+      targetingJson: hasTargeting ? targeting : undefined,
     };
 
     createMutation.mutate(payload);
@@ -267,27 +275,8 @@ export default function CampaignNew() {
             </select>
           </div>
 
-          <div>
-            <label className="block text-sm font-medium text-zinc-700 mb-1">
-              Targeting JSON (Optional)
-            </label>
-            <textarea
-              value={formData.targetingJson}
-              onChange={(e) =>
-                setFormData({ ...formData, targetingJson: e.target.value })
-              }
-              rows={4}
-              className={`w-full px-3 py-2 border rounded-md text-sm font-mono focus:outline-none focus:ring-2 focus:ring-blue-500 ${
-                errors.targetingJson ? "border-red-500" : "border-zinc-300"
-              }`}
-              placeholder='{"regions": ["Lagos", "Abuja"], "demographics": {...}}'
-            />
-            {errors.targetingJson && (
-              <p className="text-xs text-red-600 mt-1">{errors.targetingJson}</p>
-            )}
-            <p className="text-xs text-zinc-500 mt-1">
-              Advanced targeting criteria in JSON format
-            </p>
+          <div className="border-t border-zinc-200 pt-5">
+            <TargetingEditor value={targeting} onChange={setTargeting} />
           </div>
 
           <div className="flex gap-3 pt-4 border-t border-zinc-200">
