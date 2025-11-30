@@ -1,7 +1,7 @@
 # Replit Project: Beamer Mono
 
 ## Overview
-Beamer Mono is a monorepo for the Beamer Player platform, a digital signage and advertising solution. It provides a web-based CMS and is planned to include Electron desktop applications. The project's primary purpose is to deliver a robust platform for managing digital advertising campaigns, with current operations focused on user and screen management, authentication, API modules, and comprehensive reporting. The business vision is to provide multiple delivery methods for digital signage and advertising.
+Beamer Mono is a monorepo for the Beamer Player platform, a digital signage and advertising solution. Its primary purpose is to provide a robust platform for managing digital advertising campaigns, encompassing user and screen management, authentication, API modules, and comprehensive reporting. The project aims to offer multiple delivery methods for digital signage and advertising, including a web-based CMS and planned Electron desktop applications.
 
 ## User Preferences
 - None specified yet
@@ -10,9 +10,9 @@ Beamer Mono is a monorepo for the Beamer Player platform, a digital signage and 
 
 ### Project Structure
 The project is organized as a monorepo with distinct applications and libraries:
-- `backend/`: Express API server (TypeScript + Drizzle ORM)
-- `cms-web/`: CMS Frontend (React + Vite + TypeScript + Tailwind)
-- `player-core/`: Core TypeScript library for player devices with GPS tracking and device metrics
+- `backend/`: Express API server
+- `cms-web/`: CMS Frontend (React, Vite, TypeScript, Tailwind)
+- `player-core/`: Core TypeScript library for player devices
 - `player-electron/`: Electron desktop application (planned)
 - `player-web-sim/`: Web simulator (planned)
 
@@ -21,88 +21,48 @@ The project is organized as a monorepo with distinct applications and libraries:
 - **Frontend (CMS Web)**: React 19.2.0, Vite 7.2.4, TypeScript 5.9.3, Tailwind CSS 4.1.17, Zustand 5.0.8, TanStack Query 5.90.10, Axios 1.13.2, React Router DOM 7.9.6, Recharts 3.5.0
 
 ### UI/UX Decisions
-- Tailwind CSS for utility-first styling.
-- Responsive design for charts and forms.
-- Colored badges for screen types and publisher types for visual clarity.
-- Dynamic form sections based on user selections (e.g., screen classification, publisher type).
-- Interactive charts (Line Chart, Bar Chart) using Recharts for campaign reporting.
+- Tailwind CSS for utility-first styling and responsive design.
+- Interactive charts (Line, Bar) using Recharts for reporting.
+- Dynamic forms and colored badges for visual clarity.
 
 ### Feature Specifications
-- **Authentication**: JWT-based with 7-day expiration, Bcrypt hashing, and role-based access control (`admin`, `ops`, `viewer`). Protected registration. Includes password reset flow with secure token generation (1-hour expiry) and initial admin setup endpoint for production deployments.
-- **API Modules**: Comprehensive API for health checks, organizations, screens, publishers, advertisers, regions, campaigns, flights, creatives, bookings, invoices, and reports.
-- **Screens & Players Management**: Full CRUD for screens with permission-based access, atomic transactions, player swapping logic, and comprehensive validation. Supports three screen types (Vehicle-mounted, Billboard/Static, Indoor) with extended metadata and dynamic CMS UI. Includes remote player disconnection capability allowing internal users to revoke player access via `POST /api/screens/:id/disconnect-player` endpoint (beamer_internal only). Disconnected players are soft-deleted (isActive=false, revokedAt timestamp) preserving history while blocking further authentication.
-- **Publishers & Advertisers Separation**: Database restructuring to differentiate publishers and advertisers. Dedicated CRUD API endpoints and refined UI for managing both, ensuring permission-based access and data integrity.
-- **Campaigns & Flights Management**: Full CRUD for campaigns and nested flights with permission-based access, filtering, status management, and targeting capabilities (screen/screen_group). Includes dedicated Flight Detail page accessible from Campaign Detail.
-- **Flight Creatives Assignment**: Linking creatives to flights with configurable weights for playlist building. Full CRUD via `/api/flights/:flightId/creatives` endpoints (GET, POST, PATCH, DELETE with bulk support). Frontend FlightDetail page with Overview and Creatives tabs. FlightCreativesTab displays assigned creatives with inline weight editing. FlightAddCreativesModal allows selecting campaign creatives and assigning weights. Validation ensures creatives belong to the same campaign as the flight. POST uses append-mode (adds without removing existing). DELETE supports bulk removal via `creative_ids` array.
-- **Creative "Used In" Tracking**: Creatives display which flights they're assigned to via `GET /api/creatives/:id/flights`. CampaignCreativesTab shows "Used In" column with flight names for quick cross-referencing.
-- **Creatives Management**: Full CRUD for creatives (media assets) attached to campaigns. Supports file uploads via Multer with validation for image/video types (JPEG, PNG, GIF, WebP, MP4, WebM, QuickTime). Includes regional approval workflow with per-region status tracking. Endpoints: `POST /api/uploads` for file upload, `GET/POST /api/campaigns/:id/creatives` for listing/creating, `PATCH/DELETE /api/creatives/:id` for updates/deletion, `POST /api/creatives/:id/approval` for approval status updates. Static file serving at `/uploads/*`.
-  - **Auto-generated Approval Codes**: For regions that require pre-approval (`requires_pre_approval = true`), approval codes are automatically generated when a creative is approved without an explicit code. Code format: `{REGION_CODE}-{YEAR}-{SHORT_ID}` (e.g., `NG-2025-A84689`). The CMS UI displays a hint when approval codes will be auto-generated. This ensures creatives appear in playlists for pre-approval regions without manual code entry.
-- **Campaign Reporting**: API endpoint for campaign summaries with raw play event data. Frontend reporting page with campaign selector, date range picker, summary cards, data tables, and interactive charts (line and bar charts) for daily and screen-level impressions. Includes CSV export functionality.
-- **Exposure Reporting**: Geographic visualization of ad impressions showing where ads were displayed. Clusters impressions by location (4 decimal precision) with circle markers sized by impression count. Static screens (billboard/indoor) show single location while vehicle screens show multiple exposure points based on GPS history. API endpoint at `/api/reports/campaigns/:id/exposure`.
-- **Compliance Reporting**: Third tab in Campaign Reporting that shows scheduled screens (via flights) and their daily activity status based on heartbeat data. Displays daily metrics for scheduled, active, and offline screens with stacked bar chart visualization. Per-screen status indicators (OK, NO_DELIVERY, OFFLINE) based on heartbeat and impression data. API endpoint at `/api/reports/campaigns/:id/compliance`.
-- **Campaign Diagnostics**: Fourth tab in Campaign Reporting providing health-check analysis. Displays offline screens, screens without plays, unused creatives, missing approvals, and resolution mismatches. API endpoint at `/api/reports/campaigns/:id/diagnostics` returns categorized issues for proactive campaign troubleshooting.
-- **Visual Campaign Timeline**: CampaignOverviewTab displays a Gantt-style timeline showing all flights as color-coded bars within the campaign date range. Each flight bar shows duration, status badge, and is clickable for quick navigation to flight details.
-- **Enhanced Targeting Preview**: Flight targeting section shows real-time eligible screen count with breakdown popover displaying counts by region, resolution, and screen group. Uses `POST /api/screen-groups/targeting-preview` with enhanced `breakdown` response field.
-- **Development Tools**: Comprehensive seed script (`backend/scripts/seed.ts`) for deterministic and idempotent generation of extensive demo data, including organizations, users, publishers, screens, campaigns, and play events.
-- **Player Telemetry**: GPS-aware heartbeats and playback events with device metrics. Heartbeats include location (lat/lng with accuracy), device metrics (CPU usage, memory free, storage free, network type, online status), and software version. Playback events include screen_id, play status, and GPS location at time of play. Backend stores all telemetry data for exposure reporting and device health monitoring. Telemetry is resilient: events are persisted to disk queues (`pending-playbacks.json`, `pending-heartbeats.json`) and survive process restarts and network failures. Failed events remain queued until successfully sent.
-- **Player Configuration**: Ops-friendly device provisioning via `beamer.config.json` file. Configuration includes api_base_url, serial_number, screen_id, and optional provisioning_code. Player fails fast with clear error messages if config is missing or invalid. See `PLAYER_SETUP.md` for detailed setup instructions.
-- **Player Registration Conflict Detection**: Explicit detection when a screen is already linked to another player. Registration endpoint returns structured `PLAYER_ALREADY_REGISTERED` error (HTTP 409) with existing player ID. Player-core throws `PlayerAlreadyRegisteredError` with detailed console logging. Electron UI displays actionable instructions for technicians to disconnect the current player via CMS.
-- **Regions**: Country-level regulatory jurisdictions for creative approval tracking. Supported regions: Nigeria (NG, ARCON), Kenya (KE, KFCB), Ghana (GH, GACA), South Africa (ZA, AR). Migration script available at `backend/scripts/migrate-regions-to-country-level.ts` for converting from state-level to country-level regions.
-- **Vehicles Management**: Full inventory management for vehicles that carry mobile screens. Full CRUD API with publisher-scoped access control via `/api/vehicles` endpoints (GET, POST, GET/:id, PATCH/:id, DELETE/:id, GET/:id/screens). Features include:
-  - UUID-based vehicle IDs with name, external_id, license_plate, make_model, city, region fields
-  - Publisher-scoped access control (publishers only see their vehicles, internal users see all)
-  - Soft-delete (deactivation) with safeguards preventing deactivation when screens are linked
-  - Vehicle screens endpoint to list all screens attached to a vehicle
-  - **Vehicles Tab in Publisher Detail**: Vehicles are now managed within Publisher Detail page tabs (Overview, Screens, Vehicles, Reports) rather than as standalone navigation
-  - PublisherVehiclesTab component for CRUD operations within publisher context
-  - Screens list shows Vehicle column with filtering and navigation to Publisher vehicles tab
-  - Navigation shows "Inventory" label (renamed from "Screens & Players"), no standalone Vehicles link
-- **Human-Readable Public Codes**: All major entities have sequential, human-readable public codes for easy identification:
-  - Publishers: PUB-00001, PUB-00002, etc.
-  - Advertisers: ADV-00001, ADV-00002, etc.
-  - Publisher Organizations: ORG-PUB-00001, etc.
-  - Internal Organizations: ORG-INT-00001, etc.
-  - Codes are auto-generated sequentially on entity creation using MAX-based SQL queries to ensure correct ordering
-  - Frontend displays public codes in list views and detail pages with monospace badge styling
-  - Service helper at `backend/src/services/publicCodeService.ts` handles code generation
-  - Migration at `backend/drizzle/0006_add_public_codes.sql` backfills existing records
-- **Enhanced Screen Specifications**: Screens now include width_px, height_px, screen_type, orientation, and is_active fields. ScreenFormModal includes resolution and orientation editing. Screen types: vehicle, indoor, billboard, mall, other. Orientation: landscape, portrait.
-- **Publisher-scoped Screen Groups**: Screen groups are strictly scoped to publisher organizations (not advertisers). Groups can only contain screens owned by the same publisher. Key features:
-  - Publisher validation on group creation (rejects advertiser orgs)
-  - Membership integrity enforcement (screens can only be added to groups owned by their publisher)
-  - Targeting preview endpoint (`POST /api/screen-groups/targeting-preview`) with screen counts, online/offline status, and warnings
-  - Campaign by-screen-group reporting (`GET /api/reports/campaigns/:id/by-screen-group`)
-  - Frontend UI with "Publisher" labeling and publisher-only org filtering
-  - **Access Control Hardening**: `requirePublisherAccess` middleware enforces strict publisher organization boundaries on all group routes. Cross-publisher access returns 404 (security by obscurity). Beamer internal users have full access.
-  - **Overlap Detection**: Targeting preview detects screens appearing in multiple selected groups and generates warnings
-  - **Groups Tab on Screen Detail**: New "Groups" tab shows all groups containing a screen with links to group details (`GET /api/screens/:id/groups`)
-  - **Inline Targeting Warnings**: `TargetingPreviewWarnings` component displays real-time warnings (offline, low count, mixed resolution, overlap) when selecting groups
+- **Authentication**: JWT-based with role-based access control (admin, ops, viewer), secure password reset, and initial admin setup.
+- **API Modules**: Comprehensive APIs for organizations, screens, publishers, advertisers, campaigns, flights, creatives, bookings, invoices, and reports.
+- **Screens & Players Management**: Full CRUD for screens, including permission-based access, atomic transactions, player swapping, dynamic CMS UI, and remote player disconnection. Supports three screen types with extended metadata.
+- **Publishers & Advertisers Separation**: Dedicated CRUD APIs and UI for managing publishers and advertisers.
+- **Campaigns & Flights Management**: Full CRUD for campaigns and nested flights, with status management, targeting capabilities, and a dedicated Flight Detail page.
+- **Flight Creatives Assignment**: Linking creatives to flights with configurable weights for playlist building, including inline editing and bulk operations.
+- **Creative "Used In" Tracking**: Creatives display assigned flights.
+- **Creatives Management**: Full CRUD for media assets attached to campaigns, supporting file uploads (image/video) via Multer. Includes regional approval workflow with auto-generated approval codes for pre-approval regions. Playback is controlled solely by regional approvals.
+- **Campaign Reporting**: API and frontend for campaign summaries, including daily/screen-level impressions, exposure reporting (geographic visualization), compliance reporting (scheduled vs. active screens), and diagnostics (offline screens, unused creatives).
+- **Visual Campaign Timeline**: Gantt-style timeline for flights within campaign overviews.
+- **Enhanced Targeting Preview**: Real-time eligible screen count with breakdown by region, resolution, and screen group.
+- **Player Telemetry**: GPS-aware heartbeats and playback events with device metrics, resiliently stored and transmitted.
+- **Playlist Creative Type Support**: Playlist API returns `type` field (image/video) based on MIME type.
+- **Player Configuration**: Ops-friendly device provisioning via `beamer.config.json` file.
+- **Player Registration Conflict Detection**: Explicit detection and error handling for screens already linked to another player.
+- **Regions**: Country-level regulatory jurisdictions for creative approval tracking (e.g., Nigeria, Kenya).
+- **Vehicles Management**: Full inventory management for vehicles carrying mobile screens, including UUIDs, publisher-scoped access, soft-delete, and integration into Publisher Detail pages.
+- **Human-Readable Public Codes**: Auto-generated sequential public codes for publishers, advertisers, and organizations for easy identification.
+- **Enhanced Screen Specifications**: Screens include width/height, screen_type, orientation, and `is_active` fields.
+- **Publisher-scoped Screen Groups**: Screen groups are strictly scoped to publisher organizations, with access control hardening, overlap detection, and a "Groups" tab on Screen Detail pages.
 
 ### System Design Choices
 - **Monorepo Architecture**: Centralized repository for all platform components.
 - **Microservice-like Separation**: Distinct backend and CMS web applications.
-- **Database Management**: PostgreSQL with Drizzle ORM for schema management, using `npm run db:push` for updates.
-- **Frontend Development**: React with Vite for fast development and HMR, Tailwind CSS for styling.
-- **API Connectivity**: Vite proxy for seamless frontend-backend communication.
-- **Authentication**: Stateless JWTs for scalability and client-side token management.
-- **Data Integrity**: Transaction-based updates for critical operations.
-- **Role-Based Access Control**: Granular permissions enforced at the API level.
-
-### Deployment Configuration
-- **Build Command**: `npm run build` (runs `build:backend` then `build:frontend`)
-- **Run Command**: `cd backend && npm run start:migrate` (runs migrations then starts server)
-- **Deployment Type**: Reserved VM for stateful backend operations
-- **Root Scripts**:
-  - `npm run build` - Builds both backend and frontend
-  - `npm run build:backend` - TypeScript compilation for backend
-  - `npm run build:frontend` - TypeScript + Vite build for CMS
+- **Database Management**: PostgreSQL with Drizzle ORM.
+- **Frontend Development**: React with Vite and Tailwind CSS.
+- **API Connectivity**: Vite proxy.
+- **Authentication**: Stateless JWTs.
+- **Data Integrity**: Transaction-based updates.
+- **Role-Based Access Control**: Granular permissions.
 
 ## External Dependencies
 
-- **Database**: PostgreSQL (via Replit integration)
-- **Authentication**: JWT (JSON Web Tokens)
+- **Database**: PostgreSQL
+- **Authentication**: JWT
 - **HTTP Client**: Axios
 - **State Management**: Zustand
 - **Data Fetching**: TanStack Query
 - **Styling**: Tailwind CSS
-- **File Uploads**: Multer (100MB limit, image/video validation)
+- **File Uploads**: Multer
