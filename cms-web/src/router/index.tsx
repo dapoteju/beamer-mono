@@ -6,8 +6,8 @@ import { useAuthStore } from "../store/authStore";
 import Dashboard from "../pages/Dashboard";
 import Campaigns from "../pages/Campaigns";
 import CampaignNew from "../pages/CampaignNew";
-import CampaignDetail from "../pages/CampaignDetail";
-import FlightDetail from "../pages/FlightDetail";
+import CampaignWorkspace from "../pages/campaigns/CampaignWorkspace";
+import FlightRedirect from "../pages/FlightRedirect";
 import Screens from "../pages/Screens";
 import ScreenDetail from "../pages/ScreenDetail";
 import GroupsList from "../pages/inventory/GroupsList";
@@ -98,8 +98,8 @@ export const router = createBrowserRouter([
       { path: "dashboard", element: <Dashboard /> },
       { path: "campaigns", element: <Campaigns /> },
       { path: "campaigns/new", element: <CampaignNew /> },
-      { path: "campaigns/:id", element: <CampaignDetail /> },
-      { path: "flights/:id", element: <FlightDetail /> },
+      { path: "campaigns/:id", element: <CampaignWorkspace /> },
+      { path: "flights/:id", element: <FlightRedirect /> },
       {
         path: "screens",
         element: (

@@ -52,3 +52,14 @@ export async function deleteFlightCreative(
 ): Promise<void> {
   await apiClient.delete(`/flights/${flightId}/creatives/${flightCreativeId}`);
 }
+
+export async function addCreativeToFlight(
+  flightId: string,
+  creativeId: string,
+  weight: number = 1
+): Promise<FlightCreative> {
+  const response = await apiClient.post(`/flights/${flightId}/creatives`, {
+    items: [{ creative_id: creativeId, weight }]
+  });
+  return response.data.data[0];
+}
