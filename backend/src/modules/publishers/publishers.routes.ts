@@ -39,6 +39,7 @@ function canEditPublisher(req: AuthRequest): boolean {
 function flattenPublisherProfile(profile: Awaited<ReturnType<typeof listPublisherProfiles>>[0]) {
   return {
     id: profile.id,
+    publicCode: profile.publicCode,
     publisherType: profile.publisherType,
     organisationId: profile.organisationId,
     organisationName: profile.organisation?.name || null,

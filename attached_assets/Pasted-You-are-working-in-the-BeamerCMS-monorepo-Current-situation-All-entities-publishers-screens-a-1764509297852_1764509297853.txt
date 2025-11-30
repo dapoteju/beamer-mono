@@ -1,0 +1,359 @@
+You are working in the BeamerCMS monorepo.
+
+Current situation:
+
+All entities (publishers, screens, advertisers, etc.) use long UUIDs (e.g. 884e5bf6-f376-4789-87b1-0a130bf80401) as their primary keys and these are shown directly in the UI (e.g. “Publisher ID: …”).
+
+UUIDs are fine for internal references but are not user-friendly for ops, sales, or external partners.
+
+Goal
+
+Introduce short, human-readable public codes for key entities while keeping UUIDs as internal primary keys:
+
+Publishers → PUB-00001, PUB-00002, …
+
+Screens → SCR-00001, SCR-00002, …
+
+Advertisers → ADV-00001, ADV-00002, …
+
+Use these public codes in the CMS UI and for human workflows, while UUIDs remain the internal IDs.
+
+1️⃣ Database Changes
+
+Use PostgreSQL migrations via Drizzle.
+
+1.1 Add public_code columns
+
+For each table:
+
+organisations (for publishers & advertisers)
+
+screens
+
+If you already have separate advertiser tables, apply similarly.
+
+Migration file:
+apps/api/drizzle/XXXXXXXX_add_public_codes.sql
+
+Add:
+
+ALTER TABLE organisations
+  ADD COLUMN public_code TEXT;
+
+ALTER TABLE screens
+  ADD COLUMN public_code TEXT;
+
+
+(We’ll enforce NOT NULL + UNIQUE after backfilling.)
+
+Note: We’re using organisations for both publishers and advertisers, but codes will be prefixed differently based on org_type.
+
+1.2 Create sequences for auto-generation
+
+Create sequences to generate incrementing numbers per entity type:
+
+CREATE SEQUENCE publisher_public_code_seq START 1;
+CREATE SEQUENCE advertiser_public_code_seq START 1;
+CREATE SEQUENCE screen_public_code_seq START 1;
+
+
+You’ll use these in backfill + future inserts.
+
+2️⃣ Backfill Public Codes for Existing Rows
+
+Update existing rows to have readable codes.
+
+In the same migration or a follow-up migration:
+
+-- Publishers
+UPDATE organisations
+SET public_code = 'PUB-' || LPAD(nextval('publisher_public_code_seq')::text, 5, '0')
+WHERE org_type = 'publisher' AND public_code IS NULL;
+
+-- Advertisers
+UPDATE organisations
+SET public_code = 'ADV-' || LPAD(nextval('advertiser_public_code_seq')::text, 5, '0')
+WHERE org_type = 'advertiser' AND public_code IS NULL;
+
+-- Screens
+UPDATE screens
+SET public_code = 'SCR-' || LPAD(nextval('screen_public_code_seq')::text, 5, '0')
+WHERE public_code IS NULL;
+
+
+Then enforce constraints:
+
+ALTER TABLE organisations
+  ALTER COLUMN public_code SET NOT NULL;
+
+ALTER TABLE screens
+  ALTER COLUMN public_code SET NOT NULL;
+
+ALTER TABLE organisations
+  ADD CONSTRAINT organisations_public_code_unique UNIQUE (public_code);
+
+ALTER TABLE screens
+  ADD CONSTRAINT screens_public_code_unique UNIQUE (public_code);
+
+3️⃣ Drizzle Schema Updates
+3.1 Organisations
+
+File: apps/api/src/db/schema/organisations.ts
+
+Add:
+
+publicCode: text("public_code").notNull(),
+
+3.2 Screens
+
+File: apps/api/src/db/schema/screens.ts
+
+Add:
+
+publicCode: text("public_code").notNull(),
+
+
+Update any select/relations types accordingly.
+
+4️⃣ API: Generate Codes on Create
+
+Ensure that new entities get public codes if they don’t have one yet.
+
+4.1 Helper function
+
+Create a helper, e.g. apps/api/src/services/publicCodeService.ts:
+
+import { db } from "../db";
+import { sql } from "drizzle-orm";
+
+export async function generatePublisherCode() {
+  const result = await db.execute<{ nextval: number }>(sql`
+    SELECT nextval('publisher_public_code_seq') as nextval;
+  `);
+  const n = result[0]?.nextval ?? 1;
+  return `PUB-${n.toString().padStart(5, "0")}`;
+}
+
+export async function generateAdvertiserCode() {
+  const result = await db.execute<{ nextval: number }>(sql`
+    SELECT nextval('advertiser_public_code_seq') as nextval;
+  `);
+  const n = result[0]?.nextval ?? 1;
+  return `ADV-${n.toString().padStart(5, "0")}`;
+}
+
+export async function generateScreenCode() {
+  const result = await db.execute<{ nextval: number }>(sql`
+    SELECT nextval('screen_public_code_seq') as nextval;
+  `);
+  const n = result[0]?.nextval ?? 1;
+  return `SCR-${n.toString().padStart(5, "0")}`;
+}
+
+4.2 Hook into create handlers
+Publishers / Organisations
+
+In apps/api/src/controllers/organisationsController.ts (or wherever you create publishers/advertisers):
+
+When creating a publisher:
+
+import { generatePublisherCode } from "../services/publicCodeService";
+
+const publicCode = await generatePublisherCode();
+
+await db.insert(organisations).values({
+  id: crypto.randomUUID(),
+  orgType: "publisher",
+  publicCode,
+  // ...other fields from body
+});
+
+
+When creating an advertiser:
+
+const publicCode = await generateAdvertiserCode();
+// same pattern
+
+
+Guard: don’t allow clients to supply public_code directly; always generate server-side.
+
+Screens
+
+In the screen create handler:
+
+import { generateScreenCode } from "../services/publicCodeService";
+
+const publicCode = await generateScreenCode();
+
+await db.insert(screens).values({
+  id: crypto.randomUUID(),
+  publicCode,
+  // other screen fields...
+});
+
+
+For updates, public_code should remain immutable.
+
+5️⃣ API: Expose Public Codes in DTOs
+
+Where you return publishers, screens, and advertisers to the frontend, include publicCode.
+
+Examples:
+
+5.1 Publishers List / Detail
+
+In the controller mapping DTOs:
+
+function mapPublisherToDto(org: OrganisationRow) {
+  return {
+    id: org.id,                 // internal UUID
+    publicCode: org.publicCode, // human-friendly
+    name: org.name,
+    orgType: org.orgType,
+    // ...
+  };
+}
+
+5.2 Screens
+function mapScreenToDto(screen: ScreenRow) {
+  return {
+    id: screen.id,
+    publicCode: screen.publicCode,
+    name: screen.name,
+    // ...
+  };
+}
+
+5.3 Advertisers
+
+Same pattern: expose publicCode.
+
+6️⃣ Frontend: Use Public Codes in the UI
+6.1 Publisher Detail Page
+
+File: apps/cms-web/src/pages/publishers/PublisherDetail.tsx
+
+Replace the big ugly UUID in the header:
+
+Currently:
+
+<p>Publisher ID: {publisher.id}</p>
+
+
+Change to:
+
+<p className="text-xs text-muted-foreground">
+  Publisher Code: <span className="font-mono">{publisher.publicCode}</span>
+</p>
+
+
+Optionally show internal ID in a subtle way with copy button:
+
+<Button
+  variant="ghost"
+  size="xs"
+  onClick={() => navigator.clipboard.writeText(publisher.id)}
+>
+  Copy internal ID
+</Button>
+
+6.2 Publishers List
+
+File: apps/cms-web/src/pages/publishers/PublishersList.tsx
+
+Add a Code column or adapt Name:
+
+<TableCell>
+  <div className="flex flex-col">
+    <span>{publisher.name || "—"}</span>
+    <span className="text-[11px] text-muted-foreground font-mono">
+      {publisher.publicCode}
+    </span>
+  </div>
+</TableCell>
+
+
+Or add a distinct Code column if you prefer.
+
+6.3 Screens List & Detail
+
+File: apps/cms-web/src/pages/inventory/ScreensList.tsx
+
+Show code:
+
+<TableCell>
+  <div className="flex flex-col">
+    <span>{screen.name}</span>
+    <span className="text-[11px] text-muted-foreground font-mono">
+      {screen.publicCode}
+    </span>
+  </div>
+</TableCell>
+
+
+Screen detail:
+
+<p className="text-xs text-muted-foreground">
+  Screen Code: <span className="font-mono">{screen.publicCode}</span>
+</p>
+
+
+Keep UUID only for “Copy internal ID” interactions if you want.
+
+6.4 Advertisers Pages
+
+Apply the same pattern:
+
+Show advertiser.publicCode prominently.
+
+Hide raw UUID except behind a copy button.
+
+7️⃣ Search & Filters (Optional but Recommended)
+
+Where you search/filter publishers, screens, or advertisers:
+
+Extend search logic to match against both name and publicCode.
+
+Backend example:
+
+// in GET /api/publishers
+if (q) {
+  where.push(or(
+    ilike(organisations.name, `%${q}%`),
+    ilike(organisations.publicCode, `%${q}%`)
+  ));
+}
+
+
+Same approach for screens and advertisers.
+
+8️⃣ Tests & Acceptance Criteria
+Backend
+
+Creating a new publisher generates PUB-0000X.
+
+Creating a new advertiser generates ADV-0000X.
+
+Creating a new screen generates SCR-0000X.
+
+Uniqueness constraints enforced (public_code unique per table).
+
+public_code is non-null after backfill and for all new records.
+
+Frontend
+
+Publisher detail shows Publisher Code instead of raw UUID.
+
+Screens and advertisers show their codes in lists and detail views.
+
+UUIDs are not shown by default; only accessible via explicit “Copy internal ID” or debug views.
+
+Searching by public code (e.g. “PUB-00001”) finds the correct publisher.
+
+You’re done when:
+
+No user-facing views rely on raw UUIDs as primary identifiers.
+
+Ops can reference publishers, screens, and advertisers by short, readable codes.
+
+Internals can still access the UUID when needed via a copy action.

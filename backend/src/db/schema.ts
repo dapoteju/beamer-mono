@@ -38,6 +38,7 @@ export const userRoleEnum = pgEnum("user_role", [
 
 export const organisations = pgTable("organisations", {
   id: uuid("id").primaryKey().defaultRandom(),
+  publicCode: text("public_code").unique(),
   name: varchar("name", { length: 255 }).notNull(),
   type: orgTypeEnum("type").notNull(),
   billingEmail: varchar("billing_email", { length: 255 }).notNull(),
@@ -59,6 +60,7 @@ export const publisherTypeEnum = pgEnum("publisher_type", [
 
 export const publisherProfiles = pgTable("publisher_profiles", {
   id: uuid("id").primaryKey().defaultRandom(),
+  publicCode: text("public_code").notNull().unique(),
   organisationId: uuid("organisation_id").references(() => organisations.id),
   publisherType: publisherTypeEnum("publisher_type").notNull(),
   fullName: text("full_name"),

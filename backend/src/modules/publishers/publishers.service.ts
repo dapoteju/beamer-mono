@@ -2,6 +2,7 @@
 import { db } from "../../db/client";
 import { publisherProfiles, organisations, screens, vehicles, screenLocationHistory } from "../../db/schema";
 import { eq, sql, and, or, gte } from "drizzle-orm";
+import { generatePublisherCode } from "../../services/publicCodeService";
 
 export interface PublisherProfileInput {
   publisherType: "organisation" | "individual";
@@ -15,6 +16,7 @@ export interface PublisherProfileInput {
 
 export interface PublisherProfileDetail {
   id: string;
+  publicCode: string;
   publisherType: "organisation" | "individual";
   organisationId: string | null;
   fullName: string | null;
@@ -38,6 +40,7 @@ export async function listPublisherProfiles(): Promise<PublisherProfileDetail[]>
   const profiles = await db
     .select({
       id: publisherProfiles.id,
+      publicCode: publisherProfiles.publicCode,
       publisherType: publisherProfiles.publisherType,
       organisationId: publisherProfiles.organisationId,
       fullName: publisherProfiles.fullName,
@@ -74,6 +77,7 @@ export async function listPublisherProfiles(): Promise<PublisherProfileDetail[]>
 
       return {
         id: profile.id,
+        publicCode: profile.publicCode,
         publisherType: profile.publisherType,
         organisationId: profile.organisationId,
         fullName: profile.fullName,
@@ -104,6 +108,7 @@ export async function getPublisherProfile(id: string): Promise<PublisherProfileD
   const [profile] = await db
     .select({
       id: publisherProfiles.id,
+      publicCode: publisherProfiles.publicCode,
       publisherType: publisherProfiles.publisherType,
       organisationId: publisherProfiles.organisationId,
       fullName: publisherProfiles.fullName,
@@ -141,6 +146,7 @@ export async function getPublisherProfile(id: string): Promise<PublisherProfileD
 
   return {
     id: profile.id,
+    publicCode: profile.publicCode,
     publisherType: profile.publisherType,
     organisationId: profile.organisationId,
     fullName: profile.fullName,
@@ -181,9 +187,12 @@ export async function createPublisherProfile(
     }
   }
 
+  const publicCode = await generatePublisherCode();
+  
   const [created] = await db
     .insert(publisherProfiles)
     .values({
+      publicCode,
       publisherType: input.publisherType,
       organisationId: input.organisationId || null,
       fullName: input.fullName || null,
