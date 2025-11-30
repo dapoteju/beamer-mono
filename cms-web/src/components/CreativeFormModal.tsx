@@ -509,6 +509,11 @@ export function CreativeFormModal({
                                 placeholder="e.g., ARCON-2025-00123"
                                 disabled={savingApproval === approval.region_code}
                               />
+                              {approval.requires_pre_approval && edit.status === "approved" && !edit.approval_code && (
+                                <p className="mt-1 text-xs text-blue-600">
+                                  No approval code entered. One will be automatically generated when you approve.
+                                </p>
+                              )}
                             </div>
 
                             {edit.status === "rejected" && (

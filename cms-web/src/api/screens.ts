@@ -186,6 +186,7 @@ export interface Region {
   id: string;
   code: string;
   name: string;
+  requires_pre_approval?: boolean;
 }
 
 export interface Publisher {

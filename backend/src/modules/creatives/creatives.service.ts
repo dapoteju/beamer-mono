@@ -161,6 +161,13 @@ export async function deleteCreative(creativeId: string): Promise<boolean> {
   return result.length > 0;
 }
 
+function generateApprovalCode(regionCode: string, uniqueId: string): string {
+  const now = new Date();
+  const year = now.getFullYear();
+  const shortId = uniqueId.replace(/-/g, '').slice(0, 6).toUpperCase();
+  return `${regionCode}-${year}-${shortId}`;
+}
+
 export async function setCreativeApproval(params: {
   creativeId: string;
   regionCode: string;
@@ -179,6 +186,21 @@ export async function setCreativeApproval(params: {
     rejectedReason,
     approvedByUserId,
   } = params;
+
+  let finalApprovalCode = approvalCode ?? null;
+
+  if (status === 'approved' && !approvalCode) {
+    const regionResult = await pool.query(
+      `SELECT requires_pre_approval FROM regions WHERE code = $1`,
+      [regionCode]
+    );
+    
+    const requiresPreApproval = regionResult.rows[0]?.requires_pre_approval ?? false;
+    
+    if (requiresPreApproval) {
+      finalApprovalCode = generateApprovalCode(regionCode, creativeId);
+    }
+  }
 
   await pool.query(
     `
@@ -210,7 +232,7 @@ export async function setCreativeApproval(params: {
       creativeId,
       regionCode,
       status,
-      approvalCode ?? null,
+      finalApprovalCode,
       documents ? JSON.stringify(documents) : null,
       approvedByUserId ?? null,
       rejectedReason ?? null,
@@ -223,6 +245,7 @@ export interface CreativeApprovalResponse {
   creative_id: string;
   region_code: string;
   region_name: string;
+  requires_pre_approval: boolean;
   status: CreativeApprovalStatus;
   approval_code: string | null;
   documents: string[];
@@ -240,6 +263,7 @@ export async function getCreativeApprovals(creativeId: string): Promise<Creative
       ca.creative_id,
       r.code as region_code,
       r.name as region_name,
+      r.requires_pre_approval,
       ca.status,
       ca.approval_code,
       ca.documents,
@@ -260,6 +284,7 @@ export async function getCreativeApprovals(creativeId: string): Promise<Creative
     creative_id: row.creative_id,
     region_code: row.region_code,
     region_name: row.region_name,
+    requires_pre_approval: row.requires_pre_approval ?? false,
     status: row.status,
     approval_code: row.approval_code,
     documents: row.documents || [],

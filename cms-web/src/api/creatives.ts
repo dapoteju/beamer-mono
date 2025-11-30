@@ -22,6 +22,7 @@ export interface CreativeApproval {
   creative_id: string;
   region_code: string;
   region_name: string;
+  requires_pre_approval: boolean;
   status: CreativeApprovalStatus;
   approval_code: string | null;
   documents: string[];

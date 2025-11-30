@@ -1,0 +1,84 @@
+You are editing my Beamer monorepo.
+
+I have a design gap in how creative approvals work:
+
+The frontend allows approvers to mark a creative as approved without entering an approval_code.
+
+For regions where regions.requires_pre_approval = true, the playlist query requires approval_code IS NOT NULL, so these “approved but no code” creatives never appear in playlists.
+
+I want to fix this properly:
+
+1. Backend: auto-generate approval codes for required regions
+
+In the backend module that handles updating creative_approvals (status changes), please:
+
+When an approval is updated to status = 'approved':
+
+Look up the associated region.
+
+If region.requires_pre_approval = true and approval_code is null/empty:
+
+Automatically generate an approval code and save it.
+
+Implement a helper like:
+
+async function generateApprovalCode(regionCode: string, approvalId: string): Promise<string> {
+  const now = new Date();
+  const year = now.getFullYear();
+  const shortId = approvalId.slice(0, 6).toUpperCase();
+  return `${regionCode}-${year}-${shortId}`;
+}
+
+
+Use this helper to populate approval_code when missing.
+
+Keep the existing playlist filter (status='approved' AND approval_code IS NOT NULL) unchanged.
+
+2. Frontend: add a small hint in the approval modal
+
+In the CMS UI where an internal user approves a creative:
+
+Detect when:
+
+The region for that approval has requires_pre_approval = true, and
+
+The user selects status = 'approved', and
+
+The approval_code input is empty.
+
+In that case, show a helper text under the input, e.g.:
+
+“No approval code entered. One will be automatically generated when you approve.”
+
+Do not block the approval if the code is empty; backend will generate it.
+
+3. Migration: fill in missing approval codes for already-approved items
+
+Add a one-off migration or script that:
+
+For each creative_approvals row where:
+
+status = 'approved'
+
+The region’s requires_pre_approval = true
+
+approval_code IS NULL
+
+Set approval_code to:
+
+CONCAT(r.code, '-', EXTRACT(YEAR FROM NOW()), '-', SUBSTRING(ca.id::text, 1, 6))
+
+
+where r is the row from regions for that approval.
+
+Expected result:
+
+After this change and migration:
+
+All existing approved creatives for pre-approval regions will start appearing in playlists.
+
+Future approvals will always have an approval_code automatically generated if the approver doesn’t type one.
+
+The CMS UI communicates this behaviour clearly to operators.
+
+Please implement these changes.
