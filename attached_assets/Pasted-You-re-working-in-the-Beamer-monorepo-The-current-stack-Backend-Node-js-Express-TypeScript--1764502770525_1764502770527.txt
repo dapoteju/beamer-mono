@@ -1,0 +1,620 @@
+You’re working in the Beamer monorepo. The current stack:
+
+Backend: Node.js + Express + TypeScript, PostgreSQL (Drizzle ORM), JWT via HTTP-only cookies.
+
+Frontend: React (TypeScript), Tailwind CSS, shadcn/ui, React Query, React Hook Form, Wouter, Vite.
+
+Existing features:
+
+Screens & Players inventory area
+
+Screen Groups (publisher-scoped) + targeting preview
+
+GPS-based location history + inventory map
+
+Campaign Workspace (/campaigns/:id with Overview, Flights, Creatives, Reporting)
+
+Diagnostics & Delivery reporting
+
+Goal
+
+Implement proper Inventory Management so users can:
+
+Set and edit screen sizes (resolution) and related properties.
+
+Add and manage vehicles (for mobile screens).
+
+Link screens to vehicles where applicable.
+
+Manage screens (create, edit, deactivate) via CMS.
+
+Focus on:
+
+Backend schema + APIs
+
+Frontend pages, modals, and drawers
+
+Permissions consistent with publisher/org model
+
+No breaking changes for existing flows
+
+1️⃣ Backend: Schema Enhancements
+1.1 Screens Table Enhancements
+
+The screens table already exists. Extend it with:
+
+Fields (if not already present):
+
+width_px INTEGER NOT NULL DEFAULT 342
+
+height_px INTEGER NOT NULL DEFAULT 130
+
+screen_type TEXT NOT NULL DEFAULT 'vehicle'
+
+Use an enum-like constraint in validation: 'vehicle' | 'indoor' | 'billboard' | 'mall' | 'other'
+
+orientation TEXT NOT NULL DEFAULT 'landscape'
+
+Allowed: 'landscape' | 'portrait'
+
+is_active BOOLEAN NOT NULL DEFAULT TRUE
+
+vehicle_id UUID NULL REFERENCES vehicles(id) (will be created in next step)
+
+Migration file:
+apps/api/drizzle/XXXXXXXX_add_screen_resolution_and_type.sql
+
+Also update apps/api/src/db/schema/screens.ts (Drizzle):
+
+export const screens = pgTable("screens", {
+  id: uuid("id").primaryKey(),
+  orgId: uuid("org_id").notNull(), // publisher org
+  name: text("name").notNull(),
+  widthPx: integer("width_px").notNull().default(342),
+  heightPx: integer("height_px").notNull().default(130),
+  screenType: text("screen_type").notNull().default("vehicle"),
+  orientation: text("orientation").notNull().default("landscape"),
+  isActive: boolean("is_active").notNull().default(true),
+  vehicleId: uuid("vehicle_id").references(() => vehicles.id), // after vehicles created
+  // ... other existing fields like city, region, lastSeenAt, etc.
+});
+
+
+Ensure relations are updated once vehicles table is defined.
+
+1.2 Vehicles Table
+
+Create a new table: vehicles.
+
+Migration file:
+apps/api/drizzle/XXXXXXXX_create_vehicles.sql
+
+Table definition:
+
+CREATE TABLE vehicles (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  publisher_org_id UUID NOT NULL REFERENCES organisations(id),
+  name TEXT NOT NULL,
+  external_id TEXT NULL, -- e.g. taxi ID / asset ID
+  license_plate TEXT NULL,
+  make_model TEXT NULL,
+  city TEXT NULL,
+  region TEXT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  is_active BOOLEAN NOT NULL DEFAULT TRUE
+);
+CREATE INDEX idx_vehicles_publisher_org_id ON vehicles(publisher_org_id);
+CREATE INDEX idx_vehicles_is_active ON vehicles(is_active);
+
+
+Drizzle schema: apps/api/src/db/schema/vehicles.ts
+
+export const vehicles = pgTable("vehicles", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  publisherOrgId: uuid("publisher_org_id").notNull().references(() => organisations.id),
+  name: text("name").notNull(),
+  externalId: text("external_id"),
+  licensePlate: text("license_plate"),
+  makeModel: text("make_model"),
+  city: text("city"),
+  region: text("region"),
+  isActive: boolean("is_active").notNull().default(true),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow(),
+});
+
+
+Relations:
+
+In screens.ts, add relation to vehicles.
+
+In vehicles.ts, relation with screens (one-to-many).
+
+2️⃣ Backend: Inventory APIs
+2.1 Vehicles API
+
+Create router: apps/api/src/routes/vehicles.ts
+Controller: apps/api/src/controllers/vehiclesController.ts
+Validators: apps/api/src/validators/vehicles.validator.ts
+
+Base path: /api/vehicles
+
+Endpoints:
+
+GET /api/vehicles
+
+Query params: publisher_org_id?, q?, city?, region?, is_active?, page?, page_size?
+
+Non-internal:
+
+Must pass publisher_org_id they belong to.
+
+Internal:
+
+Can filter by any publisher or list all.
+
+Returns: { items: VehicleDto[], count: number }
+
+POST /api/vehicles
+
+Body:
+
+{
+  "publisher_org_id": "...",
+  "name": "Taxi 0123",
+  "external_id": "TX-0123",
+  "license_plate": "ABC-123",
+  "make_model": "Toyota Corolla",
+  "city": "Lagos",
+  "region": "NG-LA"
+}
+
+
+Validate publisher_org_id belongs to org with type publisher.
+
+Only publisher users for that org or internal can create.
+
+Returns created vehicle.
+
+GET /api/vehicles/:id
+
+Returns full vehicle details + basic screen count:
+
+{
+  "id": "...",
+  "name": "...",
+  "publisher_org_id": "...",
+  "screens_count": 3,
+  ...
+}
+
+
+PATCH /api/vehicles/:id
+
+Editable fields: name, external_id, license_plate, make_model, city, region, is_active.
+
+Permission: only same publisher or internal.
+
+DELETE /api/vehicles/:id
+
+Soft-delete preferred: set is_active = false.
+
+Return 409 if vehicle still has active screens linked, unless ?force=true and user is internal (then set screens.vehicle_id = NULL before deactivation).
+
+GET /api/vehicles/:id/screens
+
+Returns screens assigned to this vehicle for the publisher.
+
+2.2 Screens API Enhancements
+
+Existing screens routes likely live under /api/screens. Extend:
+
+GET /api/screens/:id
+
+Include:
+
+width_px
+
+height_px
+
+screen_type
+
+orientation
+
+is_active
+
+vehicle summary (if linked)
+
+PATCH /api/screens/:id
+
+Allow updating:
+
+name
+
+width_px
+
+height_px
+
+screen_type
+
+orientation
+
+city
+
+region
+
+is_active
+
+vehicle_id (must match same publisher or null)
+
+Validate:
+
+Width/height > 0
+
+Orientation in allowed values
+
+When setting vehicle_id → screens.org_id === vehicles.publisher_org_id.
+
+POST /api/screens
+
+New endpoint to create screens from CMS.
+
+Body includes:
+
+{
+  "publisher_org_id": "...",
+  "name": "Lekki Taxi Screen 1",
+  "width_px": 342,
+  "height_px": 130,
+  "screen_type": "vehicle",
+  "orientation": "landscape",
+  "city": "Lagos",
+  "region": "NG-LA",
+  "vehicle_id": "optional"
+}
+
+
+Assign screen to publisher.
+
+is_active default true.
+
+Permissions:
+
+Non-internal: can only CRUD screens where org_id is their org.
+
+Internal: can CRUD for any publisher.
+
+Add corresponding validators (screens.validator.ts) using zod.
+
+3️⃣ Frontend: Inventory Navigation
+
+Update nav so that under Inventory you have:
+
+Screens & Players (existing)
+
+Vehicles
+
+(Optionally) Map / Exposure
+
+4️⃣ Frontend: Vehicles Management
+4.1 Vehicles List Page
+
+File: apps/cms-web/src/pages/inventory/VehiclesList.tsx
+
+Features:
+
+Table columns:
+
+Name
+
+Publisher
+
+License Plate
+
+City
+
+Region
+
+Screens Count
+
+Status (Active/Inactive)
+
+Filters:
+
+Publisher selector (for internal)
+
+Search q
+
+City / Region filters (optional)
+
+Active/Inactive toggle
+
+Actions:
+
+“Add Vehicle” button → opens VehicleEditorModal (create)
+
+Row click → open VehicleDetailDrawer or detail page.
+
+Use React Query hooks:
+
+useVehiclesList(filters)
+
+useCreateVehicle
+
+useUpdateVehicle
+
+4.2 Vehicle Editor Modal
+
+File: apps/cms-web/src/components/vehicles/VehicleEditorModal.tsx
+
+Use shadcn Dialog and react-hook-form.
+
+Fields:
+
+Name (required)
+
+Publisher (for internal only)
+
+External ID
+
+License Plate
+
+Make/Model
+
+City
+
+Region
+
+Active checkbox
+
+On save → create/update via API, refetch list and close.
+
+4.3 Vehicle Detail View
+
+File: apps/cms-web/src/pages/inventory/VehicleDetail.tsx (or Drawer component)
+
+Show vehicle details at top.
+
+Tabbed layout inside:
+
+Details (info & edit button)
+
+Screens (screens assigned to this vehicle)
+
+Screens tab:
+
+Table of screens:
+
+Screen name
+
+Resolution (width × height)
+
+Orientation
+
+Online/Offline status
+
+Last seen
+
+Actions:
+
+“Add Existing Screen to Vehicle” → multi-select from publisher’s screens not currently linked.
+
+“Remove from Vehicle” per row.
+
+Use new endpoint /api/vehicles/:id/screens.
+
+5️⃣ Frontend: Screens Enhancements
+5.1 Screens List Page Enhancements
+
+File: apps/cms-web/src/pages/inventory/ScreensList.tsx
+
+Enhance with:
+
+Columns:
+
+Name
+
+Publisher
+
+Resolution (342×130)
+
+Screen Type
+
+Orientation
+
+Vehicle (if any)
+
+Status (Online/Offline)
+
+Active (Yes/No)
+
+Filters:
+
+Screen Type (dropdown)
+
+Resolution (text or “standard sizes” dropdown)
+
+Orientation
+
+Active only toggle
+
+Add an “Add Screen” button:
+
+Opens ScreenEditorModal in create mode.
+
+5.2 Screen Editor Modal (Create / Edit)
+
+File: apps/cms-web/src/components/screens/ScreenEditorModal.tsx
+
+Fields:
+
+Name (required)
+
+Publisher (for internal only; otherwise fixed)
+
+Screen Type: select (vehicle, indoor, billboard, mall, other)
+
+Resolution: width_px, height_px
+
+Orientation: radio/select (landscape/portrait)
+
+City
+
+Region
+
+Vehicle: select from vehicles for same publisher (optional)
+
+Active: checkbox
+
+Mode:
+
+Create: call POST /api/screens
+
+Edit: call PATCH /api/screens/:id
+
+Integrate this from:
+
+Screens list (“Add Screen”)
+
+Screen detail (edit button)
+
+5.3 Screen Detail Page Updates
+
+File: apps/cms-web/src/pages/inventory/ScreenDetail.tsx
+
+You already added a Groups tab. Enhance the overall screen detail with tabs:
+
+Tabs:
+
+Overview
+
+Resolution (width × height)
+
+Orientation
+
+Screen Type
+
+Publisher
+
+City / Region
+
+Vehicle (linked) + link to Vehicle detail
+
+Status (Online/Offline, Active/Inactive)
+
+Last Seen at
+
+“Edit Screen” button → opens ScreenEditorModal
+
+Groups (already implemented)
+
+List group memberships + add/remove
+
+Location History (if already there)
+
+Map, movement, last positions
+
+Diagnostics (optional)
+
+Offline events, missing heartbeats, asset issues (if available)
+
+6️⃣ Integration with Existing Logic
+6.1 Resolution-Based Creative Filtering
+
+Wherever we validate creatives against screens (for targeting or playback):
+
+Use width_px and height_px from the screens table.
+
+Keep the existing resolution mismatch warning logic tied to these fields.
+
+Ensure Diagnostics panel uses the same fields when flagging resolution mismatches.
+
+6.2 Vehicles in Map / Exposure Views
+
+Optional but recommended:
+
+On inventory map tooltips, show Vehicle: {name} if screen.vehicle_id is set.
+
+In exposure reporting for vehicle-based screens, show both Screen Name and Vehicle Name where relevant.
+
+7️⃣ Permissions & Security
+
+Vehicles
+
+Non-internal: can only see and manage vehicles for their publisher.
+
+Internal: can see/manage all vehicles.
+
+Screens
+
+Non-internal: can create/edit screens only for their publisher.
+
+Internal: can create/edit screens for any publisher.
+
+Return 403 on cross-publisher modifications and 404 on cross-publisher lookups (security by obscurity, consistent with Screen Groups).
+
+Add backend tests for:
+
+Attempting to edit another publisher’s vehicle/screen.
+
+Linking screen to vehicle from different publisher → reject.
+
+8️⃣ Tests & Acceptance Criteria
+Backend Tests
+
+Vehicle CRUD:
+
+Create, read, update, deactivate.
+
+Publisher-scoped access control.
+
+Screen CRUD:
+
+Create with resolution and type.
+
+Update resolution, type, orientation.
+
+Link/unlink vehicles with validation on publisher match.
+
+Resolution and diagnostics:
+
+Resolution mismatch warnings use new fields.
+
+Diagnostics endpoint includes resolution mismatches based on width_px/height_px.
+
+Frontend Tests
+
+Vehicles list:
+
+Renders vehicles, filters by publisher, creates and edits vehicles.
+
+Vehicle detail:
+
+Shows screens linked to vehicle.
+
+Screens list:
+
+Renders resolution, type, orientation.
+
+“Add Screen” → creates a screen and refreshes.
+
+Screen editor:
+
+Validates positive resolution values.
+
+Correct orientation options.
+
+Screen detail:
+
+Shows updated resolution and vehicle link.
+
+Functional Acceptance
+
+A publisher user can:
+
+Create a new vehicle.
+
+Create a new screen, set resolution, link it to a vehicle, and see it in inventory/map.
+
+Edit an existing screen’s resolution/orientation and see resolution-based warnings update accordingly in targeting preview and diagnostics.
