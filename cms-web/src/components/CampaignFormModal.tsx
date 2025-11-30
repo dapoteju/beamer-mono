@@ -5,6 +5,17 @@ import {
   type UpdateCampaignPayload,
   type CampaignStatus,
 } from "../api/campaigns";
+import TargetingEditor from "./TargetingEditor";
+
+interface TargetingData {
+  cities?: string[];
+  regions?: string[];
+  screen_groups?: string[];
+  time_window?: {
+    start_time?: string;
+    end_time?: string;
+  };
+}
 
 interface CampaignFormModalProps {
   mode: "edit";
@@ -37,10 +48,11 @@ export function CampaignFormModal({
     totalBudget: initialValues.totalBudget.toString(),
     currency: initialValues.currency,
     status: initialValues.status,
-    targetingJson: initialValues.targetingJson
-      ? JSON.stringify(initialValues.targetingJson, null, 2)
-      : "",
   });
+
+  const [targeting, setTargeting] = useState<TargetingData>(
+    initialValues.targetingJson || {}
+  );
 
   const [errors, setErrors] = useState<Record<string, string>>({});
 
@@ -83,15 +95,11 @@ export function CampaignFormModal({
 
     if (!validate()) return;
 
-    let targetingJson: any = undefined;
-    if (formData.targetingJson.trim()) {
-      try {
-        targetingJson = JSON.parse(formData.targetingJson);
-      } catch (err) {
-        setErrors({ targetingJson: "Invalid JSON format" });
-        return;
-      }
-    }
+    const hasTargeting =
+      (targeting.cities && targeting.cities.length > 0) ||
+      (targeting.regions && targeting.regions.length > 0) ||
+      (targeting.screen_groups && targeting.screen_groups.length > 0) ||
+      (targeting.time_window?.start_time || targeting.time_window?.end_time);
 
     const payload: UpdateCampaignPayload = {
       name: formData.name.trim(),
@@ -101,7 +109,7 @@ export function CampaignFormModal({
       totalBudget: parseFloat(formData.totalBudget),
       currency: formData.currency,
       status: formData.status,
-      targetingJson,
+      targetingJson: hasTargeting ? targeting : undefined,
     };
 
     updateMutation.mutate(payload);
@@ -266,23 +274,8 @@ export function CampaignFormModal({
             </select>
           </div>
 
-          <div>
-            <label className="block text-sm font-medium text-zinc-700 mb-1">
-              Targeting JSON (Optional)
-            </label>
-            <textarea
-              value={formData.targetingJson}
-              onChange={(e) =>
-                setFormData({ ...formData, targetingJson: e.target.value })
-              }
-              rows={4}
-              className={`w-full px-3 py-2 border rounded-md text-sm font-mono focus:outline-none focus:ring-2 focus:ring-blue-500 ${
-                errors.targetingJson ? "border-red-500" : "border-zinc-300"
-              }`}
-            />
-            {errors.targetingJson && (
-              <p className="text-xs text-red-600 mt-1">{errors.targetingJson}</p>
-            )}
+          <div className="border-t border-zinc-200 pt-5">
+            <TargetingEditor value={targeting} onChange={setTargeting} />
           </div>
 
           <div className="flex gap-3 pt-4 border-t border-zinc-200">
