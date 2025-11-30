@@ -2,6 +2,7 @@ import apiClient from "./client";
 
 export interface PublisherProfile {
   id: string;
+  publicCode: string;
   publisherType: "organisation" | "individual";
   organisationId: string | null;
   organisationName: string | null;

@@ -169,6 +169,9 @@ export default function PublisherDetail() {
       <div className="mb-6 flex items-start justify-between">
         <div>
           <div className="flex items-center gap-3 mb-2">
+            <span className="inline-flex items-center px-2.5 py-1 rounded text-sm font-mono font-semibold bg-zinc-100 text-zinc-700">
+              {publisher.publicCode}
+            </span>
             <h1 className="text-2xl font-semibold text-zinc-900">
               {publisher.publisherType === "organisation"
                 ? publisher.organisationName || "Organisation Publisher"
@@ -182,7 +185,6 @@ export default function PublisherDetail() {
               {publisher.publisherType === "organisation" ? "Organisation" : "Individual"}
             </span>
           </div>
-          <p className="text-sm text-zinc-600">Publisher ID: {publisher.id}</p>
         </div>
         {canEdit && (
           <div className="flex gap-2">

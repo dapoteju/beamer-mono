@@ -97,6 +97,9 @@ export default function Publishers() {
           <thead className="bg-zinc-50">
             <tr>
               <th className="px-6 py-3 text-left text-xs font-medium text-zinc-500 uppercase tracking-wider">
+                Code
+              </th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-zinc-500 uppercase tracking-wider">
                 Name
               </th>
               <th className="px-6 py-3 text-left text-xs font-medium text-zinc-500 uppercase tracking-wider">
@@ -107,9 +110,6 @@ export default function Publishers() {
               </th>
               <th className="px-6 py-3 text-left text-xs font-medium text-zinc-500 uppercase tracking-wider">
                 Contact
-              </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-zinc-500 uppercase tracking-wider">
-                Organisation
               </th>
               <th className="px-6 py-3 text-left text-xs font-medium text-zinc-500 uppercase tracking-wider">
                 Created At
@@ -130,6 +130,11 @@ export default function Publishers() {
                   onClick={() => navigate(`/publishers/${pub.id}`)}
                   className="hover:bg-zinc-50 cursor-pointer transition-colors"
                 >
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    <span className="inline-flex items-center px-2 py-1 rounded text-xs font-mono font-medium bg-zinc-100 text-zinc-700">
+                      {pub.publicCode}
+                    </span>
+                  </td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div className="text-sm font-medium text-zinc-900">
                       {pub.publisherType === "organisation"
@@ -153,9 +158,6 @@ export default function Publishers() {
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-zinc-600">
                     {pub.phoneNumber || pub.email || "—"}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-zinc-600">
-                    {pub.organisationName || "—"}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-zinc-600">
                     {formatDate(pub.createdAt)}

@@ -56,6 +56,15 @@ The project is organized as a monorepo with distinct applications and libraries:
   - PublisherVehiclesTab component for CRUD operations within publisher context
   - Screens list shows Vehicle column with filtering and navigation to Publisher vehicles tab
   - Navigation shows "Inventory" label (renamed from "Screens & Players"), no standalone Vehicles link
+- **Human-Readable Public Codes**: All major entities have sequential, human-readable public codes for easy identification:
+  - Publishers: PUB-00001, PUB-00002, etc.
+  - Advertisers: ADV-00001, ADV-00002, etc.
+  - Publisher Organizations: ORG-PUB-00001, etc.
+  - Internal Organizations: ORG-INT-00001, etc.
+  - Codes are auto-generated sequentially on entity creation using MAX-based SQL queries to ensure correct ordering
+  - Frontend displays public codes in list views and detail pages with monospace badge styling
+  - Service helper at `backend/src/services/publicCodeService.ts` handles code generation
+  - Migration at `backend/drizzle/0006_add_public_codes.sql` backfills existing records
 - **Enhanced Screen Specifications**: Screens now include width_px, height_px, screen_type, orientation, and is_active fields. ScreenFormModal includes resolution and orientation editing. Screen types: vehicle, indoor, billboard, mall, other. Orientation: landscape, portrait.
 - **Publisher-scoped Screen Groups**: Screen groups are strictly scoped to publisher organizations (not advertisers). Groups can only contain screens owned by the same publisher. Key features:
   - Publisher validation on group creation (rejects advertiser orgs)
