@@ -41,6 +41,7 @@ The project is organized as a monorepo with distinct applications and libraries:
 - **Playlist Creative Type Support**: Playlist API returns `type` field (image/video) based on MIME type.
 - **Player Configuration**: Ops-friendly device provisioning via `beamer.config.json` file.
 - **Player Registration Conflict Detection**: Explicit detection and error handling for screens already linked to another player.
+- **Unified Playlist Source of Truth**: Single `playlist.json` file shared between player-core and player-electron. The `paths.ts` helper resolves the data directory based on where `beamer.config.json` lives, ensuring all components (player.json, playlist.json, cache/) use the same location. Fallback placeholder creative is only used when no real playlist is available from backend or cache.
 - **Regions**: Country-level regulatory jurisdictions for creative approval tracking (e.g., Nigeria, Kenya).
 - **Vehicles Management**: Full inventory management for vehicles carrying mobile screens, including UUIDs, publisher-scoped access, soft-delete, and integration into Publisher Detail pages.
 - **Human-Readable Public Codes**: Auto-generated sequential public codes for publishers, advertisers, and organizations for easy identification.
