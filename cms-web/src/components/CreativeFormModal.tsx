@@ -248,6 +248,14 @@ export function CreativeFormModal({
       });
       
       await refetchApprovals();
+      
+      // Auto-sync: When a region approval is set to "approved", the backend also
+      // updates the creative's internal QA status to "approved" (unless it was "rejected").
+      // Reflect this in the UI by updating formData.status.
+      if (edit.status === "approved" && formData.status === "pending_review") {
+        setFormData((prev) => ({ ...prev, status: "approved" }));
+      }
+      
       setApprovalSuccess(regionCode);
       
       setTimeout(() => {
@@ -428,6 +436,11 @@ export function CreativeFormModal({
                 <p className="mt-1 text-xs text-zinc-500">
                   For internal tracking only. Playback is controlled by Region Approvals below.
                 </p>
+                {formData.status === "pending_review" && approvals.some((a) => a.status === "approved") && (
+                  <p className="mt-2 text-xs text-green-600 bg-green-50 border border-green-200 px-2 py-1.5 rounded">
+                    This creative is approved for playback in at least one region.
+                  </p>
+                )}
               </div>
 
               {isInternalUser && approvals.length > 0 && (

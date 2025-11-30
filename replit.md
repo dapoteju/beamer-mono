@@ -33,7 +33,7 @@ The project is organized as a monorepo with distinct applications and libraries:
 - **Campaigns & Flights Management**: Full CRUD for campaigns and nested flights, with status management, targeting capabilities, and a dedicated Flight Detail page.
 - **Flight Creatives Assignment**: Linking creatives to flights with configurable weights for playlist building, including inline editing and bulk operations.
 - **Creative "Used In" Tracking**: Creatives display assigned flights.
-- **Creatives Management**: Full CRUD for media assets attached to campaigns, supporting file uploads (image/video) via Multer. Includes regional approval workflow with auto-generated approval codes for pre-approval regions. Playback is controlled solely by regional approvals.
+- **Creatives Management**: Full CRUD for media assets attached to campaigns, supporting file uploads (image/video) via Multer. Includes regional approval workflow with auto-generated approval codes for pre-approval regions. Playback is controlled solely by regional approvals. Internal QA status auto-syncs: when any region approval is set to "approved", the creative's internal QA status is automatically updated to "approved" (unless explicitly rejected).
 - **Campaign Reporting**: API and frontend for campaign summaries, including daily/screen-level impressions, exposure reporting (geographic visualization), compliance reporting (scheduled vs. active screens), and diagnostics (offline screens, unused creatives).
 - **Visual Campaign Timeline**: Gantt-style timeline for flights within campaign overviews.
 - **Enhanced Targeting Preview**: Real-time eligible screen count with breakdown by region, resolution, and screen group.
