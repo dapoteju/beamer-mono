@@ -121,10 +121,13 @@ export async function listScreensWithPlayerInfo(filters?: {
       // Vehicle data (joined)
       vehicle: {
         id: vehicles.id,
-        licencePlate: vehicles.licencePlate,
-        make: vehicles.make,
-        model: vehicles.model,
-        colour: vehicles.colour,
+        name: vehicles.name,
+        licensePlate: vehicles.licensePlate,
+        makeModel: vehicles.makeModel,
+        externalId: vehicles.externalId,
+        city: vehicles.city,
+        region: vehicles.region,
+        isActive: vehicles.isActive,
       },
     })
     .from(screens)
@@ -210,13 +213,13 @@ export async function getScreenDetail(screenId: string) {
       // Vehicle data (joined)
       vehicle: {
         id: vehicles.id,
-        identifier: vehicles.identifier,
-        licencePlate: vehicles.licencePlate,
-        make: vehicles.make,
-        model: vehicles.model,
-        year: vehicles.year,
-        colour: vehicles.colour,
-        notes: vehicles.notes,
+        name: vehicles.name,
+        externalId: vehicles.externalId,
+        licensePlate: vehicles.licensePlate,
+        makeModel: vehicles.makeModel,
+        city: vehicles.city,
+        region: vehicles.region,
+        isActive: vehicles.isActive,
       },
     })
     .from(screens)
@@ -572,22 +575,26 @@ export async function getRegionsList(): Promise<Array<{ id: string; code: string
 
 export async function getVehiclesList(publisherOrgId?: string): Promise<Array<{ 
   id: string; 
-  identifier: string | null;
-  licencePlate: string | null;
-  make: string | null;
-  model: string | null;
-  colour: string | null;
+  name: string;
+  externalId: string | null;
+  licensePlate: string | null;
+  makeModel: string | null;
+  city: string | null;
+  region: string | null;
+  isActive: boolean;
   publisherOrgId: string;
   publisherOrgName: string | null;
 }>> {
   const query = db
     .select({
       id: vehicles.id,
-      identifier: vehicles.identifier,
-      licencePlate: vehicles.licencePlate,
-      make: vehicles.make,
-      model: vehicles.model,
-      colour: vehicles.colour,
+      name: vehicles.name,
+      externalId: vehicles.externalId,
+      licensePlate: vehicles.licensePlate,
+      makeModel: vehicles.makeModel,
+      city: vehicles.city,
+      region: vehicles.region,
+      isActive: vehicles.isActive,
       publisherOrgId: vehicles.publisherOrgId,
       publisherOrgName: organisations.name,
     })

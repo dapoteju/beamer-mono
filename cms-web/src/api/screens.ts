@@ -2,11 +2,13 @@ import apiClient from "./client";
 
 export interface Vehicle {
   id: string;
-  licencePlate?: string | null;
-  make?: string | null;
-  model?: string | null;
-  colour?: string | null;
-  identifier?: string | null;
+  name?: string;
+  licensePlate?: string | null;
+  makeModel?: string | null;
+  externalId?: string | null;
+  city?: string | null;
+  region?: string | null;
+  isActive?: boolean;
   publisherOrgId?: string;
   publisherOrgName?: string | null;
 }
@@ -199,11 +201,13 @@ export interface Player {
 
 export interface VehicleOption {
   id: string;
-  identifier: string | null;
-  licencePlate: string | null;
-  make: string | null;
-  model: string | null;
-  colour: string | null;
+  name: string;
+  externalId: string | null;
+  licensePlate: string | null;
+  makeModel: string | null;
+  city: string | null;
+  region: string | null;
+  isActive: boolean;
   publisherOrgId: string;
   publisherOrgName: string | null;
 }
@@ -238,6 +242,11 @@ export interface CreateScreenPayload {
   publisherId?: string; // Phase 3A
   status?: 'active' | 'inactive' | 'maintenance';
   playerId?: string;
+  // Phase 4: Resolution and orientation
+  widthPx?: number;
+  heightPx?: number;
+  screenType?: 'vehicle' | 'indoor' | 'billboard' | 'mall' | 'other';
+  orientation?: 'landscape' | 'portrait';
   // Phase 2: Extended metadata (optional)
   screenClassification?: "vehicle" | "billboard" | "indoor" | "other";
   vehicleId?: string | null;
@@ -260,6 +269,12 @@ export interface UpdateScreenPayload {
   publisherId?: string | null; // Phase 3A
   status?: 'active' | 'inactive' | 'maintenance';
   playerId?: string | null;
+  isActive?: boolean;
+  // Phase 4: Resolution and orientation
+  widthPx?: number;
+  heightPx?: number;
+  screenType?: 'vehicle' | 'indoor' | 'billboard' | 'mall' | 'other';
+  orientation?: 'landscape' | 'portrait';
   // Phase 2: Extended metadata (optional)
   screenClassification?: "vehicle" | "billboard" | "indoor" | "other";
   vehicleId?: string | null;

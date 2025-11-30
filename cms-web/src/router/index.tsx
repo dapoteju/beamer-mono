@@ -12,6 +12,8 @@ import Screens from "../pages/Screens";
 import ScreenDetail from "../pages/ScreenDetail";
 import GroupsList from "../pages/inventory/GroupsList";
 import GroupDetail from "../pages/inventory/GroupDetail";
+import VehiclesList from "../pages/inventory/VehiclesList";
+import VehicleDetail from "../pages/inventory/VehicleDetail";
 import Organisations from "../pages/Organisations";
 import OrganisationDetail from "../pages/OrganisationDetail";
 import Publishers from "../pages/Publishers";
@@ -137,6 +139,22 @@ export const router = createBrowserRouter([
         element: (
           <OrgTypeGuard allowedOrgTypes={["beamer_internal", "publisher"]}>
             <GroupDetail />
+          </OrgTypeGuard>
+        ),
+      },
+      {
+        path: "inventory/vehicles",
+        element: (
+          <OrgTypeGuard allowedOrgTypes={["beamer_internal", "publisher"]}>
+            <VehiclesList />
+          </OrgTypeGuard>
+        ),
+      },
+      {
+        path: "inventory/vehicles/:id",
+        element: (
+          <OrgTypeGuard allowedOrgTypes={["beamer_internal", "publisher"]}>
+            <VehicleDetail />
           </OrgTypeGuard>
         ),
       },

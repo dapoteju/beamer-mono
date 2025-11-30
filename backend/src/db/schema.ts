@@ -74,20 +74,20 @@ export const publisherProfiles = pgTable("publisher_profiles", {
     .notNull(),
 });
 
-// --- Vehicles (Phase 1: Vehicle metadata) ---
+// --- Vehicles (Phase 1: Vehicle metadata, Phase 4: Enhanced inventory management) ---
 
 export const vehicles = pgTable("vehicles", {
-  id: text("id").primaryKey(),
+  id: uuid("id").primaryKey().defaultRandom(),
   publisherOrgId: uuid("publisher_org_id")
     .notNull()
     .references(() => organisations.id),
-  identifier: text("identifier"),
-  licencePlate: text("licence_plate"),
-  make: text("make"),
-  model: text("model"),
-  year: text("year"),
-  colour: text("colour"),
-  notes: text("notes"),
+  name: text("name").notNull(),
+  externalId: text("external_id"),
+  licensePlate: text("license_plate"),
+  makeModel: text("make_model"),
+  city: text("city"),
+  region: text("region"),
+  isActive: boolean("is_active").notNull().default(true),
   createdAt: timestamp("created_at", { withTimezone: true })
     .defaultNow()
     .notNull(),
@@ -112,9 +112,17 @@ export const screens = pgTable("screens", {
   // Phase 3B: Name is now optional (code is the primary identifier)
   name: varchar("name", { length: 255 }),
   
-  screenType: varchar("screen_type", { length: 50 }).notNull(), // taxi_top, billboard, etc.
+  // Phase 4: Enhanced screen properties
+  widthPx: integer("width_px").notNull().default(342),
+  heightPx: integer("height_px").notNull().default(130),
+  screenType: varchar("screen_type", { length: 50 }).notNull().default("vehicle"), // vehicle, indoor, billboard, mall, other
+  orientation: varchar("orientation", { length: 20 }).notNull().default("landscape"), // landscape, portrait
+  isActive: boolean("is_active").notNull().default(true),
+  
+  // Legacy resolution fields (kept for backwards compatibility)
   resolutionWidth: integer("resolution_width").notNull(),
   resolutionHeight: integer("resolution_height").notNull(),
+  
   city: varchar("city", { length: 100 }).notNull(),
   regionCode: varchar("region_code", { length: 10 }).notNull(), // e.g. NG, KE
   lat: varchar("lat", { length: 50 }).notNull(),
@@ -129,7 +137,7 @@ export const screens = pgTable("screens", {
   
   // Phase 1: Extended metadata (all nullable, non-breaking)
   screenClassification: text("screen_classification").default("vehicle"), // vehicle, billboard, indoor
-  vehicleId: text("vehicle_id").references(() => vehicles.id),
+  vehicleId: uuid("vehicle_id").references(() => vehicles.id),
   
   // Billboard/static OOH metadata
   structureType: text("structure_type"),

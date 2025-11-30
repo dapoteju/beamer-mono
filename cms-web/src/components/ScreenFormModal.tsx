@@ -22,6 +22,11 @@ interface ScreenFormModalProps {
     publisherId?: string | null;
     status: string;
     playerId: string | null;
+    widthPx?: number | null;
+    heightPx?: number | null;
+    screenType?: "vehicle" | "indoor" | "billboard" | "mall" | "other";
+    orientation?: "landscape" | "portrait";
+    isActive?: boolean;
     screenClassification?: "vehicle" | "billboard" | "indoor" | "other";
     vehicleId?: string | null;
     structureType?: string | null;
@@ -49,6 +54,11 @@ export function ScreenFormModal({ mode, screenId, initialValues, onClose, onSucc
     publisherId: initialValues?.publisherId || "",
     status: initialValues?.status || "active",
     playerId: initialValues?.playerId || "",
+    widthPx: initialValues?.widthPx?.toString() || "",
+    heightPx: initialValues?.heightPx?.toString() || "",
+    screenType: (initialValues?.screenType || "vehicle") as "vehicle" | "indoor" | "billboard" | "mall" | "other",
+    orientation: (initialValues?.orientation || "landscape") as "landscape" | "portrait",
+    isActive: initialValues?.isActive ?? true,
     screenClassification: (initialValues?.screenClassification || "vehicle") as "vehicle" | "billboard" | "indoor" | "other",
     vehicleId: initialValues?.vehicleId || "",
     structureType: initialValues?.structureType || "",
@@ -146,6 +156,10 @@ export function ScreenFormModal({ mode, screenId, initialValues, onClose, onSucc
         publisherId: formData.publisherId || undefined,
         status: formData.status as any,
         playerId: formData.playerId || undefined,
+        widthPx: formData.widthPx ? parseInt(formData.widthPx, 10) : undefined,
+        heightPx: formData.heightPx ? parseInt(formData.heightPx, 10) : undefined,
+        screenType: formData.screenType,
+        orientation: formData.orientation,
         screenClassification: formData.screenClassification,
         vehicleId: formData.vehicleId || undefined,
         structureType: formData.structureType || undefined,
@@ -163,6 +177,11 @@ export function ScreenFormModal({ mode, screenId, initialValues, onClose, onSucc
         city: formData.city,
         regionCode: formData.regionCode,
         status: formData.status as any,
+        widthPx: formData.widthPx ? parseInt(formData.widthPx, 10) : undefined,
+        heightPx: formData.heightPx ? parseInt(formData.heightPx, 10) : undefined,
+        screenType: formData.screenType,
+        orientation: formData.orientation,
+        isActive: formData.isActive,
         screenClassification: formData.screenClassification,
         vehicleId: formData.vehicleId || undefined,
         structureType: formData.structureType || undefined,
@@ -328,9 +347,90 @@ export function ScreenFormModal({ mode, screenId, initialValues, onClose, onSucc
             {errors.publisherId && <p className="text-red-500 text-sm mt-1">{errors.publisherId}</p>}
           </div>
 
+          {/* Resolution Section */}
+          <div className="p-4 bg-zinc-50 border border-zinc-200 rounded-md space-y-3">
+            <h3 className="text-sm font-semibold text-zinc-900">Screen Specifications</h3>
+            
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-zinc-700 mb-1">
+                  Width (px)
+                </label>
+                <input
+                  type="number"
+                  value={formData.widthPx}
+                  onChange={(e) => setFormData({ ...formData, widthPx: e.target.value })}
+                  className="w-full px-3 py-2 border border-zinc-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+                  placeholder="e.g., 1920"
+                  min="1"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-zinc-700 mb-1">
+                  Height (px)
+                </label>
+                <input
+                  type="number"
+                  value={formData.heightPx}
+                  onChange={(e) => setFormData({ ...formData, heightPx: e.target.value })}
+                  className="w-full px-3 py-2 border border-zinc-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+                  placeholder="e.g., 1080"
+                  min="1"
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-zinc-700 mb-1">
+                  Orientation
+                </label>
+                <select
+                  value={formData.orientation}
+                  onChange={(e) => setFormData({ ...formData, orientation: e.target.value as "landscape" | "portrait" })}
+                  className="w-full px-3 py-2 border border-zinc-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+                >
+                  <option value="landscape">Landscape</option>
+                  <option value="portrait">Portrait</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-zinc-700 mb-1">
+                  Screen Type
+                </label>
+                <select
+                  value={formData.screenType}
+                  onChange={(e) => setFormData({ ...formData, screenType: e.target.value as any })}
+                  className="w-full px-3 py-2 border border-zinc-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+                >
+                  <option value="vehicle">Vehicle</option>
+                  <option value="indoor">Indoor</option>
+                  <option value="billboard">Billboard</option>
+                  <option value="mall">Mall</option>
+                  <option value="other">Other</option>
+                </select>
+              </div>
+            </div>
+
+            {mode === "edit" && (
+              <div className="flex items-center gap-2 pt-2">
+                <input
+                  type="checkbox"
+                  id="screenIsActive"
+                  checked={formData.isActive}
+                  onChange={(e) => setFormData({ ...formData, isActive: e.target.checked })}
+                  className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-zinc-300 rounded"
+                />
+                <label htmlFor="screenIsActive" className="text-sm font-medium text-zinc-700">
+                  Active
+                </label>
+              </div>
+            )}
+          </div>
+
           {/* Screen Classification */}
           <div>
-            <label className="block text-sm font-medium text-zinc-700 mb-1">Screen Type</label>
+            <label className="block text-sm font-medium text-zinc-700 mb-1">Screen Classification</label>
             <select
               value={formData.screenClassification}
               onChange={(e) => setFormData({ ...formData, screenClassification: e.target.value as any })}
@@ -341,6 +441,7 @@ export function ScreenFormModal({ mode, screenId, initialValues, onClose, onSucc
               <option value="indoor">Indoor</option>
               <option value="other">Other</option>
             </select>
+            <p className="text-xs text-zinc-500 mt-1">Classification for extended metadata</p>
           </div>
 
           {/* Vehicle Section (only show if classification is vehicle) */}
@@ -357,9 +458,9 @@ export function ScreenFormModal({ mode, screenId, initialValues, onClose, onSucc
                   <option value="">No vehicle assigned</option>
                   {vehicles.map((vehicle) => {
                     const label = [
-                      vehicle.licencePlate,
-                      vehicle.make,
-                      vehicle.model,
+                      vehicle.name,
+                      vehicle.licensePlate,
+                      vehicle.makeModel,
                       vehicle.publisherOrgName && `[${vehicle.publisherOrgName}]`,
                     ].filter(Boolean).join(" • ");
                     return (
