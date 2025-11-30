@@ -1,0 +1,243 @@
+You are working on a monorepo called beamer-mono-main.
+There are two issues to fix:
+
+The player treats video creatives as images.
+
+We want a simpler approval model (Option B): only region approvals should control playback. creatives.status must NOT be a gate for whether a creative plays.
+
+Please make the following changes.
+
+1. Fix: videos being treated as images
+Goal
+
+Ensure the playlist API returns a type field for each creative ("image" or "video"), derived from the DB’s mime_type, so the player can render <video> for videos and <img> for images.
+
+Steps
+
+Find the playlist code in the backend
+
+In the backend (likely backend/src/modules/player/player.service.ts or similar), find the function that builds the playlist for a screen, often named something like:
+
+getWeightedPlaylistForScreen(...)
+
+
+Extend PlaylistItem with type
+
+Inside that file, find the PlaylistItem type and update it:
+
+type PlaylistItem = {
+  creative_id: string;
+  campaign_id: string;
+  flight_id: string;
+  file_url: string;
+  duration_seconds: number;
+  type: "image" | "video"; // ✅ add this
+};
+
+
+Select mime_type in the SQL query
+
+In the SQL query that fetches creatives for the playlist, add c.mime_type to the SELECT:
+
+SELECT DISTINCT
+  c.id AS creative_id,
+  c.campaign_id,
+  c.file_url,
+  c.duration_seconds,
+  c.mime_type,         -- ✅ add this
+  fc.flight_id,
+  fc.weight,
+  ca.approval_code
+...
+
+
+Map mime_type → type in the TypeScript loop
+
+In the TS code that loops through creativesResult.rows and builds weightedPlaylist, add a small helper and use it:
+
+function mapMimeToType(mimeType: string | null): "image" | "video" {
+  if (!mimeType) return "image";
+  return mimeType.startsWith("video/") ? "video" : "image";
+}
+
+for (const row of creativesResult.rows) {
+  const {
+    creative_id,
+    campaign_id,
+    flight_id,
+    file_url,
+    duration_seconds,
+    weight,
+    mime_type,
+  } = row as any;
+
+  const type = mapMimeToType(mime_type);
+
+  for (let i = 0; i < (weight ?? 1); i++) {
+    weightedPlaylist.push({
+      creative_id,
+      campaign_id,
+      flight_id,
+      file_url,
+      duration_seconds,
+      type, // ✅ now included
+    });
+  }
+}
+
+
+(Optional but good) Add a client-side fallback
+
+In the player-core (likely player-core/src/playlistService.ts or similar), normalize the playlist so any item missing type gets inferred from the file extension:
+
+import { Playlist } from "./types";
+
+function inferTypeFromUrl(url: string): "image" | "video" {
+  const lower = (url || "").toLowerCase();
+  if (lower.endsWith(".mp4") || lower.endsWith(".mov") || lower.endsWith(".webm")) {
+    return "video";
+  }
+  return "image";
+}
+
+function normalizePlaylistTypes(playlist: Playlist): Playlist {
+  return {
+    ...playlist,
+    playlist: playlist.playlist.map((creative: any) => {
+      if (!creative.type) {
+        return {
+          ...creative,
+          type: inferTypeFromUrl(creative.file_url),
+        };
+      }
+      return creative;
+    }),
+  };
+}
+
+// Wherever we receive the playlist from the API:
+// const playlist = await fetchPlaylist(...);
+// change to:
+// const playlistWithTypes = normalizePlaylistTypes(playlist);
+// then pass playlistWithTypes to the rest of the pipeline.
+
+
+This is a safety net, but the backend fix is the primary source of truth.
+
+2. Simplify approvals: Option B (only region approvals control playback)
+Goal
+
+Playback must be gated ONLY by creative_approvals per region.
+
+creatives.status should NOT be used by the playlist logic at all.
+
+We still keep the status column in the DB (for possible future use), but it should not affect whether a creative plays.
+
+Steps
+
+Remove any c.status filter from the playlist query
+
+In the same playlist function (getWeightedPlaylistForScreen), check the SQL WHERE clause. It should:
+
+Filter creative_approvals.status = 'approved'
+
+Optionally require approval_code if the region requires pre-approval
+
+NOT filter by c.status
+
+Ensure it looks conceptually like this:
+
+WHERE fc.flight_id = ANY($1::uuid[])
+  AND r.code = $2
+  AND ca.status = 'approved'
+  -- ❌ DO NOT include "AND c.status = 'approved'"
+  ${requiresPreApproval ? "AND ca.approval_code IS NOT NULL" : ""}
+
+
+If any check like AND c.status = 'approved' exists, remove it.
+
+Confirm no other backend logic gates playback on creatives.status
+
+Search the backend for usages of creatives.status in the context of:
+
+playlist generation
+
+“active creatives” or similar
+
+Ensure it is NOT used to decide whether something goes into a playlist.
+It is allowed for:
+
+internal dashboards
+
+reporting
+
+future QA workflows
+
+but not for blocking playback.
+
+(Optional) Default creatives.status to 'approved'
+
+In the DB migration or schema definition (where the creatives table is defined), set a default to prevent weird states, if not already:
+
+ALTER TABLE public.creatives
+ALTER COLUMN status SET DEFAULT 'approved';
+
+
+Or do the equivalent in your schema definition file if you use a migration tool.
+This is optional but helps keep data consistent while the field is not in the critical path.
+
+3. UI / CMS consistency (lightweight)
+
+We want the UI to reflect this simpler logic so users aren’t confused.
+
+Creative list/detail pages
+
+If there is a creative-level “Status” that shows creatives.status:
+
+Either hide it for now, or clearly label it as something like “Internal QA (not used for playback yet)”.
+
+The main thing users should care about for “can this run?” is the region approvals.
+
+Region approvals UI
+
+Ensure the region approvals table / section makes it obvious that:
+
+If a region row is "Approved", the creative can play in that region.
+
+If it’s Pending/Rejected, it will not play in that region.
+
+Adjust labels/headers accordingly, e.g.:
+
+“Playback Status per Region”
+
+“Region Approval (controls live status)”
+
+No need to rebuild the entire UI; just tweak labels / visibility so it matches the new behaviour.
+
+4. After changes — quick sanity checks
+
+Build and run the backend.
+
+Verify the playlist API response for a screen includes:
+
+{
+  "creative_id": "...",
+  "file_url": "...mp4",
+  "duration_seconds": 15,
+  "type": "video"
+}
+
+
+Confirm that when:
+
+creative_approvals.status = 'approved' for that creative + region → it appears in the playlist.
+
+creative_approvals.status != 'approved' → it does NOT appear, regardless of creatives.status.
+
+Run the player and ensure:
+
+MP4 creatives render as videos (using <video>).
+
+Images still render normally.
+
+Please implement all of the above changes, clean up any TypeScript errors that arise from the new type field, and ensure tests/build still pass.
