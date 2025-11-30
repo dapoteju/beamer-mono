@@ -238,6 +238,21 @@ export async function setCreativeApproval(params: {
       rejectedReason ?? null,
     ]
   );
+
+  // Auto-sync: When a region approval is set to 'approved', also update the creative's
+  // internal QA status to 'approved' (unless it was explicitly rejected).
+  // This keeps the QA status in sync with region approvals for better UX.
+  if (status === 'approved') {
+    await pool.query(
+      `
+      UPDATE creatives
+      SET status = 'approved'
+      WHERE id = $1
+        AND status != 'rejected'
+      `,
+      [creativeId]
+    );
+  }
 }
 
 export interface CreativeApprovalResponse {
