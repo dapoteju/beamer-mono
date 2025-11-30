@@ -3,9 +3,56 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   fetchCreatives,
   deleteCreative,
+  fetchFlightsForCreative,
   type Creative,
 } from "../../api/creatives";
 import { CreativeFormModal } from "../../components/CreativeFormModal";
+
+function UsedInCell({ creativeId }: { creativeId: string }) {
+  const [showFlights, setShowFlights] = useState(false);
+  
+  const { data: flights = [], isLoading } = useQuery({
+    queryKey: ["creativeFlights", creativeId],
+    queryFn: () => fetchFlightsForCreative(creativeId),
+    enabled: showFlights,
+  });
+
+  if (!showFlights) {
+    return (
+      <button
+        onClick={() => setShowFlights(true)}
+        className="text-xs text-blue-600 hover:underline"
+      >
+        Check flights
+      </button>
+    );
+  }
+
+  if (isLoading) {
+    return <span className="text-xs text-zinc-500">Loading...</span>;
+  }
+
+  if (flights.length === 0) {
+    return <span className="text-xs text-zinc-400">Not used</span>;
+  }
+
+  return (
+    <div className="flex flex-wrap gap-1">
+      {flights.slice(0, 3).map((flight) => (
+        <span
+          key={flight.id}
+          className="inline-block px-1.5 py-0.5 text-xs bg-blue-50 text-blue-700 rounded"
+          title={`${flight.name} (${flight.status})`}
+        >
+          {flight.name.length > 12 ? flight.name.slice(0, 12) + "..." : flight.name}
+        </span>
+      ))}
+      {flights.length > 3 && (
+        <span className="text-xs text-zinc-500">+{flights.length - 3} more</span>
+      )}
+    </div>
+  );
+}
 
 interface CampaignCreativesTabProps {
   campaignId: string;
@@ -185,6 +232,9 @@ export default function CampaignCreativesTab({ campaignId }: CampaignCreativesTa
                   Regions
                 </th>
                 <th className="text-left px-4 py-3 text-xs font-medium text-zinc-700 uppercase">
+                  Used In
+                </th>
+                <th className="text-left px-4 py-3 text-xs font-medium text-zinc-700 uppercase">
                   Actions
                 </th>
               </tr>
@@ -219,6 +269,9 @@ export default function CampaignCreativesTab({ campaignId }: CampaignCreativesTa
                     {creative.regions_required && creative.regions_required.length > 0
                       ? creative.regions_required.join(", ")
                       : "-"}
+                  </td>
+                  <td className="px-4 py-3">
+                    <UsedInCell creativeId={creative.id} />
                   </td>
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-2">

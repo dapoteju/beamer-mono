@@ -153,3 +153,45 @@ export async function getCampaignComplianceReport(
   );
   return response.data.data;
 }
+
+export interface CampaignDiagnosticsReport {
+  screens_offline: Array<{
+    screen_id: string;
+    name: string | null;
+    last_seen_at: string | null;
+    publisher_name: string | null;
+  }>;
+  screens_targeted_but_no_plays: Array<{
+    screen_id: string;
+    name: string | null;
+    flight_id: string;
+    flight_name: string;
+  }>;
+  creatives_with_no_plays: Array<{
+    creative_id: string;
+    name: string;
+    flight_id: string;
+    flight_name: string;
+  }>;
+  missing_approvals: Array<{
+    creative_id: string;
+    name: string;
+    region: string;
+    required: boolean;
+  }>;
+  resolution_mismatches: Array<{
+    screen_id: string;
+    screen_resolution: string;
+    creative_id: string;
+    creative_resolution: string;
+  }>;
+}
+
+export async function getCampaignDiagnosticsReport(
+  campaignId: string
+): Promise<CampaignDiagnosticsReport> {
+  const response = await apiClient.get(
+    `/reports/campaigns/${campaignId}/diagnostics`
+  );
+  return response.data.data;
+}

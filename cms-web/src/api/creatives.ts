@@ -135,3 +135,18 @@ export async function fetchPendingApprovals(status?: string): Promise<PendingApp
   const response = await apiClient.get(`/creative-approvals${params}`);
   return response.data.data;
 }
+
+export interface FlightForCreative {
+  id: string;
+  name: string;
+  status: string;
+  startsAt: string;
+  endsAt: string;
+  campaignId: string;
+  campaignName: string;
+}
+
+export async function fetchFlightsForCreative(creativeId: string): Promise<FlightForCreative[]> {
+  const response = await apiClient.get(`/creatives/${creativeId}/flights`);
+  return response.data.data.items;
+}

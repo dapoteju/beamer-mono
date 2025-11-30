@@ -765,6 +765,26 @@ export interface TargetingPreviewWarning {
   count?: number;
 }
 
+export interface GroupBreakdown {
+  groupId: string;
+  groupName: string;
+  count: number;
+  onlineCount: number;
+  offlineCount: number;
+}
+
+export interface RegionBreakdown {
+  regionCode: string;
+  regionName: string;
+  count: number;
+}
+
+export interface ResolutionBreakdown {
+  width: number;
+  height: number;
+  count: number;
+}
+
 export interface TargetingPreview {
   eligible_screen_count: number;
   totalScreens: number;
@@ -774,6 +794,12 @@ export interface TargetingPreview {
   warnings: TargetingPreviewWarning[];
   regions: Record<string, number>;
   resolutions: Record<string, number>;
+  breakdown: {
+    by_region: RegionBreakdown[];
+    by_group: GroupBreakdown[];
+    by_resolution: ResolutionBreakdown[];
+    offline_count: number;
+  };
 }
 
 export async function getTargetingPreview(
@@ -789,6 +815,12 @@ export async function getTargetingPreview(
       warnings: [],
       regions: {},
       resolutions: {},
+      breakdown: {
+        by_region: [],
+        by_group: [],
+        by_resolution: [],
+        offline_count: 0,
+      },
     };
   }
 
@@ -798,6 +830,7 @@ export async function getTargetingPreview(
     .select({
       screenId: screens.id,
       groupId: screenGroupMemberships.groupId,
+      groupName: screenGroups.name,
       regionCode: screens.regionCode,
       resolutionWidth: screens.resolutionWidth,
       resolutionHeight: screens.resolutionHeight,
@@ -850,6 +883,21 @@ export async function getTargetingPreview(
   const regions: Record<string, number> = {};
   const resolutions: Record<string, number> = {};
   const offlineScreenIds: string[] = [];
+  const groupCounts: Record<string, { name: string; total: number; online: number; offline: number }> = {};
+
+  for (const m of members) {
+    if (!groupCounts[m.groupId]) {
+      groupCounts[m.groupId] = { name: m.groupName, total: 0, online: 0, offline: 0 };
+    }
+    groupCounts[m.groupId].total++;
+    
+    const lastHb = m.lastHeartbeat ? new Date(m.lastHeartbeat) : null;
+    if (lastHb && lastHb > twoMinutesAgo) {
+      groupCounts[m.groupId].online++;
+    } else {
+      groupCounts[m.groupId].offline++;
+    }
+  }
 
   for (const m of uniqueMembers) {
     const lastHb = m.lastHeartbeat ? new Date(m.lastHeartbeat) : null;
@@ -879,9 +927,6 @@ export async function getTargetingPreview(
   }
 
   if (offlineCount > 0) {
-    const offlinePercent = uniqueMembers.length > 0 
-      ? Math.round((offlineCount / uniqueMembers.length) * 100) 
-      : 0;
     warnings.push({
       type: "offline",
       message: `${offlineCount} screen${offlineCount > 1 ? 's are' : ' is'} currently offline.`,
@@ -905,6 +950,25 @@ export async function getTargetingPreview(
     });
   }
 
+  const by_region: RegionBreakdown[] = Object.entries(regions).map(([code, count]) => ({
+    regionCode: code,
+    regionName: code,
+    count,
+  }));
+
+  const by_group: GroupBreakdown[] = Object.entries(groupCounts).map(([groupId, stats]) => ({
+    groupId,
+    groupName: stats.name,
+    count: stats.total,
+    onlineCount: stats.online,
+    offlineCount: stats.offline,
+  }));
+
+  const by_resolution: ResolutionBreakdown[] = Object.entries(resolutions).map(([res, count]) => {
+    const [width, height] = res.split('x').map(Number);
+    return { width, height, count };
+  });
+
   return {
     eligible_screen_count: uniqueMembers.length,
     totalScreens: uniqueMembers.length,
@@ -914,5 +978,11 @@ export async function getTargetingPreview(
     warnings,
     regions,
     resolutions,
+    breakdown: {
+      by_region,
+      by_group,
+      by_resolution,
+      offline_count: offlineCount,
+    },
   };
 }

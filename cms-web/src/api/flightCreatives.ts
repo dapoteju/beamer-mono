@@ -63,3 +63,13 @@ export async function addCreativeToFlight(
   });
   return response.data.data[0];
 }
+
+export async function removeFlightCreatives(
+  flightId: string,
+  creativeIds: string[]
+): Promise<FlightCreative[]> {
+  const response = await apiClient.delete(`/flights/${flightId}/creatives`, {
+    data: { creative_ids: creativeIds },
+  });
+  return response.data.data;
+}

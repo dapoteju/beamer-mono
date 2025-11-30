@@ -1,0 +1,501 @@
+You are extending the Beamer CMS and API. The system already has:
+
+Publisher-scoped Screen Groups with targeting preview & warnings
+
+A Campaign Workspace at /campaigns/:id?tab=... with tabs:
+
+Overview
+
+Flights
+
+Creatives
+
+Reporting
+
+A Flight Editor Drawer with:
+
+Flight detail form
+
+Targeting (single screens or screen groups)
+
+Creatives section
+
+A Creatives tab and Creative editor modal
+
+Existing reporting components (Delivery, Exposure, Compliance)
+
+Your tasks are to implement the next UX & data upgrade wave:
+
+Allow multiple creatives per flight (correct many-to-many behaviour).
+
+Add live eligible screen count logic + breakdown in the targeting preview.
+
+Add a Flight Overview summary section at the top of the Flight drawer.
+
+Add a “Used In” matrix showing which flights use each creative.
+
+Add a visual campaign timeline in the Overview tab.
+
+Add a Reporting Diagnostics panel in the Reporting tab.
+
+1️⃣ Data Model & API: Multiple Creatives per Flight
+1.1 Schema
+
+Goal: Flights and Creatives must be many-to-many via a join table. Each Flight can have multiple creatives; each Creative can be used in multiple flights.
+
+Check existing schema:
+
+If there is already a join table (e.g. flight_creatives), use it.
+
+If not, create:
+
+Table: flight_creatives
+
+flight_id UUID NOT NULL REFERENCES flights(id) ON DELETE CASCADE
+
+creative_id UUID NOT NULL REFERENCES creatives(id) ON DELETE CASCADE
+
+position INTEGER NOT NULL DEFAULT 0 (for future ordering/weighting)
+
+created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+
+PRIMARY KEY (flight_id, creative_id)
+
+Indexes on (creative_id), (flight_id, position)
+
+If flights currently has a creative_id column:
+
+Keep it temporarily for backward compatibility, but:
+
+Stop using it in new code.
+
+Optionally add a migration to backfill flight_creatives from existing flights.creative_id.
+
+1.2 API Endpoints
+
+Create / confirm endpoints:
+
+GET /api/flights/:id/creatives
+
+Returns all creatives attached to a flight.
+
+Shape:
+
+{ "items": [ { "id": "...", "name": "...", ... } ] }
+
+
+POST /api/flights/:id/creatives
+
+Body:
+
+{ "creative_ids": ["id1", "id2", ...] }
+
+
+Semantics: append these creatives to the flight.
+
+Ignore ids that are already attached.
+
+Return updated list.
+
+DELETE /api/flights/:id/creatives
+
+Body:
+
+{ "creative_ids": ["id1", "id2"] }
+
+
+Remove these relationships from flight_creatives.
+
+Return updated list.
+
+GET /api/creatives/:id/flights
+
+Returns flights using this creative (for “Used In” matrix).
+
+Shape:
+
+{ "items": [ { "id": "...", "name": "...", "status": "...", "starts_at": "...", "ends_at": "..." } ] }
+
+1.3 Playback / Engine
+
+Wherever the player/decision engine resolves “creatives for a flight”:
+
+Change logic from flight.creative_id to:
+
+SELECT c.*
+FROM flight_creatives fc
+JOIN creatives c ON c.id = fc.creative_id
+WHERE fc.flight_id = $1
+ORDER BY fc.position ASC, fc.created_at ASC;
+
+
+The engine should rotate across these creatives according to existing logic (even if simple round-robin for now).
+
+1.4 Tests
+
+Add tests for:
+
+Attaching multiple creatives to a flight → they all appear in GET response.
+
+Adding a second creative does not remove the first.
+
+Deleting one creative attachment leaves others intact.
+
+Creative used in multiple flights is returned by /api/creatives/:id/flights.
+
+2️⃣ Live Eligible Screen Count (+ Breakdown) in Targeting Preview
+
+You already have a targeting preview endpoint with warnings (overlap, offline, mixed resolution, low count).
+
+Enhance it with counts & breakdown.
+
+2.1 API
+
+Endpoint (either existing or create):
+POST /api/flights/targeting-preview
+
+Input:
+
+Targeting payload matching flight’s targeting model, e.g.:
+
+{
+  "campaign_id": "...",
+  "flight_id": "optional",
+  "region_ids": [...],
+  "screen_group_ids": [...],
+  "screen_ids": [...],
+  "time_windows": [...]
+}
+
+
+Output:
+
+{
+  "eligible_screen_count": 27,
+  "breakdown": {
+    "by_region": [
+      { "region_id": "...", "region_name": "Lagos", "count": 12 },
+      { "region_id": "...", "region_name": "Abuja", "count": 15 }
+    ],
+    "by_group": [
+      { "group_id": "...", "group_name": "NG / Lagos / Taxis", "count": 10 },
+      { "group_id": "...", "group_name": "NG / Lagos / Malls", "count": 17 }
+    ],
+    "by_resolution": [
+      { "width": 342, "height": 130, "count": 20 },
+      { "width": 320, "height": 108, "count": 7 }
+    ],
+    "offline_count": 4
+  },
+  "warnings": [
+    "Overlap detected: 5 screens appear in multiple selected groups.",
+    "4 screens are currently offline.",
+    "Mixed resolutions: 7 screens differ from creative spec."
+  ]
+}
+
+
+Implementation:
+
+Use existing targeting resolution logic, then:
+
+Compute counts per region / group / resolution.
+
+Compute offline count based on screen status.
+
+Reuse existing warning logic.
+
+2.2 Frontend Integration
+
+In FlightEditorDrawer targeting section:
+
+Display:
+
+Badge: “Eligible Screens: N”
+
+Tooltip or small info popover showing breakdown (region, group, resolution).
+
+Use existing TargetingPreviewWarnings component to display warnings beneath targeting controls.
+
+3️⃣ Flight Overview Section (Drawer)
+
+Add a read-only summary panel at the top of the Flight drawer, above the editable form.
+
+File: apps/cms-web/src/components/flights/FlightEditorDrawer.tsx
+
+Add a “Summary” block:
+
+Flight name
+
+Status (with a colored badge)
+
+Dates (start → end)
+
+Live eligible screen count (from targeting preview)
+
+Number of attached creatives
+
+Optional: last updated timestamp
+
+Example JSX structure:
+
+<SheetContent ...>
+  <div className="flex flex-col gap-4 h-full">
+    <div className="border-b pb-3">
+      <div className="flex items-center justify-between">
+        <h2 className="text-lg font-semibold">{flight.name}</h2>
+        <StatusBadge status={flight.status} />
+      </div>
+      <p className="text-xs text-muted-foreground">
+        {formatDateRange(flight.startsAt, flight.endsAt)}
+      </p>
+      <div className="mt-2 flex flex-wrap gap-3 text-xs">
+        <Badge variant="outline">Eligible screens: {preview?.eligible_screen_count ?? "—"}</Badge>
+        <Badge variant="outline">Creatives: {flightCreatives?.length ?? 0}</Badge>
+      </div>
+    </div>
+
+    {/* Below this, your existing editable form sections */}
+    <FlightForm ... />
+    <TargetingSection ... />
+    <FlightCreativesSection ... />
+  </div>
+</SheetContent>
+
+
+The idea: user sees what they have before they edit it.
+
+4️⃣ Creative “Used In” Matrix
+
+We want to show, for each creative:
+
+Which flights it is used in
+
+Basic flight info (name, status, date)
+
+Quick navigation links
+
+4.1 Backend
+
+You already added GET /api/creatives/:id/flights above. Ensure it:
+
+Respects permissions (publisher, advertiser, internal).
+
+Only returns flights belonging to campaigns the user can see.
+
+4.2 Frontend – Creatives Tab
+
+File: apps/cms-web/src/pages/campaigns/CampaignCreativesTab.tsx
+
+For each creative row, add a column: “Used In”
+
+Show a summary like:
+
+“3 flights” (clickable to expand)
+
+Or chips: Flight A, Flight B (with tooltip for dates/status).
+
+4.3 Frontend – Creative Editor Modal
+
+File: apps/cms-web/src/components/creatives/CreativeEditorModal.tsx
+
+Fetch flights using this creative via useFlightsForCreative(creativeId).
+
+Show a “Used In” section:
+
+<h3 className="text-sm font-medium mb-2">Used In Flights</h3>
+{flights?.length ? (
+  <ul className="space-y-1 text-xs">
+    {flights.map(f => (
+      <li key={f.id} className="flex justify-between items-center">
+        <span>{f.name}</span>
+        <span className="text-muted-foreground">
+          {formatDateRange(f.startsAt, f.endsAt)}
+        </span>
+      </li>
+    ))}
+  </ul>
+) : (
+  <p className="text-xs text-muted-foreground">Not used in any flights yet.</p>
+)}
+
+
+Optionally: Allow attaching/detaching flights from this view too (but not required for this iteration).
+
+5️⃣ Visual Campaign Timeline (Overview Tab)
+
+We want a simple, visual timeline of flights within the campaign.
+
+File: apps/cms-web/src/pages/campaigns/CampaignOverviewTab.tsx
+
+Implementation:
+
+Fetch flights for this campaign.
+
+Compute campaign min/max dates.
+
+Render a horizontal timeline:
+
+A horizontal track representing the whole campaign period.
+
+Each flight as a colored bar positioned according to its start/end dates.
+
+Approach:
+
+Use a flex or CSS grid with proportional width based on (flightDuration / campaignDuration).
+
+For each flight:
+
+Calculate relative start & width.
+
+Render as a div with absolute/relative positioning inside a container.
+
+Pseudocode:
+
+const CampaignTimeline: React.FC<{ flights: Flight[]; campaign: Campaign }> = ({ flights, campaign }) => {
+  const [minDate, maxDate] = getCampaignBounds(campaign, flights);
+  const totalMs = maxDate.getTime() - minDate.getTime();
+
+  return (
+    <div className="mt-4">
+      <h3 className="text-sm font-medium mb-2">Timeline</h3>
+      <div className="relative h-16 rounded-md border bg-muted/40 overflow-hidden">
+        {flights.map(f => {
+          const start = new Date(f.startsAt).getTime();
+          const end = new Date(f.endsAt).getTime();
+          const leftPct = ((start - minDate.getTime()) / totalMs) * 100;
+          const widthPct = ((end - start) / totalMs) * 100;
+
+          return (
+            <div
+              key={f.id}
+              className="absolute top-1/4 h-1/2 rounded-sm bg-primary/70 text-[10px] flex items-center justify-center"
+              style={{ left: `${leftPct}%`, width: `${Math.max(widthPct, 5)}%` }}
+              title={`${f.name} (${formatDateRange(f.startsAt, f.endsAt)})`}
+            >
+              {f.name}
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+};
+
+6️⃣ Reporting Diagnostics Panel
+
+Add a diagnostics view inside the Reporting tab to help Ops debug under-delivery and issues.
+
+6.1 Backend – Diagnostics Endpoint
+
+Create:
+
+GET /api/reports/campaigns/:id/diagnostics
+
+Return structure:
+
+{
+  "screens_offline": [
+    { "screen_id": "...", "name": "...", "last_seen_at": "...", "publisher_name": "..." }
+  ],
+  "screens_targeted_but_no_plays": [
+    { "screen_id": "...", "name": "...", "flight_id": "...", "flight_name": "..." }
+  ],
+  "creatives_with_no_plays": [
+    { "creative_id": "...", "name": "...", "flight_id": "...", "flight_name": "..." }
+  ],
+  "missing_approvals": [
+    { "creative_id": "...", "name": "...", "region": "NG", "required": true }
+  ],
+  "resolution_mismatches": [
+    {
+      "screen_id": "...",
+      "screen_resolution": "320x108",
+      "creative_id": "...",
+      "creative_resolution": "342x130"
+    }
+  ]
+}
+
+
+Data sources:
+
+Plays / impressions table
+
+Screen status / lastSeenAt
+
+Creatives + approvals
+
+Screen + creative resolutions
+
+Flight targeting data
+
+6.2 Frontend – Diagnostics Panel
+
+File: apps/cms-web/src/pages/campaigns/CampaignReportingTab.tsx
+
+Add a “Diagnostics” section below existing reporting components.
+
+Create CampaignDiagnosticsPanel component using the endpoint above.
+
+Display sections in collapsible accordions:
+
+“Offline Screens”
+
+“Targeted Screens with No Plays”
+
+“Creatives with No Plays”
+
+“Missing Approvals”
+
+“Resolution Mismatches”
+
+Each section: simple table with key fields and maybe links to Screen / Flight / Creative.
+
+7️⃣ Acceptance Criteria
+
+You’re done when:
+
+Multiple creatives per flight
+
+Attaching a new creative does not remove the existing ones.
+
+GET /api/flights/:id/creatives returns all attached creatives.
+
+Engine rotates through multiple creatives (confirmed in test logs or telemetry).
+
+Live eligible screen count
+
+Flight drawer shows “Eligible screens: N”.
+
+Clicking or hovering can show region/group/resolution breakdown.
+
+Warnings still appear (overlap, offline, mixed resolution, low count) via existing warnings component.
+
+Flight Overview section
+
+Opening a flight drawer shows read-only summary (name, dates, status, screen count, creatives count) above the form.
+
+Creative Used In
+
+Creatives tab shows where each creative is used (flight names).
+
+Creative modal shows list of flights using that creative.
+
+Campaign Timeline
+
+Overview tab shows a horizontal timeline of flights within the campaign duration.
+
+Diagnostics Panel
+
+Reporting tab includes a diagnostics section with at least offline screens and no-play screens; others as available.
+
+All new API endpoints are permission-safe.
+
+Tests & Types
+
+New endpoints have backend tests.
+
+New hooks/components are fully typed (no any).
+
+No new TypeScript or console errors.

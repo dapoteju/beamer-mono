@@ -24,6 +24,16 @@ export interface FlightCreativeInput {
   weight: number;
 }
 
+export interface FlightForCreative {
+  id: string;
+  name: string;
+  status: string;
+  startsAt: string;
+  endsAt: string;
+  campaignId: string;
+  campaignName: string;
+}
+
 export class FlightCreativesService {
   async getFlightById(flightId: string) {
     const result = await db.select().from(flights).where(eq(flights.id, flightId)).limit(1);
@@ -191,5 +201,87 @@ export class FlightCreativesService {
       );
 
     return found.length === creativeIds.length;
+  }
+
+  async addFlightCreatives(
+    flightId: string,
+    items: FlightCreativeInput[]
+  ): Promise<FlightCreative[]> {
+    if (items.length === 0) {
+      return this.listFlightCreatives(flightId);
+    }
+
+    const existingCreatives = await db
+      .select({ creativeId: flightCreatives.creativeId })
+      .from(flightCreatives)
+      .where(eq(flightCreatives.flightId, flightId));
+
+    const existingCreativeIds = new Set(existingCreatives.map((c) => c.creativeId));
+
+    const newItems = items.filter((item) => !existingCreativeIds.has(item.creative_id));
+
+    if (newItems.length > 0) {
+      const insertValues = newItems.map((item) => ({
+        flightId,
+        creativeId: item.creative_id,
+        weight: item.weight,
+      }));
+
+      await db.insert(flightCreatives).values(insertValues);
+    }
+
+    return this.listFlightCreatives(flightId);
+  }
+
+  async removeFlightCreatives(
+    flightId: string,
+    creativeIds: string[]
+  ): Promise<FlightCreative[]> {
+    if (creativeIds.length === 0) {
+      return this.listFlightCreatives(flightId);
+    }
+
+    await db
+      .delete(flightCreatives)
+      .where(
+        and(
+          eq(flightCreatives.flightId, flightId),
+          inArray(flightCreatives.creativeId, creativeIds)
+        )
+      );
+
+    return this.listFlightCreatives(flightId);
+  }
+
+  async getFlightsForCreative(creativeId: string): Promise<FlightForCreative[]> {
+    const results = await db
+      .select({
+        id: flights.id,
+        name: flights.name,
+        status: flights.status,
+        startsAt: flights.startDatetime,
+        endsAt: flights.endDatetime,
+        campaignId: flights.campaignId,
+        campaignName: campaigns.name,
+      })
+      .from(flightCreatives)
+      .innerJoin(flights, eq(flightCreatives.flightId, flights.id))
+      .innerJoin(campaigns, eq(flights.campaignId, campaigns.id))
+      .where(eq(flightCreatives.creativeId, creativeId));
+
+    return results.map((r) => ({
+      id: r.id,
+      name: r.name,
+      status: r.status,
+      startsAt: r.startsAt.toISOString(),
+      endsAt: r.endsAt.toISOString(),
+      campaignId: r.campaignId,
+      campaignName: r.campaignName,
+    }));
+  }
+
+  async getCreativeById(creativeId: string) {
+    const result = await db.select().from(creatives).where(eq(creatives.id, creativeId)).limit(1);
+    return result[0] ?? null;
   }
 }

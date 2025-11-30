@@ -1,10 +1,114 @@
-import { type CampaignWithStats } from "../../api/campaigns";
+import { type CampaignWithStats, type Flight } from "../../api/campaigns";
 import { type CampaignTab } from "../../hooks/useUrlSyncedTab";
 import TargetingDetails from "../../components/TargetingDetails";
 
 interface CampaignOverviewTabProps {
   campaign: CampaignWithStats;
   onNavigateToTab: (tab: CampaignTab) => void;
+}
+
+function getFlightStatusColor(status: string): string {
+  switch (status) {
+    case "active": return "bg-green-500";
+    case "scheduled": return "bg-purple-400";
+    case "paused": return "bg-yellow-500";
+    case "completed": return "bg-blue-400";
+    default: return "bg-zinc-400";
+  }
+}
+
+interface FlightTimelineProps {
+  flights: Flight[];
+  campaignStart: Date;
+  campaignEnd: Date;
+}
+
+function FlightTimeline({ flights, campaignStart, campaignEnd }: FlightTimelineProps) {
+  const totalMs = campaignEnd.getTime() - campaignStart.getTime();
+  const today = new Date();
+  const todayPosition = Math.min(100, Math.max(0, 
+    ((today.getTime() - campaignStart.getTime()) / totalMs) * 100
+  ));
+  const isWithinRange = today >= campaignStart && today <= campaignEnd;
+
+  const formatShortDate = (d: Date) => d.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+
+  if (flights.length === 0) {
+    return (
+      <div className="text-center py-8 text-zinc-500 text-sm">
+        No flights scheduled yet.
+        <button className="text-blue-600 hover:underline ml-1">Add a flight</button> to see timeline.
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-3">
+      <div className="flex justify-between text-xs text-zinc-500 mb-1">
+        <span>{formatShortDate(campaignStart)}</span>
+        <span>{formatShortDate(campaignEnd)}</span>
+      </div>
+      <div className="relative h-2 bg-zinc-200 rounded-full mb-4">
+        {isWithinRange && (
+          <div 
+            className="absolute top-0 bottom-0 w-0.5 bg-red-500 z-10" 
+            style={{ left: `${todayPosition}%` }}
+            title={`Today: ${formatShortDate(today)}`}
+          />
+        )}
+      </div>
+      
+      <div className="space-y-2">
+        {flights.map((flight) => {
+          const flightStart = new Date(flight.startDatetime);
+          const flightEnd = new Date(flight.endDatetime);
+          const leftPct = Math.max(0, ((flightStart.getTime() - campaignStart.getTime()) / totalMs) * 100);
+          const widthPct = Math.min(100 - leftPct, ((flightEnd.getTime() - flightStart.getTime()) / totalMs) * 100);
+          
+          return (
+            <div key={flight.id} className="relative">
+              <div className="flex items-center gap-2 mb-1">
+                <span className="text-xs font-medium text-zinc-700 truncate max-w-[150px]">{flight.name}</span>
+                <span className={`text-xs px-1.5 py-0.5 rounded capitalize ${
+                  flight.status === "active" ? "bg-green-100 text-green-700" :
+                  flight.status === "scheduled" ? "bg-purple-100 text-purple-700" :
+                  flight.status === "paused" ? "bg-yellow-100 text-yellow-700" :
+                  "bg-zinc-100 text-zinc-600"
+                }`}>{flight.status}</span>
+              </div>
+              <div className="relative h-4 bg-zinc-100 rounded">
+                <div 
+                  className={`absolute h-full rounded ${getFlightStatusColor(flight.status)} opacity-80`}
+                  style={{ left: `${leftPct}%`, width: `${Math.max(widthPct, 1)}%` }}
+                  title={`${formatShortDate(flightStart)} - ${formatShortDate(flightEnd)}`}
+                />
+              </div>
+            </div>
+          );
+        })}
+      </div>
+      
+      <div className="flex items-center gap-4 text-xs text-zinc-500 mt-4 pt-3 border-t border-zinc-100">
+        <span className="flex items-center gap-1">
+          <span className="w-3 h-3 bg-green-500 rounded"></span> Active
+        </span>
+        <span className="flex items-center gap-1">
+          <span className="w-3 h-3 bg-purple-400 rounded"></span> Scheduled
+        </span>
+        <span className="flex items-center gap-1">
+          <span className="w-3 h-3 bg-yellow-500 rounded"></span> Paused
+        </span>
+        <span className="flex items-center gap-1">
+          <span className="w-3 h-3 bg-blue-400 rounded"></span> Completed
+        </span>
+        {isWithinRange && (
+          <span className="flex items-center gap-1">
+            <span className="w-0.5 h-3 bg-red-500"></span> Today
+          </span>
+        )}
+      </div>
+    </div>
+  );
 }
 
 export default function CampaignOverviewTab({ campaign, onNavigateToTab }: CampaignOverviewTabProps) {
@@ -117,6 +221,15 @@ export default function CampaignOverviewTab({ campaign, onNavigateToTab }: Campa
             </div>
           </div>
         </div>
+      </div>
+
+      <div className="bg-white border border-zinc-200 rounded-lg p-6">
+        <h2 className="text-lg font-semibold text-zinc-900 mb-4">Flight Timeline</h2>
+        <FlightTimeline 
+          flights={campaign.flights} 
+          campaignStart={new Date(campaign.startDate)}
+          campaignEnd={new Date(campaign.endDate)}
+        />
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">

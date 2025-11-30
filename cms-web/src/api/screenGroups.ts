@@ -200,6 +200,26 @@ export interface TargetingPreviewWarning {
   count?: number;
 }
 
+export interface GroupBreakdown {
+  groupId: string;
+  groupName: string;
+  count: number;
+  onlineCount: number;
+  offlineCount: number;
+}
+
+export interface RegionBreakdown {
+  regionCode: string;
+  regionName: string;
+  count: number;
+}
+
+export interface ResolutionBreakdown {
+  width: number;
+  height: number;
+  count: number;
+}
+
 export interface TargetingPreview {
   eligible_screen_count: number;
   totalScreens: number;
@@ -209,6 +229,12 @@ export interface TargetingPreview {
   warnings: TargetingPreviewWarning[];
   regions: Record<string, number>;
   resolutions: Record<string, number>;
+  breakdown?: {
+    by_region: RegionBreakdown[];
+    by_group: GroupBreakdown[];
+    by_resolution: ResolutionBreakdown[];
+    offline_count: number;
+  };
 }
 
 export async function fetchTargetingPreview(groupIds: string[]): Promise<TargetingPreview> {

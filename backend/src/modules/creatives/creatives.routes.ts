@@ -10,7 +10,10 @@ import {
   getCreativeApprovals,
   getPendingApprovals,
 } from "./creatives.service";
+import { FlightCreativesService } from "../campaigns/flightCreatives.service";
 import { requireAuth, AuthRequest } from "../../middleware/auth";
+
+const flightCreativesService = new FlightCreativesService();
 
 const router = Router();
 
@@ -319,6 +322,43 @@ router.get(
       return res.json({
         status: "success",
         data: approvals,
+      });
+    } catch (err) {
+      next(err);
+    }
+  }
+);
+
+router.get(
+  "/:creativeId/flights",
+  requireAuth,
+  async (req: AuthRequest, res: Response, next: NextFunction) => {
+    try {
+      if (!canAccessCampaigns(req)) {
+        return res.status(403).json({ status: "error", message: "Forbidden" });
+      }
+
+      const { creativeId } = req.params;
+
+      const creative = await getCreativeById(creativeId);
+      if (!creative) {
+        return res.status(404).json({ status: "error", message: "Creative not found" });
+      }
+
+      const campaign = await getCampaignById(creative.campaign_id);
+      if (!campaign) {
+        return res.status(404).json({ status: "error", message: "Campaign not found" });
+      }
+
+      if (!canAccessCampaign(req, campaign.advertiserOrgId)) {
+        return res.status(403).json({ status: "error", message: "Forbidden" });
+      }
+
+      const flights = await flightCreativesService.getFlightsForCreative(creativeId);
+
+      return res.json({
+        status: "success",
+        data: { items: flights },
       });
     } catch (err) {
       next(err);

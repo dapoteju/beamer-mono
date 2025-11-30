@@ -9,10 +9,33 @@ import {
   type FlightStatus,
 } from "../../api/campaigns";
 import { fetchScreens } from "../../api/screens";
-import { fetchScreenGroups } from "../../api/screenGroups";
+import { fetchScreenGroups, fetchTargetingPreview } from "../../api/screenGroups";
+import { fetchFlightCreatives } from "../../api/flightCreatives";
 import { SheetHeader, SheetTitle, SheetClose } from "../ui/Sheet";
 import { TargetingPreviewWarnings } from "../TargetingPreviewWarnings";
 import FlightCreativesSectionComponent from "./FlightCreativesSection";
+
+function getStatusBadgeColor(status: string): string {
+  switch (status) {
+    case "active":
+      return "bg-green-100 text-green-800";
+    case "scheduled":
+      return "bg-purple-100 text-purple-800";
+    case "paused":
+      return "bg-yellow-100 text-yellow-800";
+    case "completed":
+      return "bg-blue-100 text-blue-800";
+    default:
+      return "bg-zinc-100 text-zinc-800";
+  }
+}
+
+function formatDateRange(startStr: string, endStr: string): string {
+  const start = new Date(startStr);
+  const end = new Date(endStr);
+  const options: Intl.DateTimeFormatOptions = { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' };
+  return `${start.toLocaleString('en-US', options)} → ${end.toLocaleString('en-US', options)}`;
+}
 
 interface FlightEditorDrawerProps {
   campaignId: string;
@@ -59,6 +82,31 @@ export default function FlightEditorDrawer({
   });
 
   const screenGroups = screenGroupsData?.items || [];
+
+  const { data: flightCreatives = [] } = useQuery({
+    queryKey: ["flightCreatives", flightId],
+    queryFn: () => fetchFlightCreatives(flightId!),
+    enabled: !!flightId && mode === "edit",
+  });
+
+  const { data: targetingPreview } = useQuery({
+    queryKey: ["targetingPreview", flight?.targetId],
+    queryFn: () => {
+      if (flight?.targetType === "screen_group") {
+        return fetchTargetingPreview([flight.targetId]);
+      }
+      return null;
+    },
+    enabled: !!flight && flight.targetType === "screen_group" && mode === "edit",
+  });
+
+  const { data: formTargetingPreview, isLoading: targetingPreviewLoading } = useQuery({
+    queryKey: ["formTargetingPreview", formData.targetId],
+    queryFn: () => fetchTargetingPreview([formData.targetId]),
+    enabled: formData.targetType === "screen_group" && !!formData.targetId,
+  });
+
+  const [showBreakdownPopover, setShowBreakdownPopover] = useState(false);
 
   useEffect(() => {
     if (flight && mode === "edit") {
@@ -191,6 +239,42 @@ export default function FlightEditorDrawer({
       )}
 
       <div className="flex-1 overflow-y-auto p-6">
+        {mode === "edit" && flight && (
+          <div className="mb-6 bg-zinc-50 border border-zinc-200 rounded-lg p-4">
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="font-semibold text-zinc-900">{flight.name}</h3>
+              <span className={`px-2 py-1 rounded text-xs font-medium ${getStatusBadgeColor(flight.status)}`}>
+                {flight.status.charAt(0).toUpperCase() + flight.status.slice(1)}
+              </span>
+            </div>
+            <p className="text-sm text-zinc-600 mb-3">
+              {formatDateRange(flight.startDatetime, flight.endDatetime)}
+            </p>
+            <div className="grid grid-cols-2 gap-4 text-sm">
+              <div className="bg-white border border-zinc-200 rounded p-3">
+                <span className="text-zinc-500">Eligible Screens</span>
+                <p className="font-semibold text-lg text-zinc-900">
+                  {flight.targetType === "screen_group" 
+                    ? (targetingPreview?.eligible_screen_count ?? "—") 
+                    : "1"}
+                </p>
+                {flight.targetType === "screen_group" && targetingPreview && (
+                  <span className="text-xs text-zinc-500">
+                    {targetingPreview.onlineScreens} online, {targetingPreview.offlineScreens} offline
+                  </span>
+                )}
+              </div>
+              <div className="bg-white border border-zinc-200 rounded p-3">
+                <span className="text-zinc-500">Assigned Creatives</span>
+                <p className="font-semibold text-lg text-zinc-900">{flightCreatives.length}</p>
+                <span className="text-xs text-zinc-500">
+                  Total weight: {flightCreatives.reduce((sum, fc) => sum + fc.weight, 0)}
+                </span>
+              </div>
+            </div>
+          </div>
+        )}
+
         {activeSection === "details" ? (
           <form onSubmit={handleSubmit} className="space-y-6">
             {errors.submit && (
@@ -349,6 +433,71 @@ export default function FlightEditorDrawer({
                     <p className="text-xs text-red-600 mt-1">{errors.targetId}</p>
                   )}
                 </div>
+
+                {formData.targetType === "screen_group" && formData.targetId && formTargetingPreview && (
+                  <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-lg relative">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm text-blue-700">Eligible Screens:</span>
+                        <span className="bg-blue-600 text-white text-sm font-semibold px-2 py-0.5 rounded">
+                          {targetingPreviewLoading ? "..." : formTargetingPreview.eligible_screen_count}
+                        </span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setShowBreakdownPopover(!showBreakdownPopover)}
+                        className="text-xs text-blue-600 hover:text-blue-800 underline"
+                      >
+                        {showBreakdownPopover ? "Hide breakdown" : "View breakdown"}
+                      </button>
+                    </div>
+                    {!targetingPreviewLoading && (
+                      <p className="text-xs text-blue-600 mt-1">
+                        {formTargetingPreview.onlineScreens} online, {formTargetingPreview.offlineScreens} offline
+                      </p>
+                    )}
+                    {showBreakdownPopover && formTargetingPreview.breakdown && (
+                      <div className="mt-3 pt-3 border-t border-blue-200 space-y-3">
+                        {formTargetingPreview.breakdown.by_region.length > 0 && (
+                          <div>
+                            <h4 className="text-xs font-semibold text-blue-800 mb-1">By Region</h4>
+                            <div className="flex flex-wrap gap-1">
+                              {formTargetingPreview.breakdown.by_region.map((r) => (
+                                <span key={r.regionCode} className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded">
+                                  {r.regionCode}: {r.count}
+                                </span>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                        {formTargetingPreview.breakdown.by_resolution.length > 0 && (
+                          <div>
+                            <h4 className="text-xs font-semibold text-blue-800 mb-1">By Resolution</h4>
+                            <div className="flex flex-wrap gap-1">
+                              {formTargetingPreview.breakdown.by_resolution.map((res, idx) => (
+                                <span key={idx} className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded">
+                                  {res.width}x{res.height}: {res.count}
+                                </span>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                        {formTargetingPreview.breakdown.by_group.length > 0 && (
+                          <div>
+                            <h4 className="text-xs font-semibold text-blue-800 mb-1">By Group</h4>
+                            <div className="flex flex-wrap gap-1">
+                              {formTargetingPreview.breakdown.by_group.map((g) => (
+                                <span key={g.groupId} className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded">
+                                  {g.groupName}: {g.count}
+                                </span>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                )}
 
                 {formData.targetType === "screen_group" && formData.targetId && (
                   <TargetingPreviewWarnings 

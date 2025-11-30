@@ -4,6 +4,7 @@ import { getCampaignReport } from "../../api/reports";
 import { downloadCsv } from "../../utils/csv";
 import CampaignExposureTab from "../reporting/CampaignExposureTab";
 import CampaignComplianceTab from "../reporting/CampaignComplianceTab";
+import CampaignDiagnosticsTab from "../reporting/CampaignDiagnosticsTab";
 import {
   LineChart,
   Line,
@@ -19,7 +20,7 @@ import {
   ResponsiveContainer,
 } from "recharts";
 
-type ReportTab = "delivery" | "exposure" | "compliance";
+type ReportTab = "delivery" | "exposure" | "compliance" | "diagnostics";
 
 interface CampaignReportingTabProps {
   campaignId: string;
@@ -197,6 +198,16 @@ export default function CampaignReportingTab({ campaignId }: CampaignReportingTa
           >
             Compliance
           </button>
+          <button
+            onClick={() => setActiveTab("diagnostics")}
+            className={`whitespace-nowrap border-b-2 py-3 px-1 text-sm font-medium ${
+              activeTab === "diagnostics"
+                ? "border-blue-600 text-blue-600"
+                : "border-transparent text-zinc-500 hover:text-zinc-700 hover:border-zinc-300"
+            }`}
+          >
+            Diagnostics
+          </button>
         </nav>
       </div>
 
@@ -214,6 +225,8 @@ export default function CampaignReportingTab({ campaignId }: CampaignReportingTa
           endDate={endDate}
           hasLoadedOnce={hasLoadedOnce}
         />
+      ) : activeTab === "diagnostics" ? (
+        <CampaignDiagnosticsTab campaignId={campaignId} />
       ) : (
         <>
           {isLoading && !reportData && (

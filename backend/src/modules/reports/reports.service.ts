@@ -1358,3 +1358,249 @@ export async function getCampaignComplianceReport(
     byScreen,
   };
 }
+
+export interface DiagnosticsReport {
+  screens_offline: Array<{
+    screen_id: string;
+    name: string | null;
+    last_seen_at: string | null;
+    publisher_name: string | null;
+  }>;
+  screens_targeted_but_no_plays: Array<{
+    screen_id: string;
+    name: string | null;
+    flight_id: string;
+    flight_name: string;
+  }>;
+  creatives_with_no_plays: Array<{
+    creative_id: string;
+    name: string;
+    flight_id: string;
+    flight_name: string;
+  }>;
+  missing_approvals: Array<{
+    creative_id: string;
+    name: string;
+    region: string;
+    required: boolean;
+  }>;
+  resolution_mismatches: Array<{
+    screen_id: string;
+    screen_resolution: string;
+    creative_id: string;
+    creative_resolution: string;
+  }>;
+}
+
+export async function getCampaignDiagnostics(campaignId: string): Promise<DiagnosticsReport | null> {
+  const campaignData = await db
+    .select()
+    .from(campaigns)
+    .where(eq(campaigns.id, campaignId))
+    .limit(1);
+
+  if (campaignData.length === 0) {
+    return null;
+  }
+
+  const campaign = campaignData[0];
+  const twoMinutesAgo = new Date(Date.now() - 2 * 60 * 1000);
+
+  const campaignFlights = await db
+    .select({
+      id: flights.id,
+      name: flights.name,
+      targetType: flights.targetType,
+      targetId: flights.targetId,
+    })
+    .from(flights)
+    .where(eq(flights.campaignId, campaignId));
+
+  const screenIds = new Set<string>();
+  for (const flight of campaignFlights) {
+    if (flight.targetType === "screen") {
+      screenIds.add(flight.targetId);
+    } else if (flight.targetType === "screen_group") {
+      const members = await db
+        .select({ screenId: screenGroupMemberships.screenId })
+        .from(screenGroupMemberships)
+        .where(eq(screenGroupMemberships.groupId, flight.targetId));
+      members.forEach(m => screenIds.add(m.screenId));
+    }
+  }
+
+  const targetedScreenIds = Array.from(screenIds);
+
+  let screens_offline: DiagnosticsReport["screens_offline"] = [];
+  if (targetedScreenIds.length > 0) {
+    const screenData = await db
+      .select({
+        id: screens.id,
+        name: screens.name,
+        publisherName: organisations.name,
+        lastHeartbeat: sql<string | null>`(
+          SELECT h.created_at 
+          FROM ${heartbeats} h 
+          WHERE h.screen_id = ${screens.id} 
+          ORDER BY h.created_at DESC 
+          LIMIT 1
+        )`.as("last_heartbeat"),
+      })
+      .from(screens)
+      .leftJoin(organisations, eq(screens.publisherOrgId, organisations.id))
+      .where(inArray(screens.id, targetedScreenIds));
+
+    screens_offline = screenData
+      .filter(s => {
+        const lastHb = s.lastHeartbeat ? new Date(s.lastHeartbeat) : null;
+        return !lastHb || lastHb < twoMinutesAgo;
+      })
+      .map(s => ({
+        screen_id: s.id,
+        name: s.name,
+        last_seen_at: s.lastHeartbeat,
+        publisher_name: s.publisherName,
+      }));
+  }
+
+  let screens_targeted_but_no_plays: DiagnosticsReport["screens_targeted_but_no_plays"] = [];
+  if (targetedScreenIds.length > 0) {
+    const playsData = await db
+      .select({ screenId: playEvents.screenId })
+      .from(playEvents)
+      .where(
+        and(
+          eq(playEvents.campaignId, campaignId),
+          inArray(playEvents.screenId, targetedScreenIds)
+        )
+      );
+
+    const screensWithPlays = new Set(playsData.map(p => p.screenId));
+    const screensWithoutPlays = targetedScreenIds.filter(id => !screensWithPlays.has(id));
+
+    if (screensWithoutPlays.length > 0) {
+      const screenNames = await db
+        .select({ id: screens.id, name: screens.name })
+        .from(screens)
+        .where(inArray(screens.id, screensWithoutPlays));
+
+      const screenNameMap = new Map(screenNames.map(s => [s.id, s.name]));
+
+      for (const screenId of screensWithoutPlays) {
+        const flightForScreen = campaignFlights.find(f => {
+          if (f.targetType === "screen") return f.targetId === screenId;
+          return false;
+        });
+
+        screens_targeted_but_no_plays.push({
+          screen_id: screenId,
+          name: screenNameMap.get(screenId) || null,
+          flight_id: flightForScreen?.id || "unknown",
+          flight_name: flightForScreen?.name || "Unknown flight",
+        });
+      }
+    }
+  }
+
+  const campaignCreatives = await db
+    .select({
+      id: creatives.id,
+      name: creatives.name,
+      width: creatives.width,
+      height: creatives.height,
+      regionsRequired: creatives.regionsRequired,
+    })
+    .from(creatives)
+    .where(eq(creatives.campaignId, campaignId));
+
+  const creativeIds = campaignCreatives.map(c => c.id);
+
+  let creatives_with_no_plays: DiagnosticsReport["creatives_with_no_plays"] = [];
+  if (creativeIds.length > 0) {
+    const creativePlays = await db
+      .select({ creativeId: playEvents.creativeId })
+      .from(playEvents)
+      .where(
+        and(
+          eq(playEvents.campaignId, campaignId),
+          inArray(playEvents.creativeId, creativeIds)
+        )
+      );
+
+    const creativesWithPlays = new Set(creativePlays.map(p => p.creativeId));
+    const creativesWithoutPlays = campaignCreatives.filter(c => !creativesWithPlays.has(c.id));
+
+    for (const creative of creativesWithoutPlays) {
+      const fc = await db
+        .select({ flightId: sql<string>`fc.flight_id`, flightName: flights.name })
+        .from(sql`flight_creatives fc`)
+        .innerJoin(flights, sql`fc.flight_id = ${flights.id}`)
+        .where(sql`fc.creative_id = ${creative.id}`)
+        .limit(1);
+
+      creatives_with_no_plays.push({
+        creative_id: creative.id,
+        name: creative.name,
+        flight_id: fc[0]?.flightId || "not_assigned",
+        flight_name: fc[0]?.flightName || "Not assigned to any flight",
+      });
+    }
+  }
+
+  let missing_approvals: DiagnosticsReport["missing_approvals"] = [];
+  for (const creative of campaignCreatives) {
+    if (creative.regionsRequired && creative.regionsRequired.length > 0) {
+      const approvals = await db
+        .select({ regionCode: regions.code, status: creativeApprovals.status })
+        .from(creativeApprovals)
+        .innerJoin(regions, eq(creativeApprovals.regionId, regions.id))
+        .where(eq(creativeApprovals.creativeId, creative.id));
+
+      const approvedRegions = new Set(
+        approvals.filter(a => a.status === "approved").map(a => a.regionCode)
+      );
+
+      for (const region of creative.regionsRequired) {
+        if (!approvedRegions.has(region)) {
+          missing_approvals.push({
+            creative_id: creative.id,
+            name: creative.name,
+            region,
+            required: true,
+          });
+        }
+      }
+    }
+  }
+
+  let resolution_mismatches: DiagnosticsReport["resolution_mismatches"] = [];
+  if (targetedScreenIds.length > 0 && campaignCreatives.length > 0) {
+    const screenResolutions = await db
+      .select({ id: screens.id, width: screens.resolutionWidth, height: screens.resolutionHeight })
+      .from(screens)
+      .where(inArray(screens.id, targetedScreenIds));
+
+    for (const screen of screenResolutions) {
+      for (const creative of campaignCreatives) {
+        if (screen.width !== creative.width || screen.height !== creative.height) {
+          resolution_mismatches.push({
+            screen_id: screen.id,
+            screen_resolution: `${screen.width}x${screen.height}`,
+            creative_id: creative.id,
+            creative_resolution: `${creative.width}x${creative.height}`,
+          });
+        }
+      }
+    }
+
+    resolution_mismatches = resolution_mismatches.slice(0, 50);
+  }
+
+  return {
+    screens_offline,
+    screens_targeted_but_no_plays,
+    creatives_with_no_plays,
+    missing_approvals,
+    resolution_mismatches,
+  };
+}
