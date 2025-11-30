@@ -1,0 +1,195 @@
+You are working on the Beamer monorepo.
+
+All of the following changes have already been implemented:
+
+Playlist + type fix
+
+PlaylistItem now has type: "image" | "video" in the backend.
+
+The playlist SQL query now selects c.mime_type.
+
+There is a mapMimeToType helper that maps mime_type (e.g. video/mp4, image/png) → "video" or "image".
+
+The fallback creative query also sets type.
+
+In player-core, there is a client-side fallback that infers type from file extensions (.mp4, .mov, .webm → "video").
+
+Approval Model (Option B)
+
+Playlist generation only uses region approvals (creative_approvals) with ca.status = 'approved'.
+
+There is no filtering on c.status when generating playlists.
+
+creatives.status still exists but is for internal QA only and does not gate playback.
+
+CMS UI
+
+"Status" → "Internal QA Status (does not control playback)".
+
+Clear text: “For internal tracking only. Playback is controlled by Region Approvals below.”
+
+"Region Approvals" renamed to "Playback Status per Region" with description explaining that Approved = live.
+
+Now, I want you to help me verify and debug the system end-to-end, focusing on two things:
+
+The player actually plays videos as videos, not images.
+
+The live / not-live behaviour is only controlled by region approvals.
+
+Please do the following step by step:
+
+A. Verify the playlist API response
+
+Find the player playlist endpoint in the backend (e.g. in player.routes.ts / player.controller.ts).
+
+Run the backend and hit the playlist endpoint for a known screen (you may need to seed or create a test screen + campaign + creative if not present).
+
+I want you to:
+
+Log / print the raw JSON playlist response.
+
+Confirm each playlist item has:
+
+{
+  "creative_id": "...",
+  "file_url": "https://...",
+  "duration_seconds": <number>,
+  "type": "image" | "video"
+}
+
+
+Specifically verify:
+
+At least one creative with a .mp4 URL returns "type": "video".
+
+A PNG/JPG returns "type": "image".
+
+If any playlist item is missing type or has the wrong type:
+
+Trace where that playlist item comes from (main query vs fallback query).
+
+Fix the mapping so every creative in the playlist has the correct type field.
+
+Show me the logged playlist JSON in the console output.
+
+B. Verify the player uses creative.type correctly
+
+Open the Electron player or whatever frontend is rendering the creatives.
+
+Find the logic that chooses between <img> and <video> (e.g. in player-electron/index.html or equivalent):
+
+It should look like:
+
+if (creative.type === "video") {
+  // render <video>
+} else {
+  // render <img>
+}
+
+
+Add temporary logging around this:
+
+console.log("DEBUG creative in renderer", {
+  creativeId: creative.creative_id,
+  fileUrl: creative.file_url,
+  type: creative.type,
+});
+
+
+Run the player and:
+
+Capture the console logs.
+
+Confirm that for a .mp4 file:
+
+type is "video".
+
+The <video> element is actually rendered.
+
+Confirm for .png/.jpg:
+
+type is "image".
+
+The <img> element is rendered.
+
+If the logged type is correct but the player still behaves as if it’s an image:
+
+Inspect the actual DOM (if possible) to confirm whether <video> is present but maybe not visible / not playing.
+
+Check for:
+
+CSS issues (e.g. size 0, hidden, z-index problems).
+
+Missing autoplay, muted, or loop flags.
+
+Any errors in the devtools console about video playback.
+
+Please:
+
+Print the debug logs you see for at least one video creative.
+
+Confirm which element actually appears in the DOM for that creative.
+
+C. Verify region approvals are the only gate
+
+We want to confirm, in practice, that only creative_approvals controls live status.
+
+Pick a test creative C and region R where:
+
+There is a flight targeting a screen in region R.
+
+There is a creative_approvals row for C + R.
+
+Test case 1 – Approved:
+
+Set creative_approvals.status = 'approved' for C + R.
+
+Make sure the screen you’re testing is in region R.
+
+Hit the playlist endpoint again and confirm C appears in the playlist.
+
+Test case 2 – Blocked:
+
+Change creative_approvals.status to 'pending' or 'rejected' for C + R.
+
+Call the playlist endpoint again.
+
+Confirm that C no longer appears in the playlist.
+
+While doing this, intentionally change creatives.status for C:
+
+Try setting it to 'pending_review', 'rejected', etc.
+
+Verify that C’s presence in the playlist does not change as long as creative_approvals.status = 'approved'.
+
+If you find any scenario where creatives.status still affects the playlist, track it down and remove that dependency.
+
+D. Extra checks (edge cases)
+
+If time permits, please also:
+
+Check what happens if mime_type is NULL for a creative:
+
+mapMimeToType should default that to "image".
+
+Confirm that in the playlist response and logs.
+
+Confirm the fallback logic in player-core:
+
+Temporarily strip type from one playlist item before it reaches the renderer (simulate an older backend).
+
+Verify that the client-side inference still sets "video" correctly for .mp4.
+
+At the end, give me a concise report with:
+
+Example playlist JSON (1–2 items) showing correct type values.
+
+Renderer logs for a video and an image creative.
+
+Confirmation that:
+
+Region approvals alone control live status.
+
+creatives.status does not affect playback.
+
+Any bugs or oddities you found and how you fixed them.
