@@ -1,0 +1,234 @@
+You are working on the Beamer monorepo.
+
+There are currently two different playlist.json files:
+
+player-electron/playlist.json (example):
+
+{
+  "screen_id": "d2bfd3f8-2c4c-46d2-a96b-0bcc8de14845",
+  "region": "NG",
+  "city": "Lagos",
+  "config_hash": "07b12d9e105f5a5e",
+  "playlist": [
+    {
+      "creative_id": "ba35493b-3bee-44b7-a77b-feb23d3b7dd0",
+      "campaign_id": "a6b6f419-92dd-5417-922b-91748cd6e666",
+      "flight_id": "31b4adec-8d34-4173-8c97-195524720962",
+      "file_url": "/uploads/186fd7a4-fbe1-4436-a96d-c39db811b90b.png",
+      "duration_seconds": 10,
+      "type": "image"
+    },
+    {
+      "creative_id": "be33a093-390d-451c-aee2-31cd92960da4",
+      "campaign_id": "a6b6f419-92dd-5417-922b-91748cd6e666",
+      "flight_id": "31b4adec-8d34-4173-8c97-195524720962",
+      "file_url": "/uploads/13ed400e-c8f0-428f-a5a0-88e72cda3326.mp4",
+      "duration_seconds": 30,
+      "type": "video"
+    }
+  ]
+}
+
+
+player-core/playlist.json (example):
+
+{
+  "screen_id": "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee",
+  "region": "NG",
+  "city": "Lagos",
+  "config_hash": "012f166ac998ba23",
+  "playlist": [
+    {
+      "creative_id": "dummy_1",
+      "type": "image",
+      "file_url": "",
+      "duration_seconds": 10
+    }
+  ]
+}
+
+
+The media are not playing in the player.
+
+We need to:
+
+Unify the playlist source of truth (one playlist.json that everyone uses).
+
+Make sure that the playlist saved to disk by player-core is the one read by player-electron.
+
+Ensure that, after caching, each creative has a usable src (prefer local_file_path, then a correct absolute URL).
+
+Step A – Find where playlist.json is written and read
+
+Search the repo for "dummy_1" and "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee".
+
+This will show where the dummy playlist is defined and written.
+
+Identify:
+
+The write path for playlist.json in player-core.
+
+The read path for playlist.json in player-electron.
+
+Confirm:
+
+What exact file path does player-core write to when updating the playlist?
+
+What exact file path does player-electron read from when rendering creatives?
+
+If they are different, that’s a bug: we want one shared playlist file, not two independent ones.
+
+Step B – Create a single “source of truth” for playlist.json
+
+We want:
+
+player-core to own the logic of:
+
+fetching the playlist from the backend,
+
+caching assets (and adding local_file_path),
+
+writing a single playlist.json.
+
+player-electron should only read that file.
+
+Please do the following:
+
+Create a small helper in player-core (if not already present), something like:
+
+// player-core/src/paths.ts (or similar)
+import path from "path";
+
+export function getPlaylistFilePath() {
+  // Adjust paths as needed so this resolves to the playlist.json
+  // that player-electron will use at runtime.
+  return path.join(__dirname, "..", "player-electron", "playlist.json");
+}
+
+
+Use the real relative structure of the monorepo so that this path points to the single playlist.json file.
+
+Update any code in player-core that writes playlist.json to use getPlaylistFilePath() instead of a hard-coded path.
+
+The playlist that gets written should be the real playlist from the backend, after:
+
+adding type: "image" | "video",
+
+running through asset cache logic (so local_file_path is present where possible).
+
+In player-electron, update the code that reads playlist.json to use the exact same file path logic:
+
+Either import getPlaylistFilePath() from player-core (if feasible), or
+
+Duplicate its logic carefully so both sides resolve to the same file path.
+
+The goal: there is one real playlist.json — no separate dummy file for production.
+
+Step C – Ensure dummy playlist is used only as a fallback (if at all)
+
+Right now, the dummy_1 playlist suggests there is a built-in dummy.
+
+We want:
+
+Dummy playlist used only when:
+
+The player cannot reach the backend and
+
+There is no valid playlist.json on disk.
+
+Please:
+
+Refactor the dummy playlist definition into something like sample-playlist.json or a constant used explicitly in a fallback code path.
+
+Ensure the normal flow is:
+
+try {
+  // Try to fetch from backend, cache assets, and write real playlist.json
+} catch (err) {
+  // If and only if there is no existing playlist.json on disk:
+  //  - write the dummy playlist once as a fallback
+}
+
+
+Do not overwrite a real playlist.json with the dummy in normal circumstances.
+
+Step D – Make sure the renderer uses local_file_path (or a real URL)
+
+Once the playlist unification is fixed, update player-electron rendering logic:
+
+Find where the <img> / <video> src is set. It should look like:
+
+if (creative.type === "video") {
+  video.src = creative.file_url;
+} else {
+  img.src = creative.file_url;
+}
+
+
+Change this to prioritize local_file_path, then fall back to a proper absolute URL:
+
+function resolveSrc(creative) {
+  if (creative.local_file_path) return creative.local_file_path;
+
+  const url = creative.file_url || "";
+  if (url.startsWith("http://") || url.startsWith("https://") || url.startsWith("file://")) {
+    return url;
+  }
+
+  // Handle server-relative paths like "/uploads/..."
+  const base = process.env.BEAMER_CMS_BASE_URL || "http://localhost:3000";
+  return `${base}${url}`;
+}
+
+const src = resolveSrc(creative);
+
+if (creative.type === "video") {
+  video.src = src;
+  video.autoplay = true;
+  video.muted = true;
+  video.loop = true;
+  video.playsInline = true;
+} else {
+  img.src = src;
+}
+
+
+Add a console.log to debug what is being used:
+
+console.log("PLAYER DEBUG creative", {
+  id: creative.creative_id,
+  type: creative.type,
+  fileUrl: creative.file_url,
+  localPath: creative.local_file_path,
+  resolvedSrc: src,
+});
+
+Step E – Verify end-to-end
+
+After making these changes:
+
+Run the player-core update flow so that it fetches from the backend, caches assets, and writes playlist.json.
+
+Open the single playlist.json file that both sides now share and confirm:
+
+It contains the real creatives from the backend.
+
+Each creative has type and, where possible, local_file_path.
+
+Run the Electron player:
+
+Confirm via console logs that it reads the same playlist file.
+
+Confirm resolvedSrc is either:
+
+a valid file:// path (local cache), or
+
+a full http://.../uploads/... URL (not just /uploads/...).
+
+Confirm that both image and video creatives now actually display/play.
+
+Please implement these changes, clean up any TypeScript/JS issues, and ensure that:
+
+There is one source-of-truth playlist file.
+
+Media in the player now play correctly using that unified playlist.
