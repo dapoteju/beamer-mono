@@ -129,6 +129,65 @@ After initial registration, `player.json` contains the auth token. The player wi
 - Send heartbeats every 60 seconds (with GPS + device metrics)
 - Report each creative play event
 
+## Re-Registering a Player (Reconnecting to a Screen)
+
+If a player was previously connected to a screen but now shows as "offline" or "no player connected" in the CMS, you'll need to re-register the player. This commonly happens when:
+- The player was disconnected via the CMS
+- The player's credentials were revoked
+- You're setting up a new device to replace an old one
+
+### Step 1: Disconnect Old Player (If Needed)
+
+If the CMS shows another player is still linked to the screen, you'll need to disconnect it first.
+
+**For Internal/Admin Users:**
+1. Log into the Beamer CMS with admin credentials
+2. Navigate to **Screens** > select your screen
+3. Click **Disconnect Player** button
+4. Confirm the disconnection
+
+**For Field Operations Team:**
+If you don't have access to the disconnect function, contact your Beamer administrator or IT support to disconnect the old player before proceeding.
+
+This marks the old player as inactive so a new one can register.
+
+### Step 2: Delete player.json on the Device
+
+On the player device, delete the `player.json` file to clear old credentials:
+
+```bash
+# macOS / Linux
+cd player-electron
+rm player.json
+
+# Windows (PowerShell)
+cd player-electron
+Remove-Item player.json
+```
+
+**Important**: Keep `beamer.config.json` intact - this contains your screen configuration.
+
+### Step 3: Restart the Player
+
+```bash
+npm start
+```
+
+The player will:
+1. Detect that `player.json` is missing
+2. Register as a new player with the backend
+3. Receive fresh credentials (new player_id and auth_token)
+4. Save the new credentials to `player.json`
+5. Begin sending heartbeats and playing content
+
+### Step 4: Verify in CMS
+
+1. Wait 1-2 minutes for heartbeats to arrive
+2. Check the screen in CMS - it should show:
+   - Player connected
+   - Status: Online (green indicator)
+   - Last heartbeat timestamp
+
 ## Auto-Start on Boot (Linux)
 
 ### Using systemd
@@ -191,6 +250,72 @@ pm2 startup
 ```
 
 ## Troubleshooting
+
+### Player Shows Offline in CMS (But Device is Running)
+
+**Understanding Online/Offline Status:**
+
+The CMS determines if a player is "online" based on heartbeats. A player is considered online if:
+- It has sent a heartbeat within the last **2 minutes**
+- The player is marked as **active** (not disconnected/revoked)
+
+**Common Causes:**
+
+1. **Network Issues**: The player can't reach the backend API
+2. **Inactive Player**: The player was disconnected via CMS but is still running with old credentials
+3. **Wrong API URL**: The player is sending heartbeats to the wrong server
+4. **Firewall/Proxy**: Corporate network blocking outbound requests
+
+**Diagnosis Steps:**
+
+1. **Check player logs** for errors:
+   ```bash
+   # Look for heartbeat errors in console output
+   npm start 2>&1 | grep -i "heartbeat\|error"
+   ```
+
+2. **Verify network connectivity**:
+   ```bash
+   curl -I https://your-beamer-backend.replit.app/api/health
+   ```
+
+3. **Check if player.json exists and has valid credentials**:
+   ```bash
+   cat player.json
+   ```
+
+**Fixes:**
+
+- If network is fine but still offline: Delete `player.json` and restart (see "Re-Registering a Player" above)
+- If player.json is missing: The player should auto-register on next start
+- If API URL is wrong: Update `beamer.config.json` with correct URL
+
+### Error: "PLAYER_ALREADY_REGISTERED" / "Screen already linked to another player"
+
+**What This Means:**
+
+When a player tries to register, the backend checks if the screen already has an active player. If so, it blocks the registration to prevent duplicate players.
+
+**When This Happens:**
+- Reinstalling the player app without disconnecting in CMS first
+- Setting up a replacement device for an existing screen
+- The `player.json` file was deleted but the old player wasn't disconnected
+
+**Solution:**
+
+1. **Disconnect the old player via CMS** (requires admin access):
+   - Go to **Screens** > select your screen
+   - Click **Disconnect Player**
+   - This marks the old player as inactive
+   - *If you don't have admin access, contact your Beamer administrator*
+
+2. **On the device:**
+   - Delete `player.json` if it exists
+   - Restart the player app
+
+3. **The player will register successfully** and receive new credentials
+
+**Technical Note:** The backend returns error code `PLAYER_ALREADY_REGISTERED` with the existing player ID. This is intentional to prevent ghost players.
 
 ### Error: "Missing beamer.config.json"
 
@@ -263,5 +388,5 @@ For issues not covered in this guide:
 
 ---
 
-**Version**: 1.0.0  
+**Version**: 1.1.0  
 **Last Updated**: November 2025
