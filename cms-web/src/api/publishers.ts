@@ -42,7 +42,7 @@ export interface UpdatePublisherPayload {
 
 export async function fetchPublishers(): Promise<PublisherProfile[]> {
   const response = await apiClient.get<PublisherProfile[]>("/publishers");
-  return response.data;
+  return response.data || [];
 }
 
 export async function fetchPublisherById(id: string): Promise<PublisherProfileDetail> {

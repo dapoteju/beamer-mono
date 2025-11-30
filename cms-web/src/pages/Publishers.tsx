@@ -17,7 +17,7 @@ export default function Publishers() {
       setLoading(true);
       setError(null);
       const data = await fetchPublishers();
-      setPublishers(data);
+      setPublishers(data || []);
     } catch (err: any) {
       console.error("Failed to fetch publishers:", err);
       setError(
