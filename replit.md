@@ -47,6 +47,14 @@ The project is organized as a monorepo with distinct applications and libraries:
 - **Player Configuration**: Ops-friendly device provisioning via `beamer.config.json` file. Configuration includes api_base_url, serial_number, screen_id, and optional provisioning_code. Player fails fast with clear error messages if config is missing or invalid. See `PLAYER_SETUP.md` for detailed setup instructions.
 - **Player Registration Conflict Detection**: Explicit detection when a screen is already linked to another player. Registration endpoint returns structured `PLAYER_ALREADY_REGISTERED` error (HTTP 409) with existing player ID. Player-core throws `PlayerAlreadyRegisteredError` with detailed console logging. Electron UI displays actionable instructions for technicians to disconnect the current player via CMS.
 - **Regions**: Country-level regulatory jurisdictions for creative approval tracking. Supported regions: Nigeria (NG, ARCON), Kenya (KE, KFCB), Ghana (GH, GACA), South Africa (ZA, AR). Migration script available at `backend/scripts/migrate-regions-to-country-level.ts` for converting from state-level to country-level regions.
+- **Vehicles Management**: Full inventory management for vehicles that carry mobile screens. Full CRUD API with publisher-scoped access control via `/api/vehicles` endpoints (GET, POST, GET/:id, PATCH/:id, DELETE/:id, GET/:id/screens). Features include:
+  - UUID-based vehicle IDs with name, external_id, license_plate, make_model, city, region fields
+  - Publisher-scoped access control (publishers only see their vehicles, internal users see all)
+  - Soft-delete (deactivation) with safeguards preventing deactivation when screens are linked
+  - Vehicle screens endpoint to list all screens attached to a vehicle
+  - Frontend pages: VehiclesList (with filtering), VehicleDetail (with screens tab), VehicleEditorModal
+  - Navigation accessible for beamer_internal and publisher users
+- **Enhanced Screen Specifications**: Screens now include width_px, height_px, screen_type, orientation, and is_active fields. ScreenFormModal includes resolution and orientation editing. Screen types: vehicle, indoor, billboard, mall, other. Orientation: landscape, portrait.
 - **Publisher-scoped Screen Groups**: Screen groups are strictly scoped to publisher organizations (not advertisers). Groups can only contain screens owned by the same publisher. Key features:
   - Publisher validation on group creation (rejects advertiser orgs)
   - Membership integrity enforcement (screens can only be added to groups owned by their publisher)
