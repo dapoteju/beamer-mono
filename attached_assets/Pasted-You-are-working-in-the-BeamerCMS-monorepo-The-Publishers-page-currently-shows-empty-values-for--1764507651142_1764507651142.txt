@@ -1,0 +1,156 @@
+You are working in the BeamerCMS monorepo. The Publishers page currently shows empty values (—) for the Name and Organisation columns, even though publishers exist and have contact details.
+
+Your task is to fix the data plumbing so those columns show meaningful values.
+
+1️⃣ Inspect the Publisher Data Model & API
+
+Locate the backend model for publishers / organisations:
+
+Likely under: apps/api/src/db/schema/organisations.ts
+
+And any publisher-specific model (if present), e.g. publishers.ts.
+
+Identify fields that should be used for:
+
+Publisher contact/label – e.g. contact_name, display_name, or name
+
+Organisation/company name – e.g. company_name, organisation_name, or legal_name
+
+Inspect the controller / service that powers the Publishers list endpoint:
+
+Likely apps/api/src/controllers/publishersController.ts or similar.
+
+The endpoint is probably GET /api/publishers or GET /api/organisations?type=publisher.
+
+Find the DTO / mapping function that builds the JSON response for each publisher row.
+
+Ensure it exposes two clear fields, for example:
+
+{
+  id,
+  name,            // contact / primary label
+  organisationName, // company/brand name
+  orgType,
+  contactPhone,
+  screensCount,
+  createdAt,
+  ...
+}
+
+
+If these fields are missing entirely from the response:
+
+Add them to the DTO.
+
+Map them from the appropriate DB columns (contact_name, display_name, company_name, etc).
+
+2️⃣ Fix the Frontend Publisher List Mapping
+
+Locate the Publishers list page:
+
+Likely: apps/cms-web/src/pages/publishers/PublishersList.tsx or similar.
+
+And a row component like PublisherRow.tsx.
+
+Find where the Name and Organisation columns are rendered, something like:
+
+<TableCell>{publisher.name ?? "—"}</TableCell>
+<TableCell>{publisher.organisation ?? "—"}</TableCell>
+
+
+Update the mapping to use the fields from the API DTO you standardised above, e.g.:
+
+<TableCell>
+  {publisher.name || "—"}
+</TableCell>
+
+<TableCell>
+  {publisher.organisationName || "—"}
+</TableCell>
+
+
+Make sure the Type badge is using the correct orgType field and not confusing type with organisation name.
+
+3️⃣ Ensure Publisher Create/Edit Forms Actually Populate These Fields
+
+Locate the Create Publisher / Edit Publisher modal or page:
+
+Likely: apps/cms-web/src/components/publishers/PublisherEditorModal.tsx or similar.
+
+Check what fields are in the form:
+
+There should be inputs for:
+
+Name (contact/display name)
+
+Organisation / Company (organisation name)
+
+Contact phone
+
+Org type (publisher/advertiser/etc)
+
+Ensure the form’s onSubmit sends these fields to the backend in the payload:
+
+{
+  name: formValues.name,
+  organisationName: formValues.organisationName,
+  contactPhone: formValues.contactPhone,
+  orgType: "publisher",
+  ...
+}
+
+
+On the backend, in the create/update handlers:
+
+Map name and organisationName into the correct DB columns.
+
+Make sure both are persisted.
+
+If the DB is currently missing a dedicated organisation/company name field:
+
+Either:
+
+Use one generic name field for both columns (and show same value in both Name and Organisation for now), or
+
+Add a new company_name / organisation_name column to organisations and migrate.
+
+For now, prefer a minimal change:
+
+Use name for Organisation column.
+
+Use a contact_name or the same field for Name, until differentiated.
+
+4️⃣ Data Backfill (Optional but Recommended)
+
+If there are existing publishers where name or organisationName are null:
+
+Add a one-off script or migration to backfill:
+
+UPDATE organisations
+SET name = COALESCE(name, contact_name, 'Unknown Publisher')
+WHERE org_type = 'publisher' AND name IS NULL;
+
+
+If you added organisation_name / company_name:
+
+Backfill from name initially.
+
+5️⃣ Acceptance Criteria
+
+You are done when:
+
+The Publishers table Name column shows a meaningful value (contact/display name) instead of —.
+
+The Organisation column shows the company/brand name (or, as an interim, the same name as the Name column if there is no separate field yet).
+
+Creating a new publisher with Name + Organisation values immediately reflects correctly in the list.
+
+Editing an existing publisher updates both fields in the list.
+
+Type still shows “Organisation” correctly for publisher-type orgs.
+
+Make sure there are:
+
+No TypeScript errors
+
+No runtime console errors

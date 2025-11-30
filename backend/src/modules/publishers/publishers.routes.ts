@@ -35,6 +35,25 @@ function canEditPublisher(req: AuthRequest): boolean {
   return orgType === "beamer_internal" && (role === "admin" || role === "ops");
 }
 
+// Helper to flatten publisher profile for API response
+function flattenPublisherProfile(profile: Awaited<ReturnType<typeof listPublisherProfiles>>[0]) {
+  return {
+    id: profile.id,
+    publisherType: profile.publisherType,
+    organisationId: profile.organisationId,
+    organisationName: profile.organisation?.name || null,
+    fullName: profile.fullName,
+    phoneNumber: profile.phoneNumber,
+    email: profile.email,
+    address: profile.address,
+    notes: profile.notes,
+    screenCount: profile.screenCount,
+    vehicleCount: profile.vehicleCount,
+    createdAt: profile.createdAt,
+    updatedAt: profile.updatedAt,
+  };
+}
+
 // GET /api/publishers - List all publisher profiles
 publishersRouter.get("/", requireAuth, async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
@@ -49,10 +68,10 @@ publishersRouter.get("/", requireAuth, async (req: AuthRequest, res: Response, n
       const filtered = publishers.filter(
         (p) => p.organisationId === req.user!.orgId
       );
-      return res.json(filtered);
+      return res.json(filtered.map(flattenPublisherProfile));
     }
 
-    res.json(publishers);
+    res.json(publishers.map(flattenPublisherProfile));
   } catch (err) {
     next(err);
   }
@@ -137,7 +156,7 @@ publishersRouter.get("/:id", requireAuth, async (req: AuthRequest, res: Response
       return res.status(403).json({ error: "Forbidden" });
     }
 
-    res.json(publisher);
+    res.json(flattenPublisherProfile(publisher));
   } catch (err) {
     next(err);
   }
@@ -183,7 +202,7 @@ publishersRouter.post("/", requireAuth, async (req: AuthRequest, res: Response, 
       notes,
     });
 
-    res.status(201).json(created);
+    res.status(201).json(flattenPublisherProfile(created));
   } catch (err) {
     next(err);
   }
@@ -223,7 +242,7 @@ publishersRouter.patch("/:id", requireAuth, async (req: AuthRequest, res: Respon
       notes,
     });
 
-    res.json(updated);
+    res.json(flattenPublisherProfile(updated));
   } catch (err) {
     next(err);
   }
