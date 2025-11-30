@@ -1,0 +1,112 @@
+You are working on the Beamer monorepo.
+
+Current behaviour:
+
+Playback is correctly controlled only by creative_approvals (region approvals).
+
+creatives.status is now labelled “Internal QA Status (does not control playback)” in the CMS.
+
+When I approve a region for a creative (e.g. NG = approved ✅), the creative becomes live and plays correctly, but the Internal QA Status still shows pending_review, which is confusing.
+
+I want to change the behaviour so that approving a creative for a region automatically updates the Internal QA Status to approved as well (unless it was explicitly rejected).
+
+🎯 New desired behaviour
+
+When any region approval for a creative is set to approved:
+
+Automatically set creatives.status = 'approved' for that creative, if it is currently pending_review.
+
+This must not affect playback logic:
+
+Playback must still be controlled only by creative_approvals.status = 'approved'.
+
+The QA status remains purely informational, but is now kept in sync so it doesn’t stay stuck on pending_review once we’ve effectively approved the creative for use.
+
+🧩 Implementation details
+
+Please do the following:
+
+1. Find where region approvals are updated
+
+Locate the backend endpoint / service that handles updating a creative approval record, something like:
+
+PATCH /creative-approvals/:id
+
+or a handler in creativeApprovals.service.ts / creativeApproval.controller.ts
+
+This is the code that runs when I change a Playback Status per Region from pending to approved in the CMS.
+
+2. After setting a region to approved, also bump the creative’s QA status
+
+In the backend, after you persist creative_approvals.status = 'approved', add logic like:
+
+// Pseudocode – adjust to match actual file/DB layer
+
+if (updatedApproval.status === "approved") {
+  await db
+    .update(creatives)
+    .set({ status: "approved" })
+    .where(
+      and(
+        eq(creatives.id, updatedApproval.creativeId),
+        ne(creatives.status, "rejected") // don't auto-overwrite an explicit rejection
+      )
+    );
+}
+
+
+Requirements:
+
+Only auto-update the creative if:
+
+The region approval was just set to "approved".
+
+The creative is not already explicitly "rejected" (don’t override a hard QA rejection).
+
+If the creative is currently pending_review, it should become approved.
+
+If it’s already approved, nothing changes.
+
+Use the actual query builder / ORM already used in this codebase (e.g. Drizzle, Knex, Prisma, raw SQL), but keep the logic equivalent.
+
+3. Do NOT change playlist logic
+
+Double-check:
+
+getWeightedPlaylistForScreen (or equivalent) must still only filter on:
+
+ca.status = 'approved'
+[and optionally ca.approval_code IS NOT NULL if region requires pre-approval]
+
+
+There must still be no condition on c.status in the playlist query.
+
+We’re only syncing QA status for UX sanity, not reintroducing it into the playback path.
+
+4. Optional: make the UI message smarter (small tweak)
+
+In the creative detail view in the CMS:
+
+If any region approval is approved, and the Internal QA Status is still pending_review (e.g. before the new logic kicks in for existing data), show a subtle helper text like:
+
+“This creative is approved for playback in at least one region.”
+
+This is optional, but helps avoid confusion for existing creatives created before this update.
+
+✅ After change, please verify:
+
+Approve a region for a creative whose Internal QA Status is pending_review:
+
+Confirm creative_approvals.status = 'approved' for that region.
+
+Confirm creatives.status is auto-updated to 'approved'.
+
+Confirm the creative appears in the playlist and plays (as before).
+
+Change creatives.status manually to 'rejected', then approve another region:
+
+Confirm creatives.status stays rejected (we don’t silently undo a rejection).
+
+Confirm playback is still controlled strictly by region approvals.
+
+Please implement this behaviour, fix any resulting TypeScript/typing issues, and ensure tests/build pass.
