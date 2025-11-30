@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.invoices = exports.passwordResetTokens = exports.screenLocationHistory = exports.bookingFlights = exports.screenGroupMembers = exports.screenGroups = exports.heartbeats = exports.playEvents = exports.players = exports.creativeApprovals = exports.users = exports.regions = exports.creatives = exports.flightCreatives = exports.flights = exports.bookings = exports.campaigns = exports.screens = exports.vehicles = exports.publisherProfiles = exports.publisherTypeEnum = exports.organisations = exports.userRoleEnum = exports.screenStatusEnum = exports.orgTypeEnum = void 0;
+exports.invoices = exports.passwordResetTokens = exports.screenLocationHistory = exports.bookingFlights = exports.screenGroupMemberships = exports.screenGroups = exports.heartbeats = exports.playEvents = exports.players = exports.creativeApprovals = exports.users = exports.regions = exports.creatives = exports.flightCreatives = exports.flights = exports.bookings = exports.campaigns = exports.screens = exports.vehicles = exports.publisherProfiles = exports.publisherTypeEnum = exports.organisations = exports.userRoleEnum = exports.screenStatusEnum = exports.orgTypeEnum = void 0;
 // src/db/schema.ts
 const pg_core_1 = require("drizzle-orm/pg-core");
 // --- Enums ---
@@ -22,6 +22,7 @@ exports.userRoleEnum = (0, pg_core_1.pgEnum)("user_role", [
 // --- Organisations ---
 exports.organisations = (0, pg_core_1.pgTable)("organisations", {
     id: (0, pg_core_1.uuid)("id").primaryKey().defaultRandom(),
+    publicCode: (0, pg_core_1.text)("public_code").unique(),
     name: (0, pg_core_1.varchar)("name", { length: 255 }).notNull(),
     type: (0, exports.orgTypeEnum)("type").notNull(),
     billingEmail: (0, pg_core_1.varchar)("billing_email", { length: 255 }).notNull(),
@@ -39,6 +40,7 @@ exports.publisherTypeEnum = (0, pg_core_1.pgEnum)("publisher_type", [
 ]);
 exports.publisherProfiles = (0, pg_core_1.pgTable)("publisher_profiles", {
     id: (0, pg_core_1.uuid)("id").primaryKey().defaultRandom(),
+    publicCode: (0, pg_core_1.text)("public_code").notNull().unique(),
     organisationId: (0, pg_core_1.uuid)("organisation_id").references(() => exports.organisations.id),
     publisherType: (0, exports.publisherTypeEnum)("publisher_type").notNull(),
     fullName: (0, pg_core_1.text)("full_name"),
@@ -53,19 +55,19 @@ exports.publisherProfiles = (0, pg_core_1.pgTable)("publisher_profiles", {
         .defaultNow()
         .notNull(),
 });
-// --- Vehicles (Phase 1: Vehicle metadata) ---
+// --- Vehicles (Phase 1: Vehicle metadata, Phase 4: Enhanced inventory management) ---
 exports.vehicles = (0, pg_core_1.pgTable)("vehicles", {
-    id: (0, pg_core_1.text)("id").primaryKey(),
+    id: (0, pg_core_1.uuid)("id").primaryKey().defaultRandom(),
     publisherOrgId: (0, pg_core_1.uuid)("publisher_org_id")
         .notNull()
         .references(() => exports.organisations.id),
-    identifier: (0, pg_core_1.text)("identifier"),
-    licencePlate: (0, pg_core_1.text)("licence_plate"),
-    make: (0, pg_core_1.text)("make"),
-    model: (0, pg_core_1.text)("model"),
-    year: (0, pg_core_1.text)("year"),
-    colour: (0, pg_core_1.text)("colour"),
-    notes: (0, pg_core_1.text)("notes"),
+    name: (0, pg_core_1.text)("name").notNull(),
+    externalId: (0, pg_core_1.text)("external_id"),
+    licensePlate: (0, pg_core_1.text)("license_plate"),
+    makeModel: (0, pg_core_1.text)("make_model"),
+    city: (0, pg_core_1.text)("city"),
+    region: (0, pg_core_1.text)("region"),
+    isActive: (0, pg_core_1.boolean)("is_active").notNull().default(true),
     createdAt: (0, pg_core_1.timestamp)("created_at", { withTimezone: true })
         .defaultNow()
         .notNull(),
@@ -84,7 +86,13 @@ exports.screens = (0, pg_core_1.pgTable)("screens", {
         .references(() => exports.organisations.id),
     // Phase 3B: Name is now optional (code is the primary identifier)
     name: (0, pg_core_1.varchar)("name", { length: 255 }),
-    screenType: (0, pg_core_1.varchar)("screen_type", { length: 50 }).notNull(), // taxi_top, billboard, etc.
+    // Phase 4: Enhanced screen properties
+    widthPx: (0, pg_core_1.integer)("width_px").notNull().default(342),
+    heightPx: (0, pg_core_1.integer)("height_px").notNull().default(130),
+    screenType: (0, pg_core_1.varchar)("screen_type", { length: 50 }).notNull().default("vehicle"), // vehicle, indoor, billboard, mall, other
+    orientation: (0, pg_core_1.varchar)("orientation", { length: 20 }).notNull().default("landscape"), // landscape, portrait
+    isActive: (0, pg_core_1.boolean)("is_active").notNull().default(true),
+    // Legacy resolution fields (kept for backwards compatibility)
     resolutionWidth: (0, pg_core_1.integer)("resolution_width").notNull(),
     resolutionHeight: (0, pg_core_1.integer)("resolution_height").notNull(),
     city: (0, pg_core_1.varchar)("city", { length: 100 }).notNull(),
@@ -99,7 +107,7 @@ exports.screens = (0, pg_core_1.pgTable)("screens", {
     publisherId: (0, pg_core_1.uuid)("publisher_id").references(() => exports.publisherProfiles.id),
     // Phase 1: Extended metadata (all nullable, non-breaking)
     screenClassification: (0, pg_core_1.text)("screen_classification").default("vehicle"), // vehicle, billboard, indoor
-    vehicleId: (0, pg_core_1.text)("vehicle_id").references(() => exports.vehicles.id),
+    vehicleId: (0, pg_core_1.uuid)("vehicle_id").references(() => exports.vehicles.id),
     // Billboard/static OOH metadata
     structureType: (0, pg_core_1.text)("structure_type"),
     sizeDescription: (0, pg_core_1.text)("size_description"),
@@ -257,6 +265,8 @@ exports.players = (0, pg_core_1.pgTable)("players", {
     lastSeenAt: (0, pg_core_1.timestamp)("last_seen_at", { withTimezone: true }),
     softwareVersion: (0, pg_core_1.text)("software_version"),
     configHash: (0, pg_core_1.text)("config_hash"),
+    isActive: (0, pg_core_1.boolean)("is_active").notNull().default(true),
+    revokedAt: (0, pg_core_1.timestamp)("revoked_at", { withTimezone: true }),
     createdAt: (0, pg_core_1.timestamp)("created_at", { withTimezone: true })
         .defaultNow()
         .notNull(),
@@ -299,9 +309,11 @@ exports.heartbeats = (0, pg_core_1.pgTable)("heartbeats", {
     status: (0, pg_core_1.text)("status").notNull(),
     softwareVersion: (0, pg_core_1.varchar)("software_version", { length: 50 }),
     storageFreeMb: (0, pg_core_1.integer)("storage_free_mb"),
+    memoryFreeMb: (0, pg_core_1.integer)("memory_free_mb"),
     cpuUsage: (0, pg_core_1.numeric)("cpu_usage", { precision: 5, scale: 2 }),
     networkType: (0, pg_core_1.varchar)("network_type", { length: 20 }),
     signalStrength: (0, pg_core_1.integer)("signal_strength"),
+    online: (0, pg_core_1.boolean)("online"),
     lat: (0, pg_core_1.numeric)("lat", { precision: 10, scale: 7 }),
     lng: (0, pg_core_1.numeric)("lng", { precision: 10, scale: 7 }),
     createdAt: (0, pg_core_1.timestamp)("created_at", { withTimezone: true })
@@ -311,28 +323,32 @@ exports.heartbeats = (0, pg_core_1.pgTable)("heartbeats", {
 // --- Screen Groups ---
 exports.screenGroups = (0, pg_core_1.pgTable)("screen_groups", {
     id: (0, pg_core_1.uuid)("id").primaryKey().defaultRandom(),
-    publisherOrgId: (0, pg_core_1.uuid)("publisher_org_id")
+    orgId: (0, pg_core_1.uuid)("org_id")
         .notNull()
-        .references(() => exports.organisations.id),
-    name: (0, pg_core_1.varchar)("name", { length: 255 }).notNull(),
+        .references(() => exports.organisations.id, { onDelete: "cascade" }),
+    name: (0, pg_core_1.varchar)("name", { length: 100 }).notNull(),
     description: (0, pg_core_1.text)("description"),
+    isArchived: (0, pg_core_1.boolean)("is_archived").notNull().default(false),
     createdAt: (0, pg_core_1.timestamp)("created_at", { withTimezone: true })
         .defaultNow()
         .notNull(),
+    updatedAt: (0, pg_core_1.timestamp)("updated_at", { withTimezone: true })
+        .defaultNow()
+        .notNull(),
 });
-exports.screenGroupMembers = (0, pg_core_1.pgTable)("screen_group_members", {
-    id: (0, pg_core_1.uuid)("id").primaryKey().defaultRandom(),
+exports.screenGroupMemberships = (0, pg_core_1.pgTable)("screen_group_memberships", {
     groupId: (0, pg_core_1.uuid)("group_id")
         .notNull()
         .references(() => exports.screenGroups.id, { onDelete: "cascade" }),
     screenId: (0, pg_core_1.uuid)("screen_id")
         .notNull()
         .references(() => exports.screens.id, { onDelete: "cascade" }),
-    createdAt: (0, pg_core_1.timestamp)("created_at", { withTimezone: true })
+    addedByUserId: (0, pg_core_1.uuid)("added_by_user_id").references(() => exports.users.id),
+    addedAt: (0, pg_core_1.timestamp)("added_at", { withTimezone: true })
         .defaultNow()
         .notNull(),
 }, (table) => ({
-    uniqueGroupScreen: (0, pg_core_1.unique)().on(table.groupId, table.screenId),
+    pk: (0, pg_core_1.unique)().on(table.groupId, table.screenId),
 }));
 // --- Booking-Flights Junction Table ---
 exports.bookingFlights = (0, pg_core_1.pgTable)("booking_flights", {

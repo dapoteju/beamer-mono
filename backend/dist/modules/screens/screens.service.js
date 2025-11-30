@@ -1,4 +1,37 @@
 "use strict";
+var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    var desc = Object.getOwnPropertyDescriptor(m, k);
+    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
+      desc = { enumerable: true, get: function() { return m[k]; } };
+    }
+    Object.defineProperty(o, k2, desc);
+}) : (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    o[k2] = m[k];
+}));
+var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
+    Object.defineProperty(o, "default", { enumerable: true, value: v });
+}) : function(o, v) {
+    o["default"] = v;
+});
+var __importStar = (this && this.__importStar) || (function () {
+    var ownKeys = function(o) {
+        ownKeys = Object.getOwnPropertyNames || function (o) {
+            var ar = [];
+            for (var k in o) if (Object.prototype.hasOwnProperty.call(o, k)) ar[ar.length] = k;
+            return ar;
+        };
+        return ownKeys(o);
+    };
+    return function (mod) {
+        if (mod && mod.__esModule) return mod;
+        var result = {};
+        if (mod != null) for (var k = ownKeys(mod), i = 0; i < k.length; i++) if (k[i] !== "default") __createBinding(result, mod, k[i]);
+        __setModuleDefault(result, mod);
+        return result;
+    };
+})();
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.listScreens = listScreens;
 exports.listScreensWithPlayerInfo = listScreensWithPlayerInfo;
@@ -21,8 +54,14 @@ exports.getRegionsList = getRegionsList;
 exports.getVehiclesList = getVehiclesList;
 exports.createScreenForCMS = createScreenForCMS;
 exports.updateScreenData = updateScreenData;
+exports.getPlaylistPreview = getPlaylistPreview;
+exports.getLastPlayEvents = getLastPlayEvents;
+exports.disconnectPlayerFromScreen = disconnectPlayerFromScreen;
+exports.getActivePlayerForScreen = getActivePlayerForScreen;
+exports.getScreenGroups = getScreenGroups;
 // src/modules/screens/screens.service.ts
 const client_1 = require("../../db/client");
+const db_1 = require("../../db");
 const schema_1 = require("../../db/schema");
 const drizzle_orm_1 = require("drizzle-orm");
 // Phase 3B: Screen code generation helper
@@ -122,15 +161,18 @@ async function listScreensWithPlayerInfo(filters) {
         // Vehicle data (joined)
         vehicle: {
             id: schema_1.vehicles.id,
-            licencePlate: schema_1.vehicles.licencePlate,
-            make: schema_1.vehicles.make,
-            model: schema_1.vehicles.model,
-            colour: schema_1.vehicles.colour,
+            name: schema_1.vehicles.name,
+            licensePlate: schema_1.vehicles.licensePlate,
+            makeModel: schema_1.vehicles.makeModel,
+            externalId: schema_1.vehicles.externalId,
+            city: schema_1.vehicles.city,
+            region: schema_1.vehicles.region,
+            isActive: schema_1.vehicles.isActive,
         },
     })
         .from(schema_1.screens)
         .leftJoin(schema_1.organisations, (0, drizzle_orm_1.eq)(schema_1.screens.publisherOrgId, schema_1.organisations.id))
-        .leftJoin(schema_1.players, (0, drizzle_orm_1.eq)(schema_1.players.screenId, schema_1.screens.id))
+        .leftJoin(schema_1.players, (0, drizzle_orm_1.and)((0, drizzle_orm_1.eq)(schema_1.players.screenId, schema_1.screens.id), (0, drizzle_orm_1.eq)(schema_1.players.isActive, true)))
         .leftJoin(schema_1.vehicles, (0, drizzle_orm_1.eq)(schema_1.screens.vehicleId, schema_1.vehicles.id))
         .leftJoin(schema_1.publisherProfiles, (0, drizzle_orm_1.eq)(schema_1.screens.publisherId, schema_1.publisherProfiles.id));
     if (conditions.length > 0) {
@@ -193,13 +235,13 @@ async function getScreenDetail(screenId) {
         // Vehicle data (joined)
         vehicle: {
             id: schema_1.vehicles.id,
-            identifier: schema_1.vehicles.identifier,
-            licencePlate: schema_1.vehicles.licencePlate,
-            make: schema_1.vehicles.make,
-            model: schema_1.vehicles.model,
-            year: schema_1.vehicles.year,
-            colour: schema_1.vehicles.colour,
-            notes: schema_1.vehicles.notes,
+            name: schema_1.vehicles.name,
+            externalId: schema_1.vehicles.externalId,
+            licensePlate: schema_1.vehicles.licensePlate,
+            makeModel: schema_1.vehicles.makeModel,
+            city: schema_1.vehicles.city,
+            region: schema_1.vehicles.region,
+            isActive: schema_1.vehicles.isActive,
         },
     })
         .from(schema_1.screens)
@@ -216,7 +258,7 @@ async function getScreenDetail(screenId) {
         configHash: schema_1.players.configHash,
     })
         .from(schema_1.players)
-        .where((0, drizzle_orm_1.eq)(schema_1.players.screenId, screenId))
+        .where((0, drizzle_orm_1.and)((0, drizzle_orm_1.eq)(schema_1.players.screenId, screenId), (0, drizzle_orm_1.eq)(schema_1.players.isActive, true)))
         .limit(1);
     let lastHeartbeatAt = null;
     if (player) {
@@ -492,11 +534,13 @@ async function getVehiclesList(publisherOrgId) {
     const query = client_1.db
         .select({
         id: schema_1.vehicles.id,
-        identifier: schema_1.vehicles.identifier,
-        licencePlate: schema_1.vehicles.licencePlate,
-        make: schema_1.vehicles.make,
-        model: schema_1.vehicles.model,
-        colour: schema_1.vehicles.colour,
+        name: schema_1.vehicles.name,
+        externalId: schema_1.vehicles.externalId,
+        licensePlate: schema_1.vehicles.licensePlate,
+        makeModel: schema_1.vehicles.makeModel,
+        city: schema_1.vehicles.city,
+        region: schema_1.vehicles.region,
+        isActive: schema_1.vehicles.isActive,
         publisherOrgId: schema_1.vehicles.publisherOrgId,
         publisherOrgName: schema_1.organisations.name,
     })
@@ -635,4 +679,240 @@ async function updateScreenData(screenId, input, currentPlayerId) {
         }
         return updated;
     });
+}
+async function getPlaylistPreview(screenId) {
+    const client = await db_1.pool.connect();
+    try {
+        await client.query("BEGIN");
+        const screenRow = await client.query(`
+      SELECT
+        s.id AS screen_id,
+        s.region_code
+      FROM public.screens s
+      WHERE s.id = $1
+      `, [screenId]);
+        if (screenRow.rowCount === 0) {
+            throw new Error("Screen not found");
+        }
+        const { screen_id, region_code } = screenRow.rows[0];
+        const flightsResult = await client.query(`
+      SELECT DISTINCT 
+        f.id, 
+        f.name,
+        f.start_datetime,
+        f.end_datetime,
+        f.campaign_id
+      FROM public.flights f
+      WHERE f.status = 'active'
+        AND now() BETWEEN f.start_datetime AND f.end_datetime
+        AND (
+          (f.target_type = 'screen' AND f.target_id = $1)
+          OR (f.target_type = 'screen_group' AND EXISTS (
+            SELECT 1 FROM public.screen_group_members sgm
+            WHERE sgm.screen_id = $1 AND sgm.group_id = f.target_id
+          ))
+        )
+      `, [screenId]);
+        const regionRow = await client.query(`
+      SELECT r.requires_pre_approval
+      FROM public.regions r
+      WHERE r.code = $1
+      `, [region_code]);
+        const requiresPreApproval = regionRow.rowCount && regionRow.rowCount > 0
+            ? regionRow.rows[0].requires_pre_approval
+            : false;
+        const activeFlights = flightsResult.rows.map(row => ({
+            flight_id: row.id,
+            name: row.name,
+            start_datetime: row.start_datetime,
+            end_datetime: row.end_datetime,
+        }));
+        const creativeWeightMap = new Map();
+        let fallbackUsed = false;
+        if (flightsResult.rowCount && flightsResult.rowCount > 0) {
+            const flightIds = flightsResult.rows.map((r) => r.id);
+            const creativesResult = await client.query(`
+        SELECT DISTINCT
+          c.id AS creative_id,
+          c.name,
+          c.file_url,
+          c.duration_seconds,
+          fc.weight,
+          ca.approval_code
+        FROM public.flight_creatives fc
+        JOIN public.creatives c ON c.id = fc.creative_id
+        JOIN public.creative_approvals ca ON ca.creative_id = c.id
+        JOIN public.regions r ON r.id = ca.region_id
+        WHERE fc.flight_id = ANY($1::uuid[])
+          AND r.code = $2
+          AND ca.status = 'approved'
+          ${requiresPreApproval ? "AND ca.approval_code IS NOT NULL" : ""}
+        `, [flightIds, region_code]);
+            for (const row of creativesResult.rows) {
+                const existingWeight = creativeWeightMap.get(row.creative_id)?.weight || 0;
+                creativeWeightMap.set(row.creative_id, {
+                    creative_id: row.creative_id,
+                    name: row.name,
+                    file_url: row.file_url,
+                    duration_seconds: row.duration_seconds,
+                    weight: existingWeight + (row.weight || 1),
+                });
+            }
+        }
+        if (creativeWeightMap.size === 0) {
+            const fallbackResult = await client.query(`
+        SELECT
+          c.id AS creative_id,
+          c.name,
+          c.file_url,
+          c.duration_seconds,
+          ca.approval_code
+        FROM public.creatives c
+        JOIN public.creative_approvals ca ON ca.creative_id = c.id
+        JOIN public.regions r ON r.id = ca.region_id
+        JOIN public.campaigns camp ON camp.id = c.campaign_id
+        WHERE r.code = $1
+          AND ca.status = 'approved'
+          AND camp.status = 'active'
+        ORDER BY c.created_at DESC
+        LIMIT 1
+        `, [region_code]);
+            if (fallbackResult.rowCount && fallbackResult.rowCount > 0) {
+                const fb = fallbackResult.rows[0];
+                const isCompliant = !requiresPreApproval || (fb.approval_code != null && fb.approval_code !== '');
+                if (isCompliant) {
+                    creativeWeightMap.set(fb.creative_id, {
+                        creative_id: fb.creative_id,
+                        name: fb.name,
+                        file_url: fb.file_url,
+                        duration_seconds: fb.duration_seconds,
+                        weight: 1,
+                    });
+                    fallbackUsed = true;
+                }
+            }
+        }
+        await client.query("COMMIT");
+        return {
+            screen_id,
+            generated_at: new Date().toISOString(),
+            region: region_code,
+            fallback_used: fallbackUsed,
+            creatives: Array.from(creativeWeightMap.values()),
+            flights: activeFlights,
+        };
+    }
+    catch (err) {
+        await client.query("ROLLBACK");
+        throw err;
+    }
+    finally {
+        client.release();
+    }
+}
+async function getLastPlayEvents(screenId, limit = 20) {
+    const events = await client_1.db
+        .select({
+        creativeId: schema_1.playEvents.creativeId,
+        creativeName: schema_1.creatives.name,
+        startedAt: schema_1.playEvents.startedAt,
+        durationSeconds: schema_1.playEvents.durationSeconds,
+        playStatus: schema_1.playEvents.playStatus,
+        lat: schema_1.playEvents.lat,
+        lng: schema_1.playEvents.lng,
+    })
+        .from(schema_1.playEvents)
+        .leftJoin(schema_1.creatives, (0, drizzle_orm_1.eq)(schema_1.playEvents.creativeId, schema_1.creatives.id))
+        .where((0, drizzle_orm_1.eq)(schema_1.playEvents.screenId, screenId))
+        .orderBy((0, drizzle_orm_1.desc)(schema_1.playEvents.startedAt))
+        .limit(limit);
+    return events.map(e => ({
+        creative_id: e.creativeId,
+        creative_name: e.creativeName,
+        started_at: e.startedAt.toISOString(),
+        duration_seconds: e.durationSeconds,
+        play_status: e.playStatus,
+        lat: e.lat ? parseFloat(e.lat) : null,
+        lng: e.lng ? parseFloat(e.lng) : null,
+    }));
+}
+async function disconnectPlayerFromScreen(screenId) {
+    const [activePlayer] = await client_1.db
+        .select({
+        id: schema_1.players.id,
+        isActive: schema_1.players.isActive,
+    })
+        .from(schema_1.players)
+        .where((0, drizzle_orm_1.and)((0, drizzle_orm_1.eq)(schema_1.players.screenId, screenId), (0, drizzle_orm_1.eq)(schema_1.players.isActive, true)))
+        .limit(1);
+    if (!activePlayer) {
+        throw new Error("No active player linked to this screen");
+    }
+    await client_1.db
+        .update(schema_1.players)
+        .set({
+        isActive: false,
+        revokedAt: new Date(),
+    })
+        .where((0, drizzle_orm_1.eq)(schema_1.players.id, activePlayer.id));
+    await client_1.db
+        .update(schema_1.screens)
+        .set({
+        lastSeenAt: null,
+    })
+        .where((0, drizzle_orm_1.eq)(schema_1.screens.id, screenId));
+    return {
+        screen_id: screenId,
+        player_id: activePlayer.id,
+    };
+}
+async function getActivePlayerForScreen(screenId) {
+    const [player] = await client_1.db
+        .select({ id: schema_1.players.id })
+        .from(schema_1.players)
+        .where((0, drizzle_orm_1.and)((0, drizzle_orm_1.eq)(schema_1.players.screenId, screenId), (0, drizzle_orm_1.eq)(schema_1.players.isActive, true)))
+        .limit(1);
+    return player || null;
+}
+async function getScreenGroups(screenId) {
+    const { screenGroups, screenGroupMemberships, users } = await Promise.resolve().then(() => __importStar(require("../../db/schema")));
+    const memberships = await client_1.db
+        .select({
+        groupId: screenGroups.id,
+        groupName: screenGroups.name,
+        publisherOrgId: screenGroups.orgId,
+        publisherName: schema_1.organisations.name,
+        description: screenGroups.description,
+        isArchived: screenGroups.isArchived,
+        addedAt: screenGroupMemberships.addedAt,
+        addedByUserId: screenGroupMemberships.addedByUserId,
+        addedByUserName: users.fullName,
+        screenCount: (0, drizzle_orm_1.sql) `(
+        SELECT COUNT(*)::int 
+        FROM ${screenGroupMemberships} sgm2
+        WHERE sgm2.group_id = ${screenGroups.id}
+      )`,
+    })
+        .from(screenGroupMemberships)
+        .innerJoin(screenGroups, (0, drizzle_orm_1.eq)(screenGroupMemberships.groupId, screenGroups.id))
+        .leftJoin(schema_1.organisations, (0, drizzle_orm_1.eq)(screenGroups.orgId, schema_1.organisations.id))
+        .leftJoin(users, (0, drizzle_orm_1.eq)(screenGroupMemberships.addedByUserId, users.id))
+        .where((0, drizzle_orm_1.eq)(screenGroupMemberships.screenId, screenId))
+        .orderBy((0, drizzle_orm_1.desc)(screenGroupMemberships.addedAt));
+    const groups = memberships.map(m => ({
+        groupId: m.groupId,
+        groupName: m.groupName,
+        publisherOrgId: m.publisherOrgId,
+        publisherName: m.publisherName || "",
+        description: m.description,
+        isArchived: m.isArchived,
+        screenCount: m.screenCount,
+        addedAt: m.addedAt,
+        addedByUserId: m.addedByUserId,
+        addedByUserName: m.addedByUserName,
+    }));
+    return {
+        groups,
+        totalGroups: groups.length,
+    };
 }

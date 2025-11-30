@@ -497,3 +497,127 @@ exports.screensRouter.get("/:id/location-history", auth_1.requireAuth, async (re
         next(err);
     }
 });
+// GET /api/screens/:id/playlist - Screen Playlist Inspector: preview what would play
+exports.screensRouter.get("/:id/playlist", auth_1.requireAuth, async (req, res, next) => {
+    try {
+        if (!canAccessScreens(req)) {
+            return res.status(403).json({ error: "Forbidden" });
+        }
+        const screenId = req.params.id;
+        const basicScreen = await (0, screens_service_1.getScreen)(screenId);
+        if (!basicScreen) {
+            return res.status(404).json({ error: "Screen not found" });
+        }
+        if (!canAccessScreen(req, basicScreen.publisherOrgId)) {
+            return res.status(403).json({ error: "Forbidden" });
+        }
+        const playlist = await (0, screens_service_1.getPlaylistPreview)(screenId);
+        res.json({ status: "success", data: playlist });
+    }
+    catch (err) {
+        next(err);
+    }
+});
+// GET /api/screens/:id/last-play - Screen Playlist Inspector: last 20 play events
+exports.screensRouter.get("/:id/last-play", auth_1.requireAuth, async (req, res, next) => {
+    try {
+        if (!canAccessScreens(req)) {
+            return res.status(403).json({ error: "Forbidden" });
+        }
+        const screenId = req.params.id;
+        const basicScreen = await (0, screens_service_1.getScreen)(screenId);
+        if (!basicScreen) {
+            return res.status(404).json({ error: "Screen not found" });
+        }
+        if (!canAccessScreen(req, basicScreen.publisherOrgId)) {
+            return res.status(403).json({ error: "Forbidden" });
+        }
+        const limit = req.query.limit ? parseInt(req.query.limit, 10) : 20;
+        const lastPlays = await (0, screens_service_1.getLastPlayEvents)(screenId, limit);
+        res.json({ status: "success", data: lastPlays });
+    }
+    catch (err) {
+        next(err);
+    }
+});
+// POST /api/screens/:id/disconnect-player - Disconnect player from screen (beamer_internal only)
+exports.screensRouter.post("/:id/disconnect-player", auth_1.requireAuth, async (req, res, next) => {
+    try {
+        if (!req.user || req.user.orgType !== "beamer_internal") {
+            return res.status(403).json({
+                status: "error",
+                message: "Forbidden. Only internal users can disconnect players."
+            });
+        }
+        const screenId = req.params.id;
+        const basicScreen = await (0, screens_service_1.getScreen)(screenId);
+        if (!basicScreen) {
+            return res.status(404).json({
+                status: "error",
+                message: "Screen not found"
+            });
+        }
+        const result = await (0, screens_service_1.disconnectPlayerFromScreen)(screenId);
+        res.json({
+            status: "success",
+            message: "Player disconnected from screen",
+            data: {
+                screen_id: result.screen_id,
+                player_id: result.player_id,
+            },
+        });
+    }
+    catch (err) {
+        if (err.message === "No active player linked to this screen") {
+            return res.status(400).json({
+                status: "error",
+                message: err.message,
+            });
+        }
+        next(err);
+    }
+});
+// GET /api/screens/:id/groups - Get all groups this screen belongs to
+exports.screensRouter.get("/:id/groups", auth_1.requireAuth, async (req, res, next) => {
+    try {
+        if (!canAccessScreens(req)) {
+            return res.status(403).json({ error: "Forbidden" });
+        }
+        const screenId = req.params.id;
+        const basicScreen = await (0, screens_service_1.getScreen)(screenId);
+        if (!basicScreen) {
+            return res.status(404).json({
+                status: "error",
+                message: "Screen not found"
+            });
+        }
+        if (!canAccessScreen(req, basicScreen.publisherOrgId)) {
+            return res.status(403).json({
+                status: "error",
+                message: "Forbidden: cross-publisher access denied"
+            });
+        }
+        const result = await (0, screens_service_1.getScreenGroups)(screenId);
+        res.json({
+            status: "success",
+            data: {
+                groups: result.groups.map(g => ({
+                    id: g.groupId,
+                    name: g.groupName,
+                    publisherOrgId: g.publisherOrgId,
+                    publisherName: g.publisherName,
+                    description: g.description,
+                    isArchived: g.isArchived,
+                    screenCount: g.screenCount,
+                    addedAt: g.addedAt.toISOString(),
+                    addedByUserId: g.addedByUserId,
+                    addedByUserName: g.addedByUserName,
+                })),
+                totalGroups: result.totalGroups,
+            },
+        });
+    }
+    catch (err) {
+        next(err);
+    }
+});
