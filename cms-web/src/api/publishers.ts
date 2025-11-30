@@ -2,7 +2,7 @@ import apiClient from "./client";
 
 export interface PublisherProfile {
   id: string;
-  publisherType: "organisational" | "individual";
+  publisherType: "organisation" | "individual";
   organisationId: string | null;
   organisationName: string | null;
   fullName: string | null;
@@ -20,7 +20,7 @@ export interface PublisherProfileDetail extends PublisherProfile {
 }
 
 export interface CreatePublisherPayload {
-  publisherType: "organisational" | "individual";
+  publisherType: "organisation" | "individual";
   organisationId?: string;
   fullName?: string;
   phoneNumber?: string;
@@ -30,7 +30,7 @@ export interface CreatePublisherPayload {
 }
 
 export interface UpdatePublisherPayload {
-  publisherType?: "organisational" | "individual";
+  publisherType?: "organisation" | "individual";
   organisationId?: string;
   fullName?: string;
   phoneNumber?: string;

@@ -52,8 +52,10 @@ The project is organized as a monorepo with distinct applications and libraries:
   - Publisher-scoped access control (publishers only see their vehicles, internal users see all)
   - Soft-delete (deactivation) with safeguards preventing deactivation when screens are linked
   - Vehicle screens endpoint to list all screens attached to a vehicle
-  - Frontend pages: VehiclesList (with filtering), VehicleDetail (with screens tab), VehicleEditorModal
-  - Navigation accessible for beamer_internal and publisher users
+  - **Vehicles Tab in Publisher Detail**: Vehicles are now managed within Publisher Detail page tabs (Overview, Screens, Vehicles, Reports) rather than as standalone navigation
+  - PublisherVehiclesTab component for CRUD operations within publisher context
+  - Screens list shows Vehicle column with filtering and navigation to Publisher vehicles tab
+  - Navigation shows "Inventory" label (renamed from "Screens & Players"), no standalone Vehicles link
 - **Enhanced Screen Specifications**: Screens now include width_px, height_px, screen_type, orientation, and is_active fields. ScreenFormModal includes resolution and orientation editing. Screen types: vehicle, indoor, billboard, mall, other. Orientation: landscape, portrait.
 - **Publisher-scoped Screen Groups**: Screen groups are strictly scoped to publisher organizations (not advertisers). Groups can only contain screens owned by the same publisher. Key features:
   - Publisher validation on group creation (rejects advertiser orgs)

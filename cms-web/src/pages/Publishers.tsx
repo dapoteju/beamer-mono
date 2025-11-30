@@ -33,13 +33,13 @@ export default function Publishers() {
   }, []);
 
   const getTypeBadgeColor = (type: string) => {
-    return type === "organisational"
+    return type === "organisation"
       ? "bg-purple-100 text-purple-700"
       : "bg-blue-100 text-blue-700";
   };
 
   const formatType = (type: string) => {
-    return type === "organisational" ? "Organisational" : "Individual";
+    return type === "organisation" ? "Organisation" : "Individual";
   };
 
   const formatDate = (dateString: string) => {
@@ -132,7 +132,7 @@ export default function Publishers() {
                 >
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div className="text-sm font-medium text-zinc-900">
-                      {pub.publisherType === "organisational"
+                      {pub.publisherType === "organisation"
                         ? pub.organisationName || "—"
                         : pub.fullName || "—"}
                     </div>

@@ -24,7 +24,7 @@ export default function PublisherFormModal({
   onClose,
   onSuccess,
 }: PublisherFormModalProps) {
-  const [publisherType, setPublisherType] = useState<"organisational" | "individual">("organisational");
+  const [publisherType, setPublisherType] = useState<"organisation" | "individual">("organisation");
   const [organisationId, setOrganisationId] = useState("");
   const [fullName, setFullName] = useState("");
   const [phoneNumber, setPhoneNumber] = useState("");
@@ -87,8 +87,8 @@ export default function PublisherFormModal({
   const validate = () => {
     const newErrors: Record<string, string> = {};
 
-    if (publisherType === "organisational" && !organisationId) {
-      newErrors.organisationId = "Organisation is required for organisational publishers";
+    if (publisherType === "organisation" && !organisationId) {
+      newErrors.organisationId = "Organisation is required for organisation publishers";
     }
     if (publisherType === "individual" && !fullName.trim()) {
       newErrors.fullName = "Full name is required for individual publishers";
@@ -166,16 +166,16 @@ export default function PublisherFormModal({
             </label>
             <select
               value={publisherType}
-              onChange={(e) => setPublisherType(e.target.value as "organisational" | "individual")}
+              onChange={(e) => setPublisherType(e.target.value as "organisation" | "individual")}
               className="w-full px-3 py-2 border border-zinc-300 rounded-md focus:outline-none focus:ring-2 focus:ring-cyan-500"
               disabled={loading}
             >
-              <option value="organisational">Organisational</option>
+              <option value="organisation">Organisation</option>
               <option value="individual">Individual</option>
             </select>
           </div>
 
-          {publisherType === "organisational" && (
+          {publisherType === "organisation" && (
             <div>
               <label className="block text-sm font-medium text-zinc-700 mb-1">
                 Organisation <span className="text-red-500">*</span>

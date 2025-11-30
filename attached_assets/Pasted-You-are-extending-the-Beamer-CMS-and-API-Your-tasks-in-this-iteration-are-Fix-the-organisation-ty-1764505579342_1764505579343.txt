@@ -1,0 +1,431 @@
+You are extending the Beamer CMS and API. Your tasks in this iteration are:
+
+Fix the organisation type bug on the Publisher list.
+
+Restructure Vehicles so they’re not a standalone nav item, but live under Publisher detail and in reports.
+
+Improve Inventory UX for screens & vehicles (resolution, type, linking).
+
+Rename “Screens & Players” in the left nav to “Inventory” to better match the system’s scope.
+
+1️⃣ Fix the Organisation Type Bug on the Publisher List
+Problem
+
+Some organisations are appearing as “individual” in the UI even though they were set as organisation (e.g. publisher).
+
+Tasks
+1.1 DB Schema
+
+Check organisations table definition and migration:
+
+Ensure org_type exists and is correct:
+
+Either TEXT NOT NULL
+
+Or an enum: ENUM('publisher','advertiser','agency','individual')
+
+Ensure default is not hard-coded to 'individual'.
+
+If needed, create a migration:
+apps/api/drizzle/XXXXXXXX_fix_org_type_default.sql
+
+-- Example: remove bad default and set sensible one
+ALTER TABLE organisations ALTER COLUMN org_type DROP DEFAULT;
+-- Optionally, fix invalid values:
+UPDATE organisations
+SET org_type = 'publisher'
+WHERE org_type IS NULL OR org_type = '' OR org_type = 'individual' AND some heuristic applies;
+
+
+(If you have a better heuristic to distinguish publishers vs advertisers, apply it here.)
+
+1.2 Drizzle Schema
+
+File: apps/api/src/db/schema/organisations.ts
+
+Make sure orgType maps correctly:
+
+export const organisations = pgTable("organisations", {
+  // ...
+  orgType: text("org_type").notNull(), // or enum-based
+  // ...
+});
+
+1.3 API Serialization
+
+File: apps/api/src/controllers/organisationsController.ts (or similar)
+
+Check any mapOrganisationToDto or API response building.
+
+Ensure orgType is passed through correctly, without defaulting to 'individual'.
+
+1.4 UI Mapping
+
+Files likely:
+
+apps/cms-web/src/api/organisations.ts
+
+apps/cms-web/src/components/organisations/PublisherList.tsx
+
+Fix any code like:
+
+const type = org.type ?? "individual";
+
+
+Change it to use org.orgType directly, and only default if absolutely necessary (prefer showing “Unknown” rather than silently switching to individual).
+
+1.5 Validation
+
+In org POST/PATCH validators:
+
+Require org_type.
+
+Restrict to allowed values only.
+
+Return 400 for invalid values.
+
+1.6 Add a DB Patch Script
+
+If required, create a small script/endpoint (internal use only) to reclassify known publishers vs individuals if your data set is small enough.
+
+2️⃣ Remove “Vehicles” from Main Navigation
+
+Vehicles should not be a standalone global nav item.
+
+File: apps/cms-web/src/components/layout/Sidebar.tsx
+
+Remove the “Vehicles” nav entry entirely.
+
+Keep Inventory-related entries for screens, groups, map (see Section 8 for renaming).
+
+3️⃣ Add Vehicles as a Tab in Publisher Detail
+3.1 Publisher Detail Layout
+
+File: apps/cms-web/src/pages/publishers/PublisherDetail.tsx
+
+Implement tabs using shadcn <Tabs>:
+
+Tabs:
+
+Overview
+
+Screens
+
+Vehicles
+
+Reports (and/or Campaigns)
+
+Example:
+
+<Tabs value={activeTab} onValueChange={setActiveTab}>
+  <TabsList>
+    <TabsTrigger value="overview">Overview</TabsTrigger>
+    <TabsTrigger value="screens">Screens</TabsTrigger>
+    <TabsTrigger value="vehicles">Vehicles</TabsTrigger>
+    <TabsTrigger value="reports">Reports</TabsTrigger>
+  </TabsList>
+
+  <TabsContent value="vehicles">
+    <PublisherVehiclesTab publisherId={publisherId} />
+  </TabsContent>
+</Tabs>
+
+3.2 PublisherVehiclesTab Component
+
+File: apps/cms-web/src/components/publishers/PublisherVehiclesTab.tsx
+
+Functionality:
+
+List vehicles for this publisher:
+
+Name
+
+External ID
+
+License Plate
+
+City / Region
+
+Screens count
+
+Active/Inactive
+
+Actions:
+
+Add Vehicle (opens VehicleEditorModal)
+
+Edit Vehicle
+
+Deactivate (soft delete)
+
+Use APIs (from earlier work):
+
+GET /api/vehicles?publisher_org_id=...
+
+POST /api/vehicles
+
+PATCH /api/vehicles/:id
+
+DELETE /api/vehicles/:id (soft, e.g. is_active=false)
+
+Make sure permissions:
+
+Only internal or users of that publisher org can view/manage vehicles.
+
+4️⃣ Screens List: Show Vehicle Info
+
+File: apps/cms-web/src/pages/inventory/ScreensList.tsx
+
+Enhance:
+
+Add Vehicle column:
+
+Show vehicle name if linked
+
+Click → open Publisher detail with Vehicles tab preselected (e.g. /publishers/:id?tab=vehicles).
+
+Filters:
+
+Screen Type (vehicle / indoor / billboard / other)
+
+Vehicle: dropdown of vehicles for that publisher (for publisher-scoped users)
+
+Active status
+
+Use existing React Query hooks or add:
+
+useVehiclesForPublisher(publisherId) for vehicle dropdown.
+
+5️⃣ Screen Editor Modal: Resolution, Type, Vehicle
+
+File: apps/cms-web/src/components/screens/ScreenEditorModal.tsx
+
+Fields to include (if not already):
+
+Name (required)
+
+Publisher (readonly for publisher users, selectable for internal)
+
+Screen Type: select (vehicle, indoor, billboard, mall, other)
+
+Resolution: width_px, height_px (number inputs)
+
+Orientation: select (landscape, portrait)
+
+City
+
+Region
+
+Vehicle: dropdown listing vehicles for that publisher (optional)
+
+Active toggle (is_active)
+
+Create:
+
+POST /api/screens for create
+
+PATCH /api/screens/:id for update
+
+Validate:
+
+width/height > 0
+
+orientation in allowed values
+
+if vehicle_id is set, ensure that vehicle belongs to same publisher org as screen.
+
+6️⃣ Vehicle Performance Report
+6.1 Backend Endpoint
+
+Create:
+GET /api/reports/vehicles
+
+Query params:
+
+publisher_org_id (required for non-internal users)
+
+vehicle_id? (optional filter)
+
+date_from?, date_to?
+
+Response example:
+
+{
+  "vehicle": {
+    "id": "uuid",
+    "name": "Taxi 0123",
+    "publisher_org_id": "uuid"
+  },
+  "summary": {
+    "impressions": 12345,
+    "plays": 987,
+    "offline_minutes": 42
+  },
+  "screens": [
+    {
+      "screen_id": "uuid",
+      "name": "Screen 1",
+      "status": "offline",
+      "last_seen_at": "2025-01-01T12:00:00Z",
+      "impressions": 5678,
+      "plays": 321
+    }
+  ],
+  "location_clusters": [
+    { "lat": 6.43, "lng": 3.42, "impressions": 4000 }
+  ]
+}
+
+
+Use existing impressions/plays/exposure data where possible.
+
+Permissions:
+
+Non-internal: only if publisher_org_id is theirs.
+
+Internal: any publisher.
+
+6.2 Frontend Report Page
+
+File: apps/cms-web/src/pages/reports/VehiclePerformanceReport.tsx
+
+Features:
+
+Filter bar:
+
+Publisher (for internal)
+
+Vehicle (dropdown populated from /api/vehicles?publisher_org_id=...)
+
+Date range
+
+Summary cards:
+
+Total impressions
+
+Total plays
+
+Offline minutes
+
+Table:
+
+Screens associated with this vehicle and their metrics.
+
+Map (optional, using existing map component) for location_clusters.
+
+Entry points:
+
+From Publisher Detail → Reports tab → section/link for “Vehicle Performance”.
+
+Optionally from a generic Reports landing page (internal only).
+
+7️⃣ Permissions & Tests
+
+Ensure:
+
+Vehicles are always publisher-scoped.
+
+Screens can only be linked to vehicles of the same publisher.
+
+Non-internal users cannot access vehicles/screens of other publishers.
+
+Backend tests:
+
+Cross-publisher vehicle fetch/update → 403 or 404 (security by obscurity).
+
+Attempt to link screen to vehicle of another publisher → validation error.
+
+Frontend tests:
+
+PublisherVehiclesTab shows correct vehicles.
+
+ScreensList shows vehicle column.
+
+ScreenEditorModal loads vehicles for that publisher and saves correctly.
+
+8️⃣ Rename “Screens & Players” in Left Nav → “Inventory”
+
+Currently, the left navigation shows a primary item labeled “Screens & Players” for the inventory area.
+
+We want to:
+
+Rename this label to “Inventory”
+
+Make sure nested items (if any) are coherent (e.g. “Screens”, “Groups”, “Map”).
+
+8.1 Sidebar Label Change
+
+File: apps/cms-web/src/components/layout/Sidebar.tsx
+
+Find the navigation item for the inventory section, which likely looks like:
+
+{
+  label: "Screens & Players",
+  icon: <SomeIcon />,
+  href: "/inventory/screens",
+}
+
+
+Change this label to:
+
+{
+  label: "Inventory",
+  icon: <SomeIcon />,
+  href: "/inventory/screens", // or main inventory route
+}
+
+
+If there is a parent/section structure, ensure:
+
+Top-level section or parent label is “Inventory”.
+
+Child links include:
+
+“Screens” (or “Screens & Players” as subtext if you need it)
+
+“Screen Groups”
+
+“Map / Exposure”
+
+8.2 Update Page Titles
+
+Wherever the old label is used as a page title or heading:
+
+For example in ScreensList.tsx:
+
+<h1 className="text-xl font-semibold">Screens & Players</h1>
+
+
+Update to:
+
+<h1 className="text-xl font-semibold">Inventory</h1>
+
+
+Optionally, you can include a smaller subtitle to keep clarity:
+
+<p className="text-sm text-muted-foreground">
+  Manage screens, players, and digital inventory across the network.
+</p>
+
+
+This ensures the UX wording now matches Beamer’s broader scope as an inventory system, not just screens/players.
+
+9️⃣ Acceptance Criteria
+
+You’re done when:
+
+✅ Organisation list shows correct org types (no unexpected “individual” labels).
+
+✅ There is no “Vehicles” entry in the left nav.
+
+✅ Publisher Detail has a Vehicles tab listing and managing vehicles.
+
+✅ Screens list shows vehicle info and can filter by screen type and vehicle.
+
+✅ Screen editor allows setting resolution, type, orientation, and vehicle.
+
+✅ Vehicle Performance report works and is accessible from Publisher Reports.
+
+✅ The left nav now shows “Inventory” (not “Screens & Players”) and still routes correctly.
+
+✅ All new/changed parts compile with TypeScript and have no console errors.

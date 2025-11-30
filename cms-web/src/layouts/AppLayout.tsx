@@ -17,9 +17,8 @@ const navItemsByOrgType: Record<string, NavItem[]> = {
   beamer_internal: [
     { to: "/dashboard", label: "Dashboard" },
     { to: "/campaigns", label: "Campaigns" },
-    { to: "/screens", label: "Screens & Players" },
+    { to: "/screens", label: "Inventory" },
     { to: "/inventory/groups", label: "Screen Groups" },
-    { to: "/inventory/vehicles", label: "Vehicles" },
     { to: "/publishers", label: "Publishers" },
     { to: "/advertisers", label: "Advertisers" },
     { to: "/compliance", label: "Compliance" },
@@ -32,9 +31,8 @@ const navItemsByOrgType: Record<string, NavItem[]> = {
   ],
   publisher: [
     { to: "/dashboard", label: "Dashboard" },
-    { to: "/screens", label: "Screens & Players" },
+    { to: "/screens", label: "Inventory" },
     { to: "/inventory/groups", label: "Screen Groups" },
-    { to: "/inventory/vehicles", label: "Vehicles" },
     { to: "/reporting", label: "Reporting" },
   ],
 };

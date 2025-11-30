@@ -1,20 +1,25 @@
 import { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { fetchScreens } from "../api/screens";
 import type { Screen } from "../api/screens";
+import { fetchVehicles, type Vehicle } from "../api/vehicles";
 import { useAuthStore } from "../store/authStore";
 import { ScreenFormModal } from "../components/ScreenFormModal";
 
 export default function Screens() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const { user } = useAuthStore();
   const [screens, setScreens] = useState<Screen[]>([]);
+  const [vehicles, setVehicles] = useState<Vehicle[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  const initialVehicle = searchParams.get("vehicle") || "";
   const [regionFilter, setRegionFilter] = useState("");
   const [publisherFilter, setPublisherFilter] = useState("");
   const [classificationFilter, setClassificationFilter] = useState("");
+  const [vehicleFilter, setVehicleFilter] = useState(initialVehicle);
   const [showCreateModal, setShowCreateModal] = useState(false);
 
   async function loadScreens() {
@@ -44,12 +49,34 @@ export default function Screens() {
     }
   }
 
+  async function loadVehicles() {
+    try {
+      const params: any = {};
+      if (publisherFilter && user?.orgType === "beamer_internal") {
+        params.publisher_org_id = publisherFilter;
+      }
+      const data = await fetchVehicles(params);
+      setVehicles(data.items || []);
+    } catch (err: any) {
+      console.error("Failed to fetch vehicles:", err);
+    }
+  }
+
   useEffect(() => {
     loadScreens();
+    loadVehicles();
   }, [regionFilter, publisherFilter]);
 
   function handleRowClick(screenId: string) {
     navigate(`/screens/${screenId}`);
+  }
+
+  function handleVehicleClick(e: React.MouseEvent, publisherOrgId: string) {
+    e.stopPropagation();
+    const publisher = publishers.find(p => p.id === publisherOrgId);
+    if (publisher) {
+      navigate(`/publishers/${publisher.id}?tab=vehicles`);
+    }
   }
 
   function formatRelativeTime(timestamp: string | null): string {
@@ -78,14 +105,18 @@ export default function Screens() {
       publisherMap.set(s.publisherOrgId, { id: s.publisherOrgId, name: s.publisherOrgName });
     }
   });
-  const uniquePublishers = Array.from(publisherMap.values()).sort((a, b) =>
+  const publishers = Array.from(publisherMap.values()).sort((a, b) =>
     a.name.localeCompare(b.name)
   );
 
-  // Client-side filtering for classification
   const filteredScreens = screens.filter((screen) => {
     if (classificationFilter && screen.screenClassification !== classificationFilter) {
       return false;
+    }
+    if (vehicleFilter) {
+      if (!screen.vehicle || screen.vehicle.id !== vehicleFilter) {
+        return false;
+      }
     }
     return true;
   });
@@ -131,10 +162,10 @@ export default function Screens() {
       <div className="flex items-center justify-between mb-6">
         <div>
           <h1 className="text-2xl font-semibold text-zinc-900">
-            Screens & Players
+            Inventory
           </h1>
           <p className="text-sm text-zinc-600 mt-1">
-            Manage digital screens and monitor player status
+            Manage screens, players, and digital inventory across the network
           </p>
         </div>
         {canCreateScreen && (
@@ -149,7 +180,7 @@ export default function Screens() {
 
       <div className="bg-white border border-zinc-200 rounded-lg shadow-sm">
         <div className="p-4 border-b border-zinc-200">
-          <div className="flex gap-4">
+          <div className="flex flex-wrap gap-4">
             <div>
               <label className="block text-sm font-medium text-zinc-700 mb-1">
                 Region
@@ -175,11 +206,14 @@ export default function Screens() {
                 </label>
                 <select
                   value={publisherFilter}
-                  onChange={(e) => setPublisherFilter(e.target.value)}
+                  onChange={(e) => {
+                    setPublisherFilter(e.target.value);
+                    setVehicleFilter("");
+                  }}
                   className="px-3 py-2 border border-zinc-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                 >
                   <option value="">All Publishers</option>
-                  {uniquePublishers.map((publisher) => (
+                  {publishers.map((publisher) => (
                     <option key={publisher.id} value={publisher.id}>
                       {publisher.name}
                     </option>
@@ -204,6 +238,42 @@ export default function Screens() {
                 <option value="other">Other</option>
               </select>
             </div>
+
+            <div>
+              <label className="block text-sm font-medium text-zinc-700 mb-1">
+                Vehicle
+              </label>
+              <select
+                value={vehicleFilter}
+                onChange={(e) => setVehicleFilter(e.target.value)}
+                className="px-3 py-2 border border-zinc-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                <option value="">All Vehicles</option>
+                {vehicles
+                  .filter(v => v.isActive)
+                  .map((vehicle) => (
+                    <option key={vehicle.id} value={vehicle.id}>
+                      {vehicle.name} {vehicle.licensePlate && `(${vehicle.licensePlate})`}
+                    </option>
+                  ))}
+              </select>
+            </div>
+
+            {(regionFilter || publisherFilter || classificationFilter || vehicleFilter) && (
+              <div className="flex items-end">
+                <button
+                  onClick={() => {
+                    setRegionFilter("");
+                    setPublisherFilter("");
+                    setClassificationFilter("");
+                    setVehicleFilter("");
+                  }}
+                  className="px-3 py-2 text-sm text-zinc-600 hover:text-zinc-900"
+                >
+                  Clear filters
+                </button>
+              </div>
+            )}
           </div>
         </div>
 
@@ -219,6 +289,9 @@ export default function Screens() {
                 </th>
                 <th className="px-4 py-3 text-left text-xs font-medium text-zinc-700 uppercase tracking-wider">
                   Type
+                </th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-zinc-700 uppercase tracking-wider">
+                  Vehicle
                 </th>
                 <th className="px-4 py-3 text-left text-xs font-medium text-zinc-700 uppercase tracking-wider">
                   City
@@ -243,7 +316,7 @@ export default function Screens() {
             <tbody className="bg-white divide-y divide-zinc-200">
               {filteredScreens.length === 0 ? (
                 <tr>
-                  <td colSpan={9} className="px-4 py-8 text-center text-zinc-500">
+                  <td colSpan={10} className="px-4 py-8 text-center text-zinc-500">
                     No screens found
                   </td>
                 </tr>
@@ -266,6 +339,23 @@ export default function Screens() {
                       >
                         {getTypeLabel(screen.screenClassification)}
                       </span>
+                    </td>
+                    <td className="px-4 py-3 text-sm">
+                      {screen.vehicle ? (
+                        <button
+                          onClick={(e) => handleVehicleClick(e, screen.publisherOrgId)}
+                          className="text-cyan-600 hover:text-cyan-700 font-medium"
+                        >
+                          {screen.vehicle.name}
+                          {screen.vehicle.licensePlate && (
+                            <span className="text-zinc-500 font-normal ml-1">
+                              ({screen.vehicle.licensePlate})
+                            </span>
+                          )}
+                        </button>
+                      ) : (
+                        <span className="text-zinc-400">—</span>
+                      )}
                     </td>
                     <td className="px-4 py-3 text-sm text-zinc-600">
                       {screen.city}
@@ -315,7 +405,6 @@ export default function Screens() {
         </div>
       </div>
 
-      {/* Create Screen Modal */}
       {showCreateModal && (
         <ScreenFormModal
           mode="create"

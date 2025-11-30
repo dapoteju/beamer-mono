@@ -1,14 +1,22 @@
 import { useState, useEffect } from "react";
-import { useParams, useNavigate } from "react-router-dom";
+import { useParams, useNavigate, useSearchParams } from "react-router-dom";
 import { fetchPublisherById, deletePublisher, type PublisherProfileDetail } from "../api/publishers";
 import { fetchScreens, updateScreen, type Screen } from "../api/screens";
 import { useAuthStore } from "../store/authStore";
 import PublisherFormModal from "../components/PublisherFormModal";
+import { PublisherVehiclesTab } from "../components/publishers/PublisherVehiclesTab";
+
+type TabType = "overview" | "screens" | "vehicles" | "reports";
 
 export default function PublisherDetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const { user } = useAuthStore();
+  
+  const initialTab = (searchParams.get("tab") as TabType) || "overview";
+  const [activeTab, setActiveTab] = useState<TabType>(initialTab);
+  
   const [publisher, setPublisher] = useState<PublisherProfileDetail | null>(null);
   const [screens, setScreens] = useState<Screen[]>([]);
   const [availableScreens, setAvailableScreens] = useState<Screen[]>([]);
@@ -17,6 +25,11 @@ export default function PublisherDetail() {
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isAssignModalOpen, setIsAssignModalOpen] = useState(false);
   const [selectedScreenIds, setSelectedScreenIds] = useState<string[]>([]);
+
+  const handleTabChange = (tab: TabType) => {
+    setActiveTab(tab);
+    setSearchParams({ tab });
+  };
 
   async function loadPublisher() {
     if (!id) return;
@@ -137,6 +150,13 @@ export default function PublisherDetail() {
 
   const canEdit = user?.orgType === "beamer_internal" && (user?.role === "admin" || user?.role === "ops");
 
+  const tabs: { id: TabType; label: string; count?: number }[] = [
+    { id: "overview", label: "Overview" },
+    { id: "screens", label: "Screens", count: publisher.screenCount },
+    { id: "vehicles", label: "Vehicles", count: publisher.vehicleCount },
+    { id: "reports", label: "Reports" },
+  ];
+
   return (
     <div>
       <button
@@ -150,16 +170,16 @@ export default function PublisherDetail() {
         <div>
           <div className="flex items-center gap-3 mb-2">
             <h1 className="text-2xl font-semibold text-zinc-900">
-              {publisher.publisherType === "organisational"
-                ? publisher.organisationName || "Organisational Publisher"
+              {publisher.publisherType === "organisation"
+                ? publisher.organisationName || "Organisation Publisher"
                 : publisher.fullName || "Individual Publisher"}
             </h1>
             <span className={`px-2 py-1 text-xs font-medium rounded ${
-              publisher.publisherType === "organisational"
+              publisher.publisherType === "organisation"
                 ? "bg-purple-100 text-purple-700"
                 : "bg-blue-100 text-blue-700"
             }`}>
-              {publisher.publisherType === "organisational" ? "Organisational" : "Individual"}
+              {publisher.publisherType === "organisation" ? "Organisation" : "Individual"}
             </span>
           </div>
           <p className="text-sm text-zinc-600">Publisher ID: {publisher.id}</p>
@@ -182,166 +202,222 @@ export default function PublisherDetail() {
         )}
       </div>
 
-      <div className="bg-white rounded-lg border border-zinc-200 overflow-hidden mb-6">
-        <div className="px-6 py-4 border-b border-zinc-200 bg-zinc-50">
-          <h2 className="text-lg font-semibold text-zinc-900">Details</h2>
-        </div>
-        <div className="px-6 py-4 grid grid-cols-2 gap-4">
-          <div>
-            <p className="text-xs font-medium text-zinc-500 uppercase tracking-wider">Type</p>
-            <p className="mt-1 text-sm text-zinc-900">
-              {publisher.publisherType === "organisational" ? "Organisational" : "Individual"}
-            </p>
-          </div>
-          {publisher.organisationName && (
-            <div>
-              <p className="text-xs font-medium text-zinc-500 uppercase tracking-wider">Organisation</p>
-              <p className="mt-1 text-sm text-zinc-900">{publisher.organisationName}</p>
-            </div>
-          )}
-          {publisher.fullName && (
-            <div>
-              <p className="text-xs font-medium text-zinc-500 uppercase tracking-wider">Full Name</p>
-              <p className="mt-1 text-sm text-zinc-900">{publisher.fullName}</p>
-            </div>
-          )}
-          {publisher.phoneNumber && (
-            <div>
-              <p className="text-xs font-medium text-zinc-500 uppercase tracking-wider">Phone</p>
-              <p className="mt-1 text-sm text-zinc-900">{publisher.phoneNumber}</p>
-            </div>
-          )}
-          {publisher.email && (
-            <div>
-              <p className="text-xs font-medium text-zinc-500 uppercase tracking-wider">Email</p>
-              <p className="mt-1 text-sm text-zinc-900">{publisher.email}</p>
-            </div>
-          )}
-          {publisher.address && (
-            <div className="col-span-2">
-              <p className="text-xs font-medium text-zinc-500 uppercase tracking-wider">Address</p>
-              <p className="mt-1 text-sm text-zinc-900">{publisher.address}</p>
-            </div>
-          )}
-          <div>
-            <p className="text-xs font-medium text-zinc-500 uppercase tracking-wider">Screens</p>
-            <p className="mt-1 text-sm text-zinc-900">{publisher.screenCount}</p>
-          </div>
-          <div>
-            <p className="text-xs font-medium text-zinc-500 uppercase tracking-wider">Vehicles</p>
-            <p className="mt-1 text-sm text-zinc-900">{publisher.vehicleCount}</p>
-          </div>
-          <div>
-            <p className="text-xs font-medium text-zinc-500 uppercase tracking-wider">Created At</p>
-            <p className="mt-1 text-sm text-zinc-900">{formatDate(publisher.createdAt)}</p>
-          </div>
-          <div>
-            <p className="text-xs font-medium text-zinc-500 uppercase tracking-wider">Updated At</p>
-            <p className="mt-1 text-sm text-zinc-900">{formatDate(publisher.updatedAt)}</p>
-          </div>
-        </div>
-      </div>
-
-      {publisher.notes && (
-        <div className="bg-white rounded-lg border border-zinc-200 overflow-hidden mb-6">
-          <div className="px-6 py-4 border-b border-zinc-200 bg-zinc-50">
-            <h2 className="text-lg font-semibold text-zinc-900">Notes</h2>
-          </div>
-          <div className="px-6 py-4">
-            <p className="text-sm text-zinc-700 whitespace-pre-wrap">{publisher.notes}</p>
-          </div>
-        </div>
-      )}
-
       <div className="bg-white rounded-lg border border-zinc-200 overflow-hidden">
-        <div className="px-6 py-4 border-b border-zinc-200 bg-zinc-50 flex items-center justify-between">
-          <h2 className="text-lg font-semibold text-zinc-900">Screens ({screens.length})</h2>
-          {canEdit && availableScreens.length > screens.length && (
-            <button
-              onClick={() => setIsAssignModalOpen(true)}
-              className="px-3 py-1.5 bg-cyan-600 text-white rounded-md hover:bg-cyan-700 transition-colors text-sm font-medium"
-            >
-              + Assign Screens
-            </button>
-          )}
-        </div>
-        {screens.length === 0 ? (
-          <div className="px-6 py-8 text-center text-sm text-zinc-500">
-            No screens assigned to this publisher.
-          </div>
-        ) : (
-          <table className="min-w-full divide-y divide-zinc-200">
-            <thead className="bg-zinc-50">
-              <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-zinc-500 uppercase tracking-wider">
-                  Code
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-zinc-500 uppercase tracking-wider">
-                  Name
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-zinc-500 uppercase tracking-wider">
-                  City
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-zinc-500 uppercase tracking-wider">
-                  Region
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-zinc-500 uppercase tracking-wider">
-                  Status
-                </th>
-                {canEdit && (
-                  <th className="px-6 py-3 text-right text-xs font-medium text-zinc-500 uppercase tracking-wider">
-                    Actions
-                  </th>
+        <div className="border-b border-zinc-200">
+          <nav className="flex">
+            {tabs.map((tab) => (
+              <button
+                key={tab.id}
+                onClick={() => handleTabChange(tab.id)}
+                className={`px-4 py-3 text-sm font-medium border-b-2 transition-colors ${
+                  activeTab === tab.id
+                    ? "border-cyan-600 text-cyan-600"
+                    : "border-transparent text-zinc-600 hover:text-zinc-900 hover:border-zinc-300"
+                }`}
+              >
+                {tab.label}
+                {tab.count !== undefined && (
+                  <span className="ml-1.5 px-1.5 py-0.5 text-xs font-medium rounded-full bg-zinc-100 text-zinc-600">
+                    {tab.count}
+                  </span>
                 )}
-              </tr>
-            </thead>
-            <tbody className="bg-white divide-y divide-zinc-200">
-              {screens.map((screen) => (
-                <tr key={screen.id} className="hover:bg-zinc-50">
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <button
-                      onClick={() => navigate(`/screens/${screen.id}`)}
-                      className="text-sm font-semibold text-cyan-600 hover:text-cyan-700"
-                    >
-                      {screen.code}
-                    </button>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-zinc-600">
-                    {screen.name || "—"}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-zinc-600">
-                    {screen.city}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-zinc-600">
-                    {screen.region}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <span
-                      className={`px-2 py-1 text-xs font-medium rounded ${
-                        screen.status === "active"
-                          ? "bg-green-100 text-green-800"
-                          : screen.status === "inactive"
-                          ? "bg-gray-100 text-gray-800"
-                          : "bg-yellow-100 text-yellow-800"
-                      }`}
-                    >
-                      {screen.status}
-                    </span>
-                  </td>
-                  {canEdit && (
-                    <td className="px-6 py-4 whitespace-nowrap text-right text-sm">
-                      <button
-                        onClick={() => handleRemoveScreen(screen.id)}
-                        className="text-red-600 hover:text-red-700 font-medium"
-                      >
-                        Remove
-                      </button>
-                    </td>
-                  )}
-                </tr>
-              ))}
-            </tbody>
-          </table>
+              </button>
+            ))}
+          </nav>
+        </div>
+
+        {activeTab === "overview" && (
+          <div>
+            <div className="px-6 py-4 grid grid-cols-2 gap-4">
+              <div>
+                <p className="text-xs font-medium text-zinc-500 uppercase tracking-wider">Type</p>
+                <p className="mt-1 text-sm text-zinc-900">
+                  {publisher.publisherType === "organisation" ? "Organisation" : "Individual"}
+                </p>
+              </div>
+              {publisher.organisationName && (
+                <div>
+                  <p className="text-xs font-medium text-zinc-500 uppercase tracking-wider">Organisation</p>
+                  <p className="mt-1 text-sm text-zinc-900">{publisher.organisationName}</p>
+                </div>
+              )}
+              {publisher.fullName && (
+                <div>
+                  <p className="text-xs font-medium text-zinc-500 uppercase tracking-wider">Full Name</p>
+                  <p className="mt-1 text-sm text-zinc-900">{publisher.fullName}</p>
+                </div>
+              )}
+              {publisher.phoneNumber && (
+                <div>
+                  <p className="text-xs font-medium text-zinc-500 uppercase tracking-wider">Phone</p>
+                  <p className="mt-1 text-sm text-zinc-900">{publisher.phoneNumber}</p>
+                </div>
+              )}
+              {publisher.email && (
+                <div>
+                  <p className="text-xs font-medium text-zinc-500 uppercase tracking-wider">Email</p>
+                  <p className="mt-1 text-sm text-zinc-900">{publisher.email}</p>
+                </div>
+              )}
+              {publisher.address && (
+                <div className="col-span-2">
+                  <p className="text-xs font-medium text-zinc-500 uppercase tracking-wider">Address</p>
+                  <p className="mt-1 text-sm text-zinc-900">{publisher.address}</p>
+                </div>
+              )}
+              <div>
+                <p className="text-xs font-medium text-zinc-500 uppercase tracking-wider">Screens</p>
+                <p className="mt-1 text-sm text-zinc-900">{publisher.screenCount}</p>
+              </div>
+              <div>
+                <p className="text-xs font-medium text-zinc-500 uppercase tracking-wider">Vehicles</p>
+                <p className="mt-1 text-sm text-zinc-900">{publisher.vehicleCount}</p>
+              </div>
+              <div>
+                <p className="text-xs font-medium text-zinc-500 uppercase tracking-wider">Created At</p>
+                <p className="mt-1 text-sm text-zinc-900">{formatDate(publisher.createdAt)}</p>
+              </div>
+              <div>
+                <p className="text-xs font-medium text-zinc-500 uppercase tracking-wider">Updated At</p>
+                <p className="mt-1 text-sm text-zinc-900">{formatDate(publisher.updatedAt)}</p>
+              </div>
+            </div>
+            
+            {publisher.notes && (
+              <div className="border-t border-zinc-200">
+                <div className="px-6 py-4">
+                  <p className="text-xs font-medium text-zinc-500 uppercase tracking-wider mb-2">Notes</p>
+                  <p className="text-sm text-zinc-700 whitespace-pre-wrap">{publisher.notes}</p>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {activeTab === "screens" && (
+          <div>
+            <div className="px-6 py-4 border-b border-zinc-200 bg-zinc-50 flex items-center justify-between">
+              <h2 className="text-lg font-semibold text-zinc-900">Screens ({screens.length})</h2>
+              {canEdit && availableScreens.length > screens.length && (
+                <button
+                  onClick={() => setIsAssignModalOpen(true)}
+                  className="px-3 py-1.5 bg-cyan-600 text-white rounded-md hover:bg-cyan-700 transition-colors text-sm font-medium"
+                >
+                  + Assign Screens
+                </button>
+              )}
+            </div>
+            {screens.length === 0 ? (
+              <div className="px-6 py-8 text-center text-sm text-zinc-500">
+                No screens assigned to this publisher.
+              </div>
+            ) : (
+              <table className="min-w-full divide-y divide-zinc-200">
+                <thead className="bg-zinc-50">
+                  <tr>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-zinc-500 uppercase tracking-wider">
+                      Code
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-zinc-500 uppercase tracking-wider">
+                      Name
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-zinc-500 uppercase tracking-wider">
+                      City
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-zinc-500 uppercase tracking-wider">
+                      Region
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-zinc-500 uppercase tracking-wider">
+                      Status
+                    </th>
+                    {canEdit && (
+                      <th className="px-6 py-3 text-right text-xs font-medium text-zinc-500 uppercase tracking-wider">
+                        Actions
+                      </th>
+                    )}
+                  </tr>
+                </thead>
+                <tbody className="bg-white divide-y divide-zinc-200">
+                  {screens.map((screen) => (
+                    <tr key={screen.id} className="hover:bg-zinc-50">
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <button
+                          onClick={() => navigate(`/screens/${screen.id}`)}
+                          className="text-sm font-semibold text-cyan-600 hover:text-cyan-700"
+                        >
+                          {screen.code}
+                        </button>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-zinc-600">
+                        {screen.name || "—"}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-zinc-600">
+                        {screen.city}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-zinc-600">
+                        {screen.region}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <span
+                          className={`px-2 py-1 text-xs font-medium rounded ${
+                            screen.status === "active"
+                              ? "bg-green-100 text-green-800"
+                              : screen.status === "inactive"
+                              ? "bg-gray-100 text-gray-800"
+                              : "bg-yellow-100 text-yellow-800"
+                          }`}
+                        >
+                          {screen.status}
+                        </span>
+                      </td>
+                      {canEdit && (
+                        <td className="px-6 py-4 whitespace-nowrap text-right text-sm">
+                          <button
+                            onClick={() => handleRemoveScreen(screen.id)}
+                            className="text-red-600 hover:text-red-700 font-medium"
+                          >
+                            Remove
+                          </button>
+                        </td>
+                      )}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </div>
+        )}
+
+        {activeTab === "vehicles" && (
+          <PublisherVehiclesTab publisherOrgId={publisher.organisationId} />
+        )}
+
+        {activeTab === "reports" && (
+          <div className="px-6 py-8">
+            <h2 className="text-lg font-semibold text-zinc-900 mb-4">Publisher Reports</h2>
+            <div className="grid gap-4 md:grid-cols-2">
+              <button
+                onClick={() => navigate(`/reporting?publisher=${publisher.organisationId || id}`)}
+                className="p-4 text-left border border-zinc-200 rounded-lg hover:bg-zinc-50 transition-colors"
+              >
+                <h3 className="font-medium text-zinc-900">Campaign Performance</h3>
+                <p className="text-sm text-zinc-600 mt-1">
+                  View impressions, plays, and campaign metrics for screens owned by this publisher.
+                </p>
+              </button>
+              {publisher.publisherType === "organisation" && (
+                <button
+                  onClick={() => navigate(`/reports/vehicles?publisher=${publisher.organisationId}`)}
+                  className="p-4 text-left border border-zinc-200 rounded-lg hover:bg-zinc-50 transition-colors"
+                >
+                  <h3 className="font-medium text-zinc-900">Vehicle Performance</h3>
+                  <p className="text-sm text-zinc-600 mt-1">
+                    View performance metrics for vehicles and their attached screens.
+                  </p>
+                </button>
+              )}
+            </div>
+          </div>
         )}
       </div>
 
@@ -379,7 +455,7 @@ export default function PublisherDetail() {
                       if (e.target.checked) {
                         setSelectedScreenIds([...selectedScreenIds, screen.id]);
                       } else {
-                        setSelectedScreenIds(selectedScreenIds.filter((id) => id !== screen.id));
+                        setSelectedScreenIds(selectedScreenIds.filter((sid) => sid !== screen.id));
                       }
                     }}
                     className="mr-3 h-4 w-4 text-cyan-600 focus:ring-cyan-500 border-zinc-300 rounded"
