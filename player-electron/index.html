@@ -34,9 +34,32 @@
     <script>
       const { initPlayer } = require("../player-core/dist/index.js");
 
+      function resolveSrc(creative) {
+        if (creative.local_file_path) {
+          return creative.local_file_path;
+        }
+
+        const url = creative.file_url || "";
+
+        if (url.startsWith("http://") || url.startsWith("https://") || url.startsWith("file://")) {
+          return url;
+        }
+
+        const base = process.env.BEAMER_CMS_BASE_URL || "http://localhost:3000";
+        return `${base}${url}`;
+      }
+
       function renderCreative(creative) {
         const root = document.getElementById("root");
-        const src = creative.local_file_path || creative.file_url;
+        const src = resolveSrc(creative);
+
+        console.log("PLAYER DEBUG creative", {
+          id: creative.creative_id,
+          type: creative.type,
+          fileUrl: creative.file_url,
+          localPath: creative.local_file_path,
+          resolvedSrc: src,
+        });
 
         if (creative.type === "video") {
           root.innerHTML = `
@@ -52,14 +75,16 @@
           `;
           const video = document.getElementById("creative-video");
           if (video) {
-            video.play().catch(() => {});
+            video.play().catch((err) => {
+              console.error("Video play error:", err);
+            });
           }
         } else {
           root.innerHTML = `
             <div>Now Playing (IMAGE):</div>
             <div><strong>${creative.creative_id}</strong></div>
             <div>${creative.duration_seconds}s</div>
-            <img src="${src}" alt="Creative" />
+            <img src="${src}" alt="Creative" onerror="console.error('Image load error:', this.src)" />
           `;
         }
       }

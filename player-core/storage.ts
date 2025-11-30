@@ -1,4 +1,4 @@
-// Simple storage wrapper that works in Node (Electron) and browser sim.
+import { getDataDir, resolveDataPath, getBeamerConfigFilePath } from "./paths";
 
 export interface RawBeamerConfig {
   api_base_url: string;
@@ -21,22 +21,25 @@ function canUseFileSystem(): boolean {
   }
 }
 
-export function saveJSON(path: string, data: any) {
+export function saveJSON(filename: string, data: any) {
   if (canUseFileSystem()) {
     const fs = require("fs");
-    fs.writeFileSync(path, JSON.stringify(data, null, 2));
+    const resolvedPath = resolveDataPath(filename);
+    fs.writeFileSync(resolvedPath, JSON.stringify(data, null, 2));
+    console.log(`Saved ${filename} to: ${resolvedPath}`);
   } else {
-    localStorage.setItem(path, JSON.stringify(data));
+    localStorage.setItem(filename, JSON.stringify(data));
   }
 }
 
-export function loadJSON(path: string): any | null {
+export function loadJSON(filename: string): any | null {
   if (canUseFileSystem()) {
     const fs = require("fs");
-    if (!fs.existsSync(path)) return null;
-    return JSON.parse(fs.readFileSync(path, "utf-8"));
+    const resolvedPath = resolveDataPath(filename);
+    if (!fs.existsSync(resolvedPath)) return null;
+    return JSON.parse(fs.readFileSync(resolvedPath, "utf-8"));
   } else {
-    const raw = localStorage.getItem(path);
+    const raw = localStorage.getItem(filename);
     return raw ? JSON.parse(raw) : null;
   }
 }
@@ -47,23 +50,14 @@ export function loadBeamerConfig(): RawBeamerConfig {
 
   if (canUseFileSystem()) {
     const fs = require("fs");
-    const path = require("path");
+    const configPath = getBeamerConfigFilePath();
 
-    const candidatePaths = [
-      path.join(process.cwd(), "beamer.config.json"),
-      path.join(__dirname, "beamer.config.json"),
-      path.join(__dirname, "..", "beamer.config.json"),
-    ];
-
-    for (const candidatePath of candidatePaths) {
-      if (fs.existsSync(candidatePath)) {
-        resolvedPath = candidatePath;
-        try {
-          config = JSON.parse(fs.readFileSync(candidatePath, "utf-8"));
-        } catch (err) {
-          throw new Error(`Failed to parse beamer.config.json at ${candidatePath}: ${err}`);
-        }
-        break;
+    if (fs.existsSync(configPath)) {
+      resolvedPath = configPath;
+      try {
+        config = JSON.parse(fs.readFileSync(configPath, "utf-8"));
+      } catch (err) {
+        throw new Error(`Failed to parse beamer.config.json at ${configPath}: ${err}`);
       }
     }
 

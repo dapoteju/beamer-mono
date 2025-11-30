@@ -1,4 +1,5 @@
 import { Creative, Playlist } from "./types";
+import { getCacheDir } from "./paths";
 
 function isNodeEnv() {
   return typeof window === "undefined";
@@ -8,15 +9,6 @@ function getFsAndPath() {
   const fs = require("fs") as typeof import("fs");
   const path = require("path") as typeof import("path");
   return { fs, path };
-}
-
-function getCacheDir() {
-  const { fs, path } = getFsAndPath();
-  const cacheDir = path.join(process.cwd(), "cache");
-  if (!fs.existsSync(cacheDir)) {
-    fs.mkdirSync(cacheDir, { recursive: true });
-  }
-  return cacheDir;
 }
 
 function getExtensionFromUrl(url: string): string {
@@ -59,6 +51,8 @@ async function downloadCreative(creative: Creative): Promise<Creative> {
   const cachePath = path.join(cacheDir, filename);
 
   try {
+    console.log(`Downloading creative ${creative.creative_id} from ${creative.file_url}...`);
+    
     const res = await fetch(creative.file_url);
     if (!res.ok) {
       console.error("Failed to download creative:", creative.file_url, res.status);
@@ -69,6 +63,7 @@ async function downloadCreative(creative: Creative): Promise<Creative> {
     const buffer = Buffer.from(arrayBuffer);
     fs.writeFileSync(cachePath, buffer);
 
+    console.log(`Cached creative ${creative.creative_id} to ${cachePath}`);
     return { ...creative, local_file_path: cachePath };
   } catch (err) {
     console.error("Error downloading creative:", creative.file_url, err);
@@ -89,6 +84,7 @@ async function cacheCreative(creative: Creative): Promise<Creative> {
   const cachePath = path.join(cacheDir, filename);
 
   if (fs.existsSync(cachePath) && isAssetValid(cachePath)) {
+    console.log(`Using cached asset for creative ${creative.creative_id}: ${cachePath}`);
     return { ...creative, local_file_path: cachePath };
   }
 

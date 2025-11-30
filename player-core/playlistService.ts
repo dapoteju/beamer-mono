@@ -2,10 +2,17 @@ import { loadJSON, saveJSON } from "./storage";
 import { Playlist, Creative } from "./types";
 import { fetchPlaylist } from "./apiClient";
 import { cachePlaylistAssets } from "./assetCache";
+import { getPlaylistFilePath } from "./paths";
 
-/**
- * Infer creative type from file URL extension as a fallback
- */
+const PLAYLIST_FILENAME = "playlist.json";
+
+const FALLBACK_CREATIVE: Creative = {
+  creative_id: "fallback_placeholder",
+  type: "image",
+  file_url: "https://via.placeholder.com/1920x1080.png?text=No+Active+Campaigns",
+  duration_seconds: 10,
+};
+
 function inferTypeFromUrl(url: string): "image" | "video" {
   const lower = (url || "").toLowerCase();
   if (lower.endsWith(".mp4") || lower.endsWith(".mov") || lower.endsWith(".webm")) {
@@ -14,10 +21,6 @@ function inferTypeFromUrl(url: string): "image" | "video" {
   return "image";
 }
 
-/**
- * Normalize playlist to ensure all items have a type field.
- * This is a safety net for backwards compatibility with older API responses.
- */
 function normalizePlaylistTypes(playlist: Playlist): Playlist {
   return {
     ...playlist,
@@ -34,47 +37,51 @@ function normalizePlaylistTypes(playlist: Playlist): Playlist {
 }
 
 export async function loadLocalPlaylist(): Promise<Playlist | null> {
-  return loadJSON("playlist.json");
+  return loadJSON(PLAYLIST_FILENAME);
 }
 
 export async function updatePlaylist(auth_token: string): Promise<Playlist> {
-  const local: Playlist | null = loadJSON("playlist.json");
+  const local: Playlist | null = loadJSON(PLAYLIST_FILENAME);
   const configHash = local?.config_hash;
 
-  const remote = await fetchPlaylist(auth_token, configHash);
+  let remote: Playlist | null = null;
 
-  // If no new playlist (304 or error), fall back to local
+  try {
+    remote = await fetchPlaylist(auth_token, configHash);
+  } catch (err) {
+    console.error("Failed to fetch remote playlist:", err);
+  }
+
   let playlist: Playlist | null = remote || local;
 
   if (!playlist) {
-    throw new Error("No playlist available (remote failed, no local cache)");
+    console.warn("No playlist available from backend or local cache. Using fallback placeholder.");
+    
+    playlist = {
+      screen_id: "unknown",
+      region: "unknown",
+      city: "unknown",
+      config_hash: "fallback",
+      playlist: [FALLBACK_CREATIVE],
+    };
   }
 
-  // DEV ONLY: if playlist is empty, inject a dummy creative for testing
   if (!Array.isArray(playlist.playlist) || playlist.playlist.length === 0) {
-    console.warn("Remote playlist is empty. Injecting a dummy test creative (DEV ONLY).");
-
-    const dummy: Creative = {
-      creative_id: "dummy_1",
-      type: "video",
-      file_url:
-        "https://firebasestorage.googleapis.com/v0/b/beamer-f945b.appspot.com/o/Creatives%2FAwari%20billboard%20(1).mp4?alt=media&token=8730f32a-1967-4584-823b-42dcc80b28cf",
-      duration_seconds: 7,
-    };
-
+    console.warn("Remote playlist is empty. Using fallback placeholder creative.");
     playlist = {
       ...playlist,
-      playlist: [dummy],
+      playlist: [FALLBACK_CREATIVE],
     };
   }
 
-  // Normalize playlist types (safety net for older API responses)
   const normalizedPlaylist = normalizePlaylistTypes(playlist);
 
-  // ⬇️ NEW: cache assets locally (Node/Electron only)
   const playlistWithCache = await cachePlaylistAssets(normalizedPlaylist);
 
-  // Save to disk (includes local_file_path)
-  saveJSON("playlist.json", playlistWithCache);
+  saveJSON(PLAYLIST_FILENAME, playlistWithCache);
+  
+  console.log("Playlist saved to:", getPlaylistFilePath());
+  console.log("Playlist creatives count:", playlistWithCache.playlist.length);
+  
   return playlistWithCache;
 }
