@@ -102,6 +102,53 @@ In the `player-electron` folder, create a file named `beamer.config.json`:
 3. Click on the screen you're setting up
 4. Copy the **Screen ID** from the details panel (format: `xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx`)
 
+## Enabling GPS Location (macOS)
+
+For the player to report accurate GPS coordinates, you must grant Location Services permission to the Electron app.
+
+### Step 1: Enable Location Services
+
+1. Open **System Preferences** (or **System Settings** on macOS Ventura+)
+2. Go to **Security & Privacy** > **Privacy** tab
+3. Select **Location Services** in the left sidebar
+4. Check the box to enable Location Services (if not already enabled)
+
+### Step 2: Grant Permission to Electron
+
+1. In the Location Services list, look for **Electron** (or the app name if packaged)
+2. Check the box next to it to allow location access
+3. If Electron isn't listed, run the player once - it should appear after requesting permission
+
+### Step 3: Verify Location Access
+
+When you start the player, you should see the actual device coordinates in the logs:
+
+```
+GPS location: { lat: 51.5074, lng: -0.1278, accuracy_m: 10 }
+```
+
+**Troubleshooting:**
+
+- If coordinates show as Nigeria (~6.44, ~3.48), the player is using fallback mock data because it can't access real GPS
+- On macOS, ensure the app has permission in System Preferences
+- In development, you may need to restart the Electron app after granting permissions
+- Some corporate networks/VPNs may block geolocation services
+
+### Windows Location Settings
+
+1. Go to **Settings** > **Privacy** > **Location**
+2. Enable **Allow apps to access your location**
+3. Scroll down and enable location for **Desktop apps**
+
+### Linux Location Settings
+
+On Linux, geolocation typically requires the GeoClue service:
+
+```bash
+# Ubuntu/Debian
+sudo apt install geoclue-2.0
+```
+
 ## Running the Player
 
 ### Start the Player

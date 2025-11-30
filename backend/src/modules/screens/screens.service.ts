@@ -830,7 +830,7 @@ export async function getPlaylistPreview(screenId: string): Promise<PlaylistPrev
         AND (
           (f.target_type = 'screen' AND f.target_id = $1)
           OR (f.target_type = 'screen_group' AND EXISTS (
-            SELECT 1 FROM public.screen_group_members sgm
+            SELECT 1 FROM public.screen_group_memberships sgm
             WHERE sgm.screen_id = $1 AND sgm.group_id = f.target_id
           ))
         )
