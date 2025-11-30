@@ -13,6 +13,7 @@ type PlaylistItem = {
   flight_id: string;
   file_url: string;
   duration_seconds: number;
+  type: "image" | "video";
 };
 
 type PlaylistResponse = {
@@ -83,6 +84,14 @@ type RegisterPlayerResult =
   | RegisterPlayerErrorResponse;
 
 export class PlayerService {
+  /**
+   * Helper to map MIME type to creative type ("image" or "video")
+   */
+  private mapMimeToType(mimeType: string | null): "image" | "video" {
+    if (!mimeType) return "image";
+    return mimeType.startsWith("video/") ? "video" : "image";
+  }
+
   /**
    * Register a new player for a screen.
    * - Validates screen exists
@@ -255,6 +264,7 @@ export class PlayerService {
             c.campaign_id,
             c.file_url,
             c.duration_seconds,
+            c.mime_type,
             fc.flight_id,
             fc.weight,
             ca.approval_code
@@ -272,7 +282,8 @@ export class PlayerService {
 
         // 5) Build weighted playlist
         for (const row of creativesResult.rows) {
-          const { creative_id, campaign_id, flight_id, file_url, duration_seconds, weight } = row;
+          const { creative_id, campaign_id, flight_id, file_url, duration_seconds, weight, mime_type } = row;
+          const type = this.mapMimeToType(mime_type);
 
           for (let i = 0; i < (weight ?? 1); i++) {
             weightedPlaylist.push({
@@ -281,6 +292,7 @@ export class PlayerService {
               flight_id,
               file_url,
               duration_seconds,
+              type,
             });
           }
         }
@@ -296,6 +308,7 @@ export class PlayerService {
             c.campaign_id,
             c.file_url,
             c.duration_seconds,
+            c.mime_type,
             ca.approval_code
           FROM public.creatives c
           JOIN public.creative_approvals ca ON ca.creative_id = c.id
@@ -323,6 +336,7 @@ export class PlayerService {
               flight_id: "00000000-0000-0000-0000-000000000000",
               file_url: fb.file_url,
               duration_seconds: fb.duration_seconds,
+              type: this.mapMimeToType(fb.mime_type),
             });
           }
         }

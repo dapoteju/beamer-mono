@@ -412,7 +412,8 @@ export function CreativeFormModal({
 
               <div>
                 <label className="block text-sm font-medium text-zinc-700 mb-1">
-                  Status
+                  Internal QA Status
+                  <span className="text-xs text-zinc-500 ml-1">(does not control playback)</span>
                 </label>
                 <select
                   value={formData.status}
@@ -424,15 +425,21 @@ export function CreativeFormModal({
                   <option value="approved">Approved</option>
                   <option value="rejected">Rejected</option>
                 </select>
+                <p className="mt-1 text-xs text-zinc-500">
+                  For internal tracking only. Playback is controlled by Region Approvals below.
+                </p>
               </div>
 
               {isInternalUser && approvals.length > 0 && (
                 <div id="region-approvals" className="border-t border-zinc-200 pt-4 mt-4">
-                  <h3 className="text-sm font-semibold text-zinc-900 mb-3">Region Approvals</h3>
+                  <h3 className="text-sm font-semibold text-zinc-900 mb-1">Playback Status per Region</h3>
+                  <p className="text-xs text-zinc-500 mb-3">
+                    Controls whether this creative can play in each region. Approved = live, Pending/Rejected = blocked.
+                  </p>
                   
                   {hasPendingApprovals && (
                     <div className="bg-yellow-50 border border-yellow-200 text-yellow-800 px-3 py-2 rounded text-xs mb-3">
-                      Some regions are still pending approval. These creatives will not play where pre-approval is required.
+                      Some regions are still pending approval. These creatives will not play in those regions.
                     </div>
                   )}
 
