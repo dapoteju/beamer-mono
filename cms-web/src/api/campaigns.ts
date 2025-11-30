@@ -143,7 +143,7 @@ export async function fetchCampaigns(filters?: CampaignFilters): Promise<Campaig
   if (filters?.org_id) params.append("org_id", filters.org_id);
 
   const response = await apiClient.get(`/campaigns?${params.toString()}`);
-  return response.data.data;
+  return response.data?.data || [];
 }
 
 export async function fetchCampaignDetail(id: string): Promise<CampaignWithStats> {

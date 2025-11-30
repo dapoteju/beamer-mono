@@ -22,7 +22,7 @@ export default function Campaigns() {
         status: statusFilter || undefined,
         search: searchQuery || undefined,
       });
-      setCampaigns(data);
+      setCampaigns(data || []);
     } catch (err: any) {
       console.error("Failed to fetch campaigns:", err);
       setError(

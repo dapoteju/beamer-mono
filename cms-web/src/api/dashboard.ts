@@ -50,14 +50,31 @@ export interface DashboardSummary {
   };
 }
 
+const defaultDashboardSummary: DashboardSummary = {
+  stats: {
+    activeCampaigns: 0,
+    activeScreens: 0,
+    onlineScreens: 0,
+    totalScreens: 0,
+    pendingApprovals: 0,
+  },
+  offlineScreens: { items: [], generatedAt: new Date().toISOString() },
+  mapScreens: { items: [] },
+  pendingApprovals: { items: [], totalPending: 0 },
+};
+
 export async function fetchDashboardSummary(
   offlineLimit = 10,
   approvalsLimit = 10
 ): Promise<DashboardSummary> {
-  const params = new URLSearchParams();
-  params.append("offlineLimit", offlineLimit.toString());
-  params.append("approvalsLimit", approvalsLimit.toString());
+  try {
+    const params = new URLSearchParams();
+    params.append("offlineLimit", offlineLimit.toString());
+    params.append("approvalsLimit", approvalsLimit.toString());
 
-  const response = await apiClient.get(`/dashboard/summary?${params.toString()}`);
-  return response.data.data;
+    const response = await apiClient.get(`/dashboard/summary?${params.toString()}`);
+    return response.data?.data || defaultDashboardSummary;
+  } catch (error) {
+    return defaultDashboardSummary;
+  }
 }
