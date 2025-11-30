@@ -1,0 +1,427 @@
+You’re working in a monorepo with:
+
+Backend: Node.js + Express + TypeScript, PostgreSQL via Drizzle ORM.
+
+Frontend: React (TypeScript), Tailwind CSS, shadcn/ui, Wouter routing, Vite, React Query, React Hook Form.
+
+The app already has:
+
+Campaigns, Flights, Creatives
+
+A “Screens & Players” / Inventory area
+
+Campaign Reporting (including Exposure tab)
+
+Screen Groups & Targeting Preview warnings
+
+Goal
+
+Refactor the Campaign / Flight / Creative UX so that:
+
+/campaigns/:id becomes a single “Campaign Workspace” page with tabs:
+
+Overview
+
+Flights
+
+Creatives
+
+Reporting
+
+Flights & creatives are managed inside this workspace, not via separate full pages.
+
+Flights open in a right-hand drawer; creatives open in a modal.
+
+Existing backend APIs remain unchanged; only the frontend routing/UX is reorganized.
+
+1️⃣ Routing & Navigation Refactor
+a) Campaign Workspace Route
+
+Create/modify:
+
+apps/cms-web/src/pages/campaigns/CampaignWorkspace.tsx
+
+This component will:
+
+Read campaignId from the URL.
+
+Fetch campaign details via existing API (e.g. useCampaign(campaignId)).
+
+Render a layout with:
+
+Header (campaign name, status, dates, actions)
+
+Tabs: Overview | Flights | Creatives | Reporting
+
+Tab content rendered within the same page.
+
+Use shadcn Tabs:
+
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+
+
+Tabs should be URL-aware:
+
+Use a tab query param or hash (e.g. ?tab=flights).
+
+Default tab: overview.
+
+b) Deprecate Standalone Flight & Creative Pages
+
+Currently you probably have routes like:
+
+/flights/:id
+
+/creatives/:id
+
+Update routing so that:
+
+Those routes either:
+
+(Preferred) Redirect to /campaigns/:campaignId?tab=flights or ?tab=creatives, OR
+
+(Interim) Render minimal “not for direct use” pages that just show a message and a link back to the campaign workspace.
+
+Update navigation:
+
+Remove Flights/Creatives as top-level nav items from the sidebar if they exist.
+
+Campaigns remain the primary entry point for this workflow.
+
+2️⃣ Campaign Workspace Layout
+File: apps/cms-web/src/pages/campaigns/CampaignWorkspace.tsx
+
+Structure:
+
+const CampaignWorkspace: React.FC = () => {
+  const { campaignId } = useParams();
+  const { data: campaign, isLoading } = useCampaign(campaignId);
+  const [activeTab, setActiveTab] = useUrlSyncedTab("overview"); // custom hook
+
+  if (isLoading) return <LoadingState />;
+  if (!campaign) return <NotFoundState />;
+
+  return (
+    <div className="flex flex-col gap-4 p-4">
+      <CampaignHeader campaign={campaign} />
+
+      <Tabs value={activeTab} onValueChange={setActiveTab}>
+        <TabsList>
+          <TabsTrigger value="overview">Overview</TabsTrigger>
+          <TabsTrigger value="flights">Flights</TabsTrigger>
+          <TabsTrigger value="creatives">Creatives</TabsTrigger>
+          <TabsTrigger value="reporting">Reporting</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="overview">
+          <CampaignOverviewTab campaign={campaign} />
+        </TabsContent>
+
+        <TabsContent value="flights">
+          <CampaignFlightsTab campaignId={campaignId} />
+        </TabsContent>
+
+        <TabsContent value="creatives">
+          <CampaignCreativesTab campaignId={campaignId} />
+        </TabsContent>
+
+        <TabsContent value="reporting">
+          <CampaignReportingTab campaignId={campaignId} />
+        </TabsContent>
+      </Tabs>
+    </div>
+  );
+};
+
+
+Create useUrlSyncedTab hook to sync tab with ?tab= in the URL.
+
+3️⃣ Flights Tab — Inline Management + Drawer
+File: apps/cms-web/src/pages/campaigns/CampaignFlightsTab.tsx
+
+This replaces any standalone Flights page for this workflow.
+
+Features:
+
+Show all flights for this campaign only.
+
+Provide:
+
+“Add Flight” button → opens FlightEditorDrawer in create mode.
+
+Flight list table with:
+
+Name
+
+Status
+
+Dates
+
+Targeting summary
+
+Spend / Impressions (if available)
+
+“Edit” / “View” action → opens drawer.
+
+Implementation:
+
+Use existing hook: useFlightsForCampaign(campaignId) (or create it around your existing API).
+
+Use shadcn Sheet or Dialog as a right-hand drawer:
+
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
+
+const CampaignFlightsTab: React.FC<{ campaignId: string }> = ({ campaignId }) => {
+  const [selectedFlightId, setSelectedFlightId] = useState<string | null>(null);
+  const [drawerOpen, setDrawerOpen] = useState(false);
+
+  const { data: flights } = useFlightsForCampaign(campaignId);
+
+  const openFlight = (flightId?: string) => {
+    setSelectedFlightId(flightId ?? null);
+    setDrawerOpen(true);
+  };
+
+  return (
+    <>
+      <div className="flex justify-between items-center mb-4">
+        <h2 className="text-lg font-semibold">Flights</h2>
+        <Button onClick={() => openFlight()}>Add Flight</Button>
+      </div>
+
+      <FlightsTable flights={flights} onRowClick={(f) => openFlight(f.id)} />
+
+      <Sheet open={drawerOpen} onOpenChange={setDrawerOpen}>
+        <SheetContent side="right" className="w-full sm:max-w-xl">
+          <FlightEditorDrawer
+            campaignId={campaignId}
+            flightId={selectedFlightId}
+            onClose={() => setDrawerOpen(false)}
+          />
+        </SheetContent>
+      </Sheet>
+    </>
+  );
+};
+
+File: apps/cms-web/src/components/flights/FlightEditorDrawer.tsx
+
+This component:
+
+In create mode (flightId undefined): show blank flight form.
+
+In edit mode: load flight via useFlight(flightId) and populate form.
+
+Contains sections for:
+
+Basic Details (name, dates, status, budget)
+
+Targeting (Regions, Screen Groups, etc.) — reuse existing TargetingPanel
+
+Creatives attached to this flight (see section 4 below)
+
+On save, calls existing createFlight / updateFlight APIs and then onClose.
+
+4️⃣ Creatives Inside Flight (Inline Attach / Detach)
+
+In the FlightEditorDrawer, include a “Creatives” section:
+
+Shows creatives currently attached to this flight.
+
+Allows:
+
+Attach existing creatives from the Campaign
+
+Create new creative and attach immediately.
+
+Implementation idea:
+
+const FlightCreativesSection: React.FC<{ campaignId: string; flightId?: string }> = ({
+  campaignId,
+  flightId,
+}) => {
+  const { data: campaignCreatives } = useCreativesForCampaign(campaignId);
+  const { data: flightCreatives } = useCreativesForFlight(flightId);
+  const attachCreative = useAttachCreativeToFlight();
+  const detachCreative = useDetachCreativeFromFlight();
+
+  // UI: list flightCreatives + “Attach creative” dropdown/modal
+};
+
+
+This ensures users can manage which creatives run on which flight without leaving the campaign workspace.
+
+5️⃣ Campaign Creatives Tab — Central Creative Library for the Campaign
+File: apps/cms-web/src/pages/campaigns/CampaignCreativesTab.tsx
+
+This replaces the standalone Creatives page for day-to-day use.
+
+Features:
+
+List all creatives under this campaign:
+
+Thumbnail / name
+
+Format / duration / resolution
+
+Approval status per region (if available)
+
+Which flights they’re attached to (summary)
+
+Actions:
+
+“Upload Creative” → opens CreativeEditorModal in create mode.
+
+Click row → open modal in edit mode.
+
+Implementation:
+
+const CampaignCreativesTab: React.FC<{ campaignId: string }> = ({ campaignId }) => {
+  const { data: creatives } = useCreativesForCampaign(campaignId);
+  const [selectedCreativeId, setSelectedCreativeId] = useState<string | null>(null);
+
+  return (
+    <>
+      <div className="flex justify-between items-center mb-4">
+        <h2 className="text-lg font-semibold">Creatives</h2>
+        <Button onClick={() => setSelectedCreativeId(null)}>Upload Creative</Button>
+      </div>
+
+      <CreativesTable creatives={creatives} onRowClick={(c) => setSelectedCreativeId(c.id)} />
+
+      <CreativeEditorModal
+        campaignId={campaignId}
+        creativeId={selectedCreativeId}
+        onClose={() => setSelectedCreativeId(null)}
+      />
+    </>
+  );
+};
+
+File: apps/cms-web/src/components/creatives/CreativeEditorModal.tsx
+
+Reuse your existing creative edit component, but wrap it in shadcn Dialog instead of a standalone page.
+
+Allow:
+
+Upload/change asset
+
+Set meta (name, duration, format)
+
+Set creative approvals (reuse existing component)
+
+After save, refetch creatives and close.
+
+6️⃣ Overview Tab — High-level Summary
+File: apps/cms-web/src/pages/campaigns/CampaignOverviewTab.tsx
+
+Content:
+
+Top cards:
+
+Total impressions
+
+Total spend
+
+Active vs scheduled flights
+
+Number of creatives
+
+Timeline / dates
+
+Quick links:
+
+“Add Flight”
+
+“Upload Creative”
+
+“View Report”
+
+Use existing reporting data endpoints to populate metrics.
+
+7️⃣ Reporting Tab — Integrate Existing Campaign Reporting
+File: apps/cms-web/src/pages/campaigns/CampaignReportingTab.tsx
+
+This should embed your existing campaign reporting view:
+
+Exposure / location map
+
+By Screen, By Screen Group, By Creative breakdown
+
+Timeline charts
+
+If you already have a separate page like /campaigns/:id/report, refactor that component into a reusable CampaignReportView and render it inside the Reporting tab instead of as a separate page.
+
+8️⃣ Targeting Panel + Warnings Integration
+
+In FlightEditorDrawer, for the Targeting section:
+
+Use your existing TargetingPanel component.
+
+Wire it to the enhanced Targeting Preview endpoint (/api/screen-groups/targeting-preview etc.).
+
+Display warnings through the TargetingPreviewWarnings component you recently added (offline, overlap, mixed resolution, low count).
+
+This keeps all targeting configuration within the flight drawer and aligned with your new Screen Groups system.
+
+9️⃣ Clean-up & Acceptance Criteria
+Remove/Deprecate:
+
+Any direct menu links to standalone Flights / Creatives pages in the sidebar.
+
+Direct “Edit Flight” / “Edit Creative” navigation patterns that leave the campaign context.
+
+New UX must satisfy:
+
+A user can:
+
+Open a campaign
+
+Add a flight
+
+Set targeting
+
+Upload creatives
+
+Attach creatives to flights
+Without ever leaving /campaigns/:id.
+
+Flight management:
+
+Creating/editing a flight happens in the drawer.
+
+Targeting + creatives for that flight are configured in that drawer.
+
+Creative management:
+
+Creating/editing a creative happens in a modal.
+
+Approvals are handled there.
+
+Flight attachments are visible & manageable from either:
+
+Flight drawer, or
+
+Creative modal (optional extra).
+
+Reporting:
+
+Campaign-level reporting is accessible as a tab in the campaign workspace.
+
+No separate report page is required for normal usage.
+
+TypeScript:
+
+All new components are typed.
+
+No any-leaks in new API hooks.
+
+🔚 Definition of Done
+
+/campaigns/:id is the central, primary workspace for campaign-related work.
+
+Flights & creatives are no longer “first-class pages” in the navigation; they are sub-resources inside the campaign workspace via tabs, drawers, and modals.
+
+All existing API calls keep working; only the frontend structure changed.
+
+The flow “Create Campaign → Create Flight → Add Creative → Attach to Flight → Launch” can be completed in one page with no full navigation away.
